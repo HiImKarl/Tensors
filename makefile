@@ -1,9 +1,8 @@
 SUBDIRS := $(wildcard */.)
 
-all: $(SUBDIRS)
-$(SUBDIRS):
+all:
+	cp lib/tensor.hh test/tensor.hh
 	$(MAKE) -C $@
-
 clean:
 	$(MAKE) -C $(SUBDIRS) clean
 
