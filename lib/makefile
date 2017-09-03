@@ -1,19 +1,19 @@
 CXX = g++
-CXXFLAGS = -O3 -c
+CXXFLAGS = -O3
 LINK = g++
 LINKFLAGS =
 
 .PHONY : all
 
-all : tensor.exe
+all : tensor
 
-tensor.exe : tensor.o
-	$(LINK) $(LINKFLAGS) $< -o $@
+tensor : tensor.o
+	$(LINK) $(LINKFLAGS) $^ -o $@
 
 tensor.o : tensor.cpp tensor.hh
-	$(CXX) $(CXXFLAGS) $< -o $@
+	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 .PHONY : clean
 
 clean : 
-	rm -f *.o tensor.exe
+	rm -f *.o tensor

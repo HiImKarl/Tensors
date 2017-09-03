@@ -7,5 +7,5 @@ $(SUBDIRS):
 clean:
 	$(MAKE) -C $(SUBDIRS) clean
 
-.PHONY: all $(SUBDIRS) clean
+.PHONY: all clean
 
