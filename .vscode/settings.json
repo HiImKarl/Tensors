@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "streambuf": "cpp",
+        "vector": "cpp",
+        "initializer_list": "cpp",
+        "type_traits": "cpp",
+        "xstring": "cpp",
+        "xutility": "cpp",
+        "iostream": "cpp"
+    }
+}

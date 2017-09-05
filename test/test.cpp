@@ -23,7 +23,7 @@ int main() {
     }
   }
   tensor(1, 2, 2) = tensor_2;
-  // cout << tensor_2;
+  cout << tensor_2 << '\n';
   Tensor<double> scalar{};
   scalar = 109000;
   tensor_2(1, 1, 1) = scalar;
