@@ -34,16 +34,7 @@ public:
       : dimensions_(tensor.dimensions_), is_owner_(true) {
     elements_ = pArrayCopy(tensor.elements_, pVectorProduct(dimensions_));
   }
-  Tensor(Tensor<T> &&tensor)
-      : dimensions_(tensor.dimensions_), is_owner_(true) {
-    // If tensor owns its memory, move; ow. copy
-    if (tensor.is_owner_) {
-      elements_ = tensor.elements_;
-      tensor.elements_ = nullptr;
-    } else {
-      elements_ = pArrayCopy(tensor.elements_, pVectorProduct(dimensions_));
-    }
-  }
+  Tensor(Tensor<T> &&tensor);
 
   // Assignment
   Tensor<T> &operator=(const Tensor<T> &tensor);
@@ -153,6 +144,17 @@ std::string Tensor<T>::pRepeatString(string to_repeat, uint32_t n) {
 }
 
 // Tensor Methods
+template <typename T>
+Tensor<T>::Tensor(Tensor<T> &&tensor)
+    : dimensions_(tensor.dimensions_), is_owner_(true) {
+  // If tensor owns its memory, move; ow. copy
+  if (tensor.is_owner_) {
+    elements_ = tensor.elements_;
+    tensor.elements_ = nullptr;
+  } else {
+    elements_ = pArrayCopy(tensor.elements_, pVectorProduct(dimensions_));
+  }
+}
 template <typename T> Tensor<T> &Tensor<T>::operator=(const Tensor<T> &tensor) {
   if (dimensions_ != tensor.dimensions_) {
     std::cout << "Tensor Assignment Failed :: tensors are not the same size\n";
