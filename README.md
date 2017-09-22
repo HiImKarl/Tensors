@@ -9,7 +9,7 @@ Tensors are multi-dimensional arrays. This library consists only of one headerfi
 Tensor<double> my_tensor {3, 4, 5};
 
 // The followinf instantiates a scalar
-Tensor<double my_scalar {};
+Tensor<double> my_scalar {};
 ```
 
 ## Assignment
