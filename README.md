@@ -8,7 +8,7 @@ Tensors are multi-dimensional arrays. This library consists only of one headerfi
 // The following instantiates a 3rd degree tensor with dimensions 3x4x5
 Tensor<double> my_tensor {3, 4, 5};
 
-// The followinf instantiates a scalar
+// The following instantiates a scalar
 Tensor<double> my_scalar {};
 ```
 
