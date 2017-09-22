@@ -20,7 +20,7 @@ Tensor<double> my_tensor {2, 4, 3};
 for (int i = 1; i <= my_tensor.dimension(1); ++i) {
   for (int j = 1; j <= my_tensor.dimension(2); ++j) {
     for (int k = 1; k <= my_tensor.dimension(3); ++k) {
-      my_tensor(i, j) = i + 0.1 * j + 0.01 * k;  
+      my_tensor(i, j, k) = i + 0.1 * j + 0.01 * k;  
     }
   } 
 }
@@ -34,7 +34,7 @@ Tensor<double> tensor_1 {3, 7, 14, 5};
 Tensor<double> tensor_2 {7, 14, 5};
 //... instantiate the values in tensor_2
 tensor_1(2) = tensor_2;
-tensor_2(1, 3) = tensor_2(5);
+tensor_2(1, 3) = tensor_2(7, 12);
 ```
 
 ## Addition and Subtraction
