@@ -7,6 +7,8 @@
 
 namespace tensor {
 
+// util namespace
+namespace util {
 // Utility Functions
 // Product of unsigned int array
 uint32_t ArrayProduct(const uint16_t *xs, uint16_t size)
@@ -38,6 +40,7 @@ std::string RepeatString(const std::string &to_repeat, uint32_t n)
     out += to_repeat;
   return out;
 }
+} // namespace util
 
 template <typename T> class Tensor {
   public:
@@ -113,8 +116,8 @@ Tensor<T>::Tensor() : dimensions_(nullptr), degree_(0), is_owner_(true)
 template <typename T> Tensor<T>::Tensor(std::initializer_list<uint16_t> indices)
 {
   degree_ = indices.size();
-  dimensions_ = ArrayCopy(indices.begin(), degree_);
-  uint32_t num_elements = ArrayProduct(dimensions_, degree_);
+  dimensions_ = util::ArrayCopy(indices.begin(), degree_);
+  uint32_t num_elements = util::ArrayProduct(dimensions_, degree_);
   elements_ = new T[num_elements];
 }
 
@@ -122,20 +125,22 @@ template <typename T>
 Tensor<T>::Tensor(const Tensor<T> &tensor)
     : degree_(tensor.degree_), is_owner_(true)
 {
-  dimensions_ = ArrayCopy(tensor.dimensions_, degree);
-  elements_ = ArrayCopy(tensor.elements_, pVectorProduct(dimensions_, degree));
+  dimensions_ = util::ArrayCopy(tensor.dimensions_, degree);
+  elements_ =
+      util::ArrayCopy(tensor.elements_, pVectorProduct(dimensions_, degree));
 }
 template <typename T>
 Tensor<T>::Tensor(Tensor<T> &&tensor) : degree_(tensor.degree_), is_owner_(true)
 {
   // If tensor owns its memory, move; ow. copy
-  dimensions_ = ArrayCopy(tensor.dimensions_, degree_);
+  dimensions_ = util::ArrayCopy(tensor.dimensions_, degree_);
   if (tensor.is_owner_) {
     elements_ = tensor.elements_;
     tensor.elements_ = nullptr;
     tensor.is_owner_ = false;
   } else {
-    elements_ = ArrayCopy(tensor.elements_, ArrayProduct(dimensions_, degree_));
+    elements_ = util::ArrayCopy(tensor.elements_,
+                                util::ArrayProduct(dimensions_, degree_));
   }
 }
 template <typename T> Tensor<T>::~Tensor()
@@ -158,7 +163,7 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(const Tensor<T> &tensor)
       return *this;
     }
   }
-  uint32_t total_elems = ArrayProduct(tensor.dimensions_, degree_);
+  uint32_t total_elems = util::ArrayProduct(tensor.dimensions_, degree_);
   for (uint32_t i = 0; i < total_elems; ++i) {
     elements_[i] = tensor.elements_[i];
   }
@@ -185,7 +190,7 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(Tensor<T> &&tensor)
     tensor.elements_ = nullptr;
     tensor.is_owner_ = false;
   } else {
-    uint32_t total_elems = ArrayProduct(dimensions_, degree_);
+    uint32_t total_elems = util::ArrayProduct(dimensions_, degree_);
     for (uint32_t i = 0; i < total_elems; ++i) {
       elements_[i] = tensor.elements_[i];
     }
@@ -219,7 +224,7 @@ template <typename T>
 Tensor<T>::Tensor(uint16_t *dimensions, unsigned degree)
     : dimensions_(dimensions), degree_(degree)
 {
-  uint32_t num_elements = ArrayProduct(dimensions_, degree_);
+  uint32_t num_elements = util::ArrayProduct(dimensions_, degree_);
   elements_ = new T[num_elements];
 }
 
@@ -269,7 +274,7 @@ Tensor<T> Tensor<T>::pAccessExpansion(uint16_t *indices, unsigned curr_index,
 template <typename T>
 uint32_t Tensor<T>::pCumulativeIndex(uint16_t *xs, unsigned size)
 {
-  uint32_t total_elems = ArrayProduct(dimensions_, degree_);
+  uint32_t total_elems = util::ArrayProduct(dimensions_, degree_);
   uint32_t cumul = 0;
   for (size_t i = 0; i < size; ++i) {
     total_elems /= dimensions_[i];
@@ -287,14 +292,15 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
     os << tensor.elements_[0];
     return os;
   }
-  uint32_t indices_product = ArrayProduct(tensor.dimensions(), tensor.degree());
+  uint32_t indices_product =
+      util::ArrayProduct(tensor.dimensions(), tensor.degree());
   uint32_t bracket_mod_arr[tensor.degree()];
   uint32_t prod = 1;
   for (size_t i = 0; i < tensor.degree(); ++i) {
     prod *= tensor.dimensions()[tensor.degree() - i - 1];
     bracket_mod_arr[i] = prod;
   }
-  os << RepeatString("[", tensor.degree());
+  os << util::RepeatString("[", tensor.degree());
   os << tensor.elements_[0] << ", ";
   for (uint32_t i = 1; i < indices_product - 1; ++i) {
     os << tensor.elements_[i];
@@ -302,12 +308,12 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
     for (; num_brackets < tensor.degree(); ++num_brackets) {
       if (!((i + 1) % bracket_mod_arr[num_brackets]) == 0) break;
     }
-    os << RepeatString("]", num_brackets);
+    os << util::RepeatString("]", num_brackets);
     os << ", ";
-    os << RepeatString("[", num_brackets);
+    os << util::RepeatString("[", num_brackets);
   }
   if (indices_product - 1) os << tensor.elements_[indices_product - 1];
-  os << RepeatString("]", tensor.degree());
+  os << util::RepeatString("]", tensor.degree());
   return os;
 }
 
@@ -317,7 +323,7 @@ template <typename T> void Tensor<T>::operator+=(const Tensor<T> &tensor)
     std::cout << "operator+=(Tensor) Failed :: Incompatible Dimensions\n";
     return Tensor<T>();
   }
-  uint32_t total_dims = ArrayProduct(dimensions_, degree_);
+  uint32_t total_dims = util::ArrayProduct(dimensions_, degree_);
   for (uint32_t i = 0; i < total_dims; ++i) {
     elements_[i] += tensor.elements_[i];
   }
@@ -329,7 +335,7 @@ template <typename T> void Tensor<T>::operator-=(const Tensor<T> &tensor)
     std::cout << "operator-=(Tensor) Failed :: Incompatible Dimensions\n";
     return Tensor<T>();
   }
-  uint32_t total_dims = ArrayProduct(dimensions_, degree_);
+  uint32_t total_dims = util::ArrayProduct(dimensions_, degree_);
   for (uint32_t i = 0; i < total_dims; ++i) {
     elements_[i] -= tensor.elements_[i];
   }
