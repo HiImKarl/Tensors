@@ -1,0 +1,8 @@
+Language: Cpp
+AccessModifierOffset: -4
+AllowShortIfStatementsOnASingleLine : true
+Standard : C++11
+BreakBeforeBraces : Custom
+BraceWrapping :  
+  AfterControlStatement : false
+  AfterFunction : true

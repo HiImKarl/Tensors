@@ -1,7 +1,8 @@
 #include "tensor.hh"
 using namespace tensor;
 using namespace std;
-int main() {
+int main()
+{
   Tensor<double> tensor{3, 3, 4, 7, 4, 3};
   for (int i = 1; i < 4; ++i) {
     for (int j = 1; j < 4; ++j) {

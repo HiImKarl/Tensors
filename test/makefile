@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3
+CXXFLAGS = -O3 -I../
 LINK = g++
 LINKFLAGS =
 
@@ -10,7 +10,7 @@ all : test
 test : test.o
 	$(LINK) $(LINKFLAGS) $^ -o $@
 
-test.o : test.cpp tensor.hh
+test.o : test.cpp ../tensor.hh
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 .PHONY : clean
