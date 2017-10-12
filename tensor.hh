@@ -7,9 +7,7 @@
 
 namespace tensor {
 
-// util namespace
 namespace util {
-// Utility Functions
 // Product of unsigned int array
 uint32_t ArrayProduct(const uint16_t *xs, uint16_t size)
 {
@@ -201,7 +199,7 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(Tensor<T> &&tensor)
 // Getters
 template <typename T> uint16_t Tensor<T>::dimension(uint16_t index) const
 {
-  if (dimensions.size() > index || index == 0) {
+  if (degree_ < index || index == 0) {
     std::cout << "Attempt to access invalid dimension\n";
     return 0;
   }
