@@ -1,3 +1,4 @@
+#pragma once
 #ifndef TENSOR_H_
 #define TENSOR_H_
 #include <initializer_list>
@@ -8,8 +9,9 @@
 namespace tensor {
 
 namespace util {
+
 // Product of unsigned int array
-uint32_t ArrayProduct(const uint16_t *xs, uint16_t size)
+inline uint32_t ArrayProduct(const uint16_t *xs, uint16_t size)
 {
   uint32_t product = 1;
   for (uint16_t i = 0; i < size; ++i) {
@@ -19,13 +21,21 @@ uint32_t ArrayProduct(const uint16_t *xs, uint16_t size)
 }
 
 // Copies an array with size specified by size and returns the ptr
-template <typename T> T *ArrayCopy(const T *xs, uint32_t size)
+template <typename T> inline T *ArrayCopy(const T *xs, uint32_t size)
 {
   T *copy = new T[size];
   for (uint32_t i = 0; i < size; ++i) {
     copy[i] = xs[i];
   }
   return copy;
+}
+
+// Compares Arrays of equivalent sizes
+inline bool ArrayCompare(uint16_t const *xs, uint16_t const *ys, uint16_t size)
+{
+	for (uint16_t i = 0; i < size; ++i)
+		if (xs[i] != ys[i]) return false;
+	return true;
 }
 
 // Repeats a string n time
@@ -37,6 +47,13 @@ std::string RepeatString(const std::string &to_repeat, uint32_t n)
   for (uint32_t i = 0; i < n; ++i)
     out += to_repeat;
   return out;
+}
+
+void DebugLog(const std::string &msg) 
+{
+#ifndef _NDEBUG
+	std::cout << "Debug :: " << msg << '\n';
+#endif
 }
 } // namespace util
 
@@ -100,6 +117,7 @@ template <typename T> class Tensor {
   template <typename... Args>
   Tensor<T> pAccessExpansion(uint16_t *, unsigned, uint16_t, Args...);
   uint32_t pCumulativeIndex(uint16_t *, unsigned);
+
 }; // Tensor
 
 // Tensor Methods
@@ -141,6 +159,7 @@ Tensor<T>::Tensor(Tensor<T> &&tensor) : degree_(tensor.degree_), is_owner_(true)
                                 util::ArrayProduct(dimensions_, degree_));
   }
 }
+
 template <typename T> Tensor<T>::~Tensor()
 {
   if (is_owner_) {
@@ -151,13 +170,12 @@ template <typename T> Tensor<T>::~Tensor()
 template <typename T> Tensor<T> &Tensor<T>::operator=(const Tensor<T> &tensor)
 {
   if (degree_ != tensor.degree_) {
-    std::cout
-        << "Tensor assignment failed, tensors do not have the same degree\n";
+    util::DebugLog("Tensor assignment failed, tensors do not have the same degree");
     return *this;
   }
   for (uint16_t i = 0; i < degree_; ++i) {
     if (dimensions_[i] != tensor.dimensions_[i]) {
-      std::cout << "Tensor assignment failed, tensor dimension mismatch\n";
+      util::DebugLog("Tensor assignment failed, tensor dimension mismatch");
       return *this;
     }
   }
@@ -172,13 +190,12 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(const Tensor<T> &tensor)
 template <typename T> Tensor<T> &Tensor<T>::operator=(Tensor<T> &&tensor)
 {
   if (degree_ != tensor.degree) {
-    std::cout
-        << "Tensor assignment failed, tensors do not have the same degree\n";
+			util::DebugLog("Tensor assignment failed, tensors do not have the same degree");
     return *this;
   }
   for (uint16_t i = 0; i < degree_; ++i) {
     if (dimensions_[i] != tensor.dimensions_[i]) {
-      std::cout << "Tensor assignment failed, tensor dimension mismatch\n";
+      util::DebugLog("Tensor assignment failed, tensor dimension mismatch");
       return *this;
     }
   }
@@ -200,7 +217,7 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(Tensor<T> &&tensor)
 template <typename T> uint16_t Tensor<T>::dimension(uint16_t index) const
 {
   if (degree_ < index || index == 0) {
-    std::cout << "Attempt to access invalid dimension\n";
+    util::DebugLog("Attempt to access invalid dimension");
     return 0;
   }
   return dimensions_[index - 1];
@@ -210,7 +227,7 @@ template <typename T> uint16_t Tensor<T>::dimension(uint16_t index) const
 template <typename T> Tensor<T> &Tensor<T>::operator=(T elem)
 {
   if (degree_ != 0) {
-    std::cout << "Cannot assign scalar to multi dimensional tensor\n";
+    util::DebugLog("Cannot assign scalar to multi dimensional tensor");
     return *this;
   }
   *elements_ = elem;
@@ -256,12 +273,11 @@ Tensor<T> Tensor<T>::pAccessExpansion(uint16_t *indices, unsigned curr_index,
                                       uint16_t next_index, Args... rest)
 {
   if (curr_index == degree_) {
-    std::cout << "Dimension " << curr_index << " out of bounds\n";
+    util::DebugLog("Dimension " + std::to_string(curr_index) + " out of bounds");
     return Tensor<T>();
   }
   if (next_index > dimensions_[curr_index] || next_index == 0) {
-    std::cout << "Index " << curr_index << " (" << next_index
-              << ") Out of Bounds\n";
+    util::DebugLog("Index " + std::to_string(curr_index) + " (" + std::to_string(next_index) + ") Out of Bounds");
     return Tensor<T>();
   }
   // adjust for 1 index array access
@@ -317,9 +333,9 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
 
 template <typename T> void Tensor<T>::operator+=(const Tensor<T> &tensor)
 {
-  if (dimensions_ != tensor.dimensions_) {
-    std::cout << "operator+=(Tensor) Failed :: Incompatible Dimensions\n";
-    return Tensor<T>();
+  if (degree_ != tensor.degree_ || !util::ArrayCompare(dimensions_, tensor.dimensions_, degree_)) {
+    util::DebugLog("operator+=(Tensor) Failed :: Incompatible Dimensions");
+		return;
   }
   uint32_t total_dims = util::ArrayProduct(dimensions_, degree_);
   for (uint32_t i = 0; i < total_dims; ++i) {
@@ -329,8 +345,8 @@ template <typename T> void Tensor<T>::operator+=(const Tensor<T> &tensor)
 
 template <typename T> void Tensor<T>::operator-=(const Tensor<T> &tensor)
 {
-  if (dimensions_ != tensor.dimensions_) {
-    std::cout << "operator-=(Tensor) Failed :: Incompatible Dimensions\n";
+  if (degree_ != tensor.degree_ || !util::ArrayCompare(dimensions_, tensor.dimensions_, degree_)) {
+    util::DebugLog("operator-=(Tensor) Failed :: Incompatible Dimensions");
     return Tensor<T>();
   }
   uint32_t total_dims = util::ArrayProduct(dimensions_, degree_);
@@ -342,9 +358,8 @@ template <typename T> void Tensor<T>::operator-=(const Tensor<T> &tensor)
 template <typename T>
 Tensor<T> operator+(const Tensor<T> &tensor_1, const Tensor<T> &tensor_2)
 {
-  if (tensor_1.dimensions_ != tensor_2.dimensions_) {
-    std::cout
-        << "operator+(Tensor, Tensor) Failed :: Incompatible Dimensions\n";
+  if (tensor_1.degree_ != tensor_2.degree_ || !util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, tensor_1.degree_)) {
+    util::DebugLog("operator+(Tensor, Tensor) Failed :: Incompatible Dimensions");
     return Tensor<T>();
   }
   Tensor<T> new_tensor{tensor_1.dimensions_};
@@ -358,9 +373,8 @@ Tensor<T> operator+(const Tensor<T> &tensor_1, const Tensor<T> &tensor_2)
 template <typename T>
 Tensor<T> operator-(const Tensor<T> &tensor_1, const Tensor<T> &tensor_2)
 {
-  if (tensor_1.dimensions_ != tensor_2.dimensions_) {
-    std::cout
-        << "operator+(Tensor, Tensor) Failed :: Incompatible Dimensions\n";
+  if (tensor_1.degree_ != tensor_2.degree_ || !util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, tensor_1.degree_)) {
+    util::DebugLog("operator+(Tensor, Tensor) Failed :: Incompatible Dimensions");
     return Tensor<T>();
   }
   Tensor<T> new_tensor{tensor_1.dimensions_};
@@ -370,5 +384,9 @@ Tensor<T> operator-(const Tensor<T> &tensor_1, const Tensor<T> &tensor_2)
   }
   return new_tensor;
 }
+
+
+
 } // tensor
+
 #endif // TENSORS_H_
