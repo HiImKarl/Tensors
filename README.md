@@ -1,7 +1,7 @@
 
-Tensor Template header-only library. Everything except tensor addition and subtraction has to be user implemenented.
+Tensor Template header-only library. Everything except tensor addition and subtraction has to be user implemenented. The library consists only of one headerfile, just include "tensors.hh" and everything is good to go. 
 
-Tensors are multi-dimensional arrays. This library consists only of one headerfile, just include "tensors.hh" and everything is good to go.
+More examples are located in test/test.cpp
 
 ## Decleration:
 ```c++
