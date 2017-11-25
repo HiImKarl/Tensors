@@ -47,3 +47,11 @@ Tensor<int> tensor_2 {3, 4};
 //... instantiate values
 tensor_1(1, 1) += tensor_2;
 ```
+
+## Running the sample
+
+Just cd into the /test folder and write
+```
+make
+./test
+```
