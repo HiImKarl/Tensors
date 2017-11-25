@@ -50,7 +50,7 @@ tensor_1(1, 1) += tensor_2;
 
 ## Running the sample
 
-Just cd into the /test folder and write
+Just cd into the /test folder and write (you will need a port of g++ in your path if your on Windows)
 ```
 make
 ./test
