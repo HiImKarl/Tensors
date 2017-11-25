@@ -32,7 +32,7 @@ my_scalar = 3.1415;
 // multi-dimensional tensors can also be assigned to each other as long as the indices match
 Tensor<double> tensor_1 {3, 7, 14, 5};
 Tensor<double> tensor_2 {7, 14, 5};
-//... instantiate the values in tensor_2
+//... instantiate the values in tensor_1 and tensor_2
 tensor_1(2) = tensor_2;
 tensor_2(1, 3) = tensor_2(7, 12);
 ```
