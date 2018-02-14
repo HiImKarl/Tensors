@@ -10,7 +10,7 @@ all : test
 test : test.o
 	$(LINK) $(LINKFLAGS) $^ -o $@
 
-test.o : test.cpp ../tensor.hh
+test.o : test.cc ../tensor.hh
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 .PHONY : clean
