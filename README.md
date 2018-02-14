@@ -1,7 +1,7 @@
 
-Tensor Template header-only library. Everything except tensor addition and subtraction has to be user implemenented.
+Tensor Template header-only library. Everything except tensor addition and subtraction has to be user implemented. The library consists only of one headerfile, just include "tensors.hh" and everything is good to go. 
 
-Tensors are multi-dimensional arrays. This library consists only of one headerfile, just include "tensors.hh" and everything is good to go.
+More examples are located in test/test.cpp
 
 ## Decleration:
 ```c++
@@ -32,7 +32,7 @@ my_scalar = 3.1415;
 // multi-dimensional tensors can also be assigned to each other as long as the indices match
 Tensor<double> tensor_1 {3, 7, 14, 5};
 Tensor<double> tensor_2 {7, 14, 5};
-//... instantiate the values in tensor_2
+//... instantiate the values in tensor_1 and tensor_2
 tensor_1(2) = tensor_2;
 tensor_2(1, 3) = tensor_2(7, 12);
 ```
@@ -46,4 +46,12 @@ Tensor<int> tensor_1 {1, 2, 3, 4};
 Tensor<int> tensor_2 {3, 4};
 //... instantiate values
 tensor_1(1, 1) += tensor_2;
+```
+
+## Running the sample
+
+Just cd into the /test folder and write (you will need a port of g++ in your path if your on Windows)
+```
+make
+./test
 ```
