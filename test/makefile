@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3 -I../
+CXXFLAGS = -O3 -I../ -Wall -Wextra
 LINK = g++
 LINKFLAGS =
 
