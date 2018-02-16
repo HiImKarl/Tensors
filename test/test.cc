@@ -16,18 +16,38 @@ TEST_CASE("Intializing Tensors ") {
       REQUIRE(t1.dimension(i) == i);
   }
 
+  // Initialize
+  for (uint32_t i = 1; i <= t1.dimension(1); ++i)
+    for (uint32_t j = 1; j <= t1.dimension(2); ++j)
+      for (uint32_t k = 1; k <= t1.dimension(3); ++k)
+        for (uint32_t l = 1; l <= t1.dimension(4); ++l)
+          t1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
+
   SECTION("Initializing Values") {
+    // Compare
     for (uint32_t i = 1; i <= t1.dimension(1); ++i)
       for (uint32_t j = 1; j <= t1.dimension(2); ++j)
         for (uint32_t k = 1; k <= t1.dimension(3); ++k)
           for (uint32_t l = 1; l <= t1.dimension(4); ++l)
-            t1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
+            REQUIRE(t1(i, j, k, l) == 1000 * i + 100 * j + 10 * k + l);
   }
 
   SECTION("Tensor Assignment") {
-    Tensor<uint32_t> t2{ 3, 4};
+    Tensor<uint32_t> t2{3, 4};
+    for (uint32_t i = 1; i <= t2.dimension(1); ++i)
+      for (uint32_t j = 1; j <= t2.dimension(2); ++j)
+        t2(i, j) = t1(1, 1, i, j) - 1000;
+
     t1(1, 1) = t2;
-    cout << t1 << '\n';
+
+    for (uint32_t i = 1; i <= t1.dimension(3); ++i)
+      for (uint32_t j = 1; j <= t1.dimension(4); ++j)
+        REQUIRE(t1(1, 1, i, j) == 100 + 10 * i + j);
+
+
+    for (uint32_t i = 1; i <= t1.dimension(3); ++i)
+      for (uint32_t j = 1; j <= t1.dimension(4); ++j)
+        REQUIRE(t1(1, 2, i, j) == 1000 + 200 + 10 * i + j);
   }
 }
 

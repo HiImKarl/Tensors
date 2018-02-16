@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <exception>
+#include <utility>
 
 namespace tensor {
 namespace util {
@@ -51,10 +52,11 @@ std::string RepeatString(const std::string &to_repeat, uint32_t n)
 template <typename T> class Tensor {
 public:
   // typedefs
-  typedef T   value_type;
+  typedef T value_type;
 
   // Constructors
   Tensor();
+  explicit Tensor(value_type &&val);
   explicit Tensor(std::initializer_list<uint32_t> indices);
   Tensor(const Tensor<T> &tensor);
   Tensor(Tensor<T> &&tensor);
@@ -81,16 +83,26 @@ public:
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X> &tensor);
 
   // equivalence
-  bool operator==(Tensor const& tensor);
-  bool operator!=(Tensor const& tensor) { return !(*this == tensor); }
-  bool operator==(value_type val);
-  bool operator!=(value_type val) { return !(*this == val); }
+  bool operator==(Tensor const& tensor) const;
+  bool operator!=(Tensor const& tensor) const { return !(*this == tensor); }
+
+  // single val equivalence
+  template <typename X>
+  bool operator==(X val) const;
+  template <typename X>
+  bool operator!=(X val) const { return !(*this == val); }
+
 
   // Example operations that can be implemented
+  Tensor<T> operator-() const;
   template <typename X>
   friend Tensor<X> operator+(const Tensor<X> &tensor_1, const Tensor<X> &tensor_2);
   template <typename X>
   friend Tensor<X> operator-(const Tensor<X> &tensor_1, const Tensor<X> &tensor_2);
+  template <typename X>
+  Tensor<T> operator+(X &&val) const;
+  template <typename X>
+  Tensor<T> operator-(X &&val) const;
   void operator-=(const Tensor<T> &tensor);
   void operator+=(const Tensor<T> &tensor);
   template <typename X>
@@ -130,6 +142,12 @@ template <typename T>
 Tensor<T>::Tensor() : degree_(0), dimensions_(nullptr), is_owner_(true)
 {
   elements_ = new T;
+}
+
+template <typename T>
+Tensor<T>::Tensor(T &&val) : degree_(0), dimensions_(nullptr), is_owner_(true)
+{
+  elements_ = new T(std::forward<T>(val));
 }
 
 template <typename T> Tensor<T>::Tensor(std::initializer_list<uint32_t> indices): is_owner_(true)
@@ -184,7 +202,7 @@ template <typename T> Tensor<T> &Tensor<T>::operator=(const Tensor<T> &tensor)
 
 template <typename T> Tensor<T> &Tensor<T>::operator=(Tensor<T> &&tensor)
 {
-  if (degree_ != tensor.degree) 
+  if (degree_ != tensor.degree_) 
       throw std::logic_error("Tensor assignment failed, tensors do not have the same degree");
 
   for (uint32_t i = 0; i < degree_; ++i) 
@@ -279,7 +297,7 @@ uint32_t Tensor<T>::pCumulativeIndex(uint32_t *xs, uint32_t size)
 }
 
 template <typename T>
-bool Tensor<T>::operator==(Tensor<T> const& tensor)
+bool Tensor<T>::operator==(Tensor<T> const& tensor) const
 {
   if (!DimensionsMatch(*this, tensor)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
   uint32_t indices_product = util::ArrayProduct(tensor.dimensions_, tensor.degree_);
@@ -289,16 +307,32 @@ bool Tensor<T>::operator==(Tensor<T> const& tensor)
 }
 
 template <typename T>
-bool Tensor<T>::operator==(T val)
+template <typename X>
+bool Tensor<T>::operator==(X val) const
 {
   if (degree_) throw std::logic_error("Tensor::operator==(value_type) Failure -- Non-zero rank");
-
   return *elements_ == val;
+}
+
+template <typename T>
+template <typename X>
+Tensor<T> Tensor<T>::operator+(X &&val) const
+{
+  if (degree_) throw std::logic_error("Tensor::operator+(X) Failure -- Non-zero rank");
+  return new Tensor(val + *elements_);
+}
+
+template <typename T>
+template <typename X>
+Tensor<T> Tensor<T>::operator-(X &&val) const
+{
+  if (degree_) throw std::logic_error("Tensor::operator+(X) Failure -- Non-zero rank");
+  return Tensor(*elements_ - val);
 }
 
 // iostream overload implemented for debugging
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
+std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor) 
 {
   // if its a scalar just return;
   if (!tensor.degree_) {
@@ -329,7 +363,17 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
   return os;
 }
 
-// Arithmatic operators implemented for testing
+/*  EXAMPLE OPERATORS THAT CAN BE IMPLEMENTED   */
+
+template <typename T> Tensor<T> Tensor<T>::operator-() const
+{
+  Tensor<T> neg_tensor = *this;
+  uint32_t total_dims = util::ArrayProduct(dimensions_, degree_);
+  for (uint32_t i = 0; i < total_dims; ++i) 
+    neg_tensor.elements_[i] *= -1;
+  return neg_tensor;
+}
+
 template <typename T> void Tensor<T>::operator+=(const Tensor<T> &tensor)
 {
   if (degree_ != tensor.degree_ || !util::ArrayCompare(dimensions_, tensor.dimensions_, degree_)) 
