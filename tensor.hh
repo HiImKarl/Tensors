@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <initializer_list>
 #include <iostream>
-#include <string>
 #include <exception>
 #include <utility>
+#include <type_traits>
 
 namespace tensor {
 namespace util {
@@ -38,18 +38,11 @@ inline bool ArrayCompare(uint32_t const *xs, uint32_t const *ys, uint32_t size)
   return true;
 }
 
-// Repeats a string n time
-std::string RepeatString(const std::string &to_repeat, uint32_t n)
-{
-  std::string out{};
-  out.reserve(n * to_repeat.size());
-  for (uint32_t i = 0; i < n; ++i)
-    out += to_repeat;
-  return out;
-}
 } // namespace util
 
-template <typename T> class Tensor {
+// TENSORS TYPE CANNOT BE A REFERENCE
+template <typename T>
+class Tensor {
 public:
   // typedefs
   typedef T value_type;
@@ -76,7 +69,11 @@ public:
   template <typename... Args> Tensor<T> operator()(Args... args);
 
   // Setters
-  Tensor<T> &operator=(T&& elem);
+  template <typename X, 
+            typename = typename std::enable_if<std::is_convertible<
+            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<X>::type>::value>::type>
+  Tensor<T> &operator=(X&& elem);
 
   // print
   template <typename X>
@@ -131,8 +128,6 @@ public:
   Tensor<T> pAccessExpansion(uint32_t *dimensions, uint32_t degree, uint32_t, 
       Args...);
   uint32_t pCumulativeIndex(uint32_t *xs, uint32_t size);
-
-
 }; // Tensor
 
 // Tensor Methods
@@ -234,11 +229,12 @@ template <typename T> uint32_t Tensor<T>::dimension(uint32_t index) const
 }
 
 // Setters
-template <typename T> Tensor<T> &Tensor<T>::operator=(T&& elem)
+template <typename T> 
+template <typename X, typename>
+Tensor<T> &Tensor<T>::operator=(X&& elem)
 {
   if (degree_ != 0) throw std::logic_error("Tensor::operator=(T&&) Failure -- Non-zero rank");
-
-  *elements_ = std::forward<T>(elem);
+  *elements_ = std::forward<X>(elem);
   return *this;
 }
 
@@ -346,7 +342,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
     prod *= tensor.dimensions_[tensor.degree_ - i - 1];
     bracket_mod_arr[i] = prod;
   }
-  os << util::RepeatString("[", tensor.degree_);
+  for (size_t i = 0; i < tensor.degree_; ++i) os << '[';
   os << tensor.elements_[0] << ", ";
   for (uint32_t i = 1; i < indices_product - 1; ++i) {
     os << tensor.elements_[i];
@@ -354,12 +350,12 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T> &tensor)
     for (; num_brackets < tensor.degree_; ++num_brackets) {
       if (!((i + 1) % bracket_mod_arr[num_brackets]) == 0) break;
     }
-    os << util::RepeatString("]", num_brackets);
+    for (size_t i = 0; i < num_brackets; ++i) os << ']';
     os << ", ";
-    os << util::RepeatString("[", num_brackets);
+    for (size_t i = 0; i < num_brackets; ++i) os << '[';
   }
   if (indices_product - 1) os << tensor.elements_[indices_product - 1];
-  os << util::RepeatString("]", tensor.degree_);
+  for (size_t i = 0; i < tensor.degree_; ++i) os << ']';
   return os;
 }
 
