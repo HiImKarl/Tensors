@@ -22,13 +22,18 @@ inline uint32_t ArrayProduct(const uint32_t *xs, uint32_t size)
 }
 
 // Copies an array with size specified by size and returns the ptr
-template <typename T> inline T *ArrayCopy(const T *xs, uint32_t size)
+template <typename T> inline T *ArrayCopy(T const *xs, uint32_t size)
 {
   T *copy = new T[size];
-  for (uint32_t i = 0; i < size; ++i) {
+  for (uint32_t i = 0; i < size; ++i) 
     copy[i] = xs[i];
-  }
   return copy;
+}
+
+template <typename T> inline void ArrayCopy(T *dest, T const *src, uint32_t size)
+{
+  for (uint32_t i = 0; i < size; ++i) 
+    dest[i] = src[i];
 }
 
 // Compares uint32_t arrays of equivalent sizes
@@ -56,6 +61,7 @@ public:
 
   // Assignment
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
+  template <typename X> Tensor<T, N> &operator=(Tensor<X, N> const &tensor);
   Tensor<T, N> &operator=(Tensor<T, N> &&tensor);
 
   // Destructor
@@ -66,7 +72,7 @@ public:
   uint32_t dimension(uint32_t index) const;
 
   // Access to elements_
-  template <typename... Args> auto operator()(Args... args);
+  template <typename... Args> decltype(auto) operator()(Args... args);
 
   // Setters
   template <typename X, 
@@ -80,13 +86,22 @@ public:
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
   // equivalence
-  bool operator==(Tensor const& tensor) const;
-  bool operator!=(Tensor const& tensor) const { return !(*this == tensor); }
+  bool operator==(Tensor<T, N> const& tensor) const;
+  bool operator!=(Tensor<T, N> const& tensor) const { return !(*this == tensor); }
+
+  template <typename X>
+  bool operator==(Tensor<X, N> const& tensor) const;
 
   // single val equivalence
-  template <typename X>
+  template <typename X,
+            typename = typename std::enable_if<std::is_convertible<
+            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<X>::type>::value>::type>
   bool operator==(X val) const;
-  template <typename X>
+  template <typename X,
+            typename = typename std::enable_if<std::is_convertible<
+            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<X>::type>::value>::type>
   bool operator!=(X val) const { return !(*this == val); }
 
   // Example operations that can be implemented
@@ -104,13 +119,6 @@ public:
   template <typename X, uint32_t M>
   friend Tensor<X, M> operator*(const Tensor<X, M> &tensor_1, const Tensor<X, M> &tensor_2);
 
-  // Do the tensors have the same dimensions?
-  template <typename X, typename Y>
-  friend bool DimensionsMatch(Tensor<X, N> const &tensor_1, const Tensor<Y, N> &tensor_2)
-  {
-    return util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, N);
-  }
-
   private:
   uint32_t dimensions_[N];
   T *elements_;
@@ -120,7 +128,7 @@ public:
   bool is_owner_;
 
   // declare all fields of the constructor at once
-  Tensor(uint32_t const (&dimensions)[N], T *elements, bool is_owner_);
+  Tensor(uint32_t const *dimensions, T *elements);
 
   // Access Expansion for operator()
   template <uint32_t M>
@@ -128,6 +136,7 @@ public:
   template <uint32_t M, typename... Args>
   Tensor<T, N - M> pAccessExpansion(uint32_t *indices, uint32_t next_index, Args...);
   uint32_t pCumulativeIndex(uint32_t *xs, uint32_t size);
+
 }; // Tensor
 
 // Tensor Methods
@@ -178,10 +187,10 @@ Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): is_owner_(tensor.is_owner_)
 
 // private constructor
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T *elements, bool is_owner)
-  : elements_(elements), is_owner_(is_owner)
+Tensor<T, N>::Tensor(uint32_t const *dimensions, T *elements)
+  : elements_(elements), is_owner_(false)
 {
-  memcpy(dimensions_, dimensions, sizeof(dimensions));
+  memcpy(dimensions_, dimensions, sizeof(dimensions_));
 }
 
 template <typename T, uint32_t N> Tensor<T, N>::~Tensor()
@@ -203,7 +212,8 @@ Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
   return *this;
 }
 
-template <typename T, uint32_t N> Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T, N> &&tensor)
+template <typename T, uint32_t N> 
+Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T, N> &&tensor)
 {
   for (uint32_t i = 0; i < N; ++i) 
     if (dimensions_[i] != tensor.dimensions_[i]) 
@@ -212,13 +222,36 @@ template <typename T, uint32_t N> Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T
   // DO NOT MOVE DATA unless boths tensors are principle owners
   if (tensor.is_owner_ && is_owner_) {
     elements_ = tensor.elements_;
-    tensor.elements_ = nullptr;
     tensor.is_owner_ = false;
   } else {
     uint32_t total_elems = util::ArrayProduct(dimensions_, N);
     for (uint32_t i = 0; i < total_elems; ++i)
       elements_[i] = tensor.elements_[i];
   }
+  return *this;
+}
+
+template <typename T, uint32_t N> 
+template <typename X> 
+Tensor<T, N> &Tensor<T, N>::operator=(Tensor<X, N> const &tensor)
+{
+  for (uint32_t i = 0; i < N; ++i) {
+    if (dimensions_[i] != tensor.dimensions_[i]) 
+      throw std::logic_error("Tensor::operator=(Tensor const&) Failed -- Tensor dimension mismatch");
+  } 
+  uint32_t total_elems = util::ArrayProduct(tensor.dimensions_, N);
+  for (uint32_t i = 0; i < total_elems; ++i)
+    elements_[i] = tensor.elements_[i];
+
+  return *this;
+}
+
+template <typename T, uint32_t N> 
+template <typename X, typename>
+Tensor<T, N> &Tensor<T, N>::operator=(X&& elem)
+{
+  static_assert(N == 0);
+  *elements_ = std::forward<X>(elem);
   return *this;
 }
 
@@ -233,19 +266,9 @@ uint32_t Tensor<T, N>::dimension(uint32_t index) const
   return dimensions_[index - 1];
 }
 
-// Scalar setter
-template <typename T, uint32_t N> 
-template <typename X, typename>
-Tensor<T, N> &Tensor<T, N>::operator=(X&& elem)
-{
-  static_assert(N == 0);
-  *elements_ = std::forward<X>(elem);
-  return *this;
-}
-
 template <typename T, uint32_t N>
 template <typename... Args>
-auto Tensor<T, N>::operator()(Args... args) 
+decltype(auto) Tensor<T, N>::operator()(Args... args) 
 {
   static_assert(N >= sizeof...(args), "Tensor::operator(Args...) -- Rank Requested Out of Bounds");
   uint32_t *indices = new uint32_t[sizeof...(args)];
@@ -256,21 +279,15 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices)
 {
-  uint32_t indices_product = pCumulativeIndex(indices, N);
-  uint32_t new_indices[N -M];
-  for (uint32_t i = M; i < N; ++i) new_indices[i - M] = dimensions_[i];
-  // ptr for new_indices is moved so delete[] is unecessary
-  Tensor<T, N - M> new_tensor(new_indices, elements_ + indices_product, false);
-  return new_tensor;
+  uint32_t indices_product = pCumulativeIndex(indices, M);
+  return Tensor<T, N - M>(dimensions_ + M, elements_ + indices_product);
 }
 
 template <typename T, uint32_t N>
 template <uint32_t M, typename... Args>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices, uint32_t next_index, Args... rest)
 {
-  static_assert(N > sizeof...(rest));
   if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0) throw std::logic_error("Tensor::operator(Args...) failed -- Index Out of Bounds");
-
   // adjust for 1 index array access
   indices[N - sizeof...(rest) - 1] = --next_index;
   return pAccessExpansion<M>(indices, rest...);
@@ -279,7 +296,7 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices, uint32_t next
 template <typename T, uint32_t N>
 uint32_t Tensor<T, N>::pCumulativeIndex(uint32_t *xs, uint32_t size)
 {
-  uint32_t total_elems = util::ArrayProduct(dimensions_, N);
+  uint32_t total_elems = util::ArrayProduct(dimensions_, size);
   uint32_t cumul = 0;
   for (uint32_t i = 0; i < size; ++i) {
     total_elems /= dimensions_[i];
@@ -291,7 +308,8 @@ uint32_t Tensor<T, N>::pCumulativeIndex(uint32_t *xs, uint32_t size)
 template <typename T, uint32_t N>
 bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
 {
-  if (!DimensionsMatch(*this, tensor)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
+  if (!util::ArrayCompare(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
+
   uint32_t indices_product = util::ArrayProduct(dimensions_, N);
   for (uint32_t i = 0; i < indices_product; ++i)
     if (elements_[i] != tensor.elements_[i]) return false;
@@ -300,6 +318,18 @@ bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
 
 template <typename T, uint32_t N>
 template <typename X>
+bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
+{
+  if (!util::ArrayCompare(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
+
+  uint32_t indices_product = util::ArrayProduct(dimensions_, N);
+  for (uint32_t i = 0; i < indices_product; ++i)
+    if (elements_[i] != tensor.elements_[i]) return false;
+  return true;
+}
+
+template <typename T, uint32_t N>
+template <typename X, typename>
 bool Tensor<T, N>::operator==(X val) const
 {
   static_assert(N == 0, "Tensor::operator==(value_type) -- Non-Zero Rank");
@@ -386,7 +416,7 @@ template <typename T, uint32_t N> void Tensor<T, N>::operator-=(const Tensor<T, 
 template <typename T, uint32_t N>
 Tensor<T, N> operator+(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_2)
 {
-  if (!DimensionsMatch(tensor_1, tensor_2))
+  if (!util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, N))
     throw std::logic_error("operator+(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
@@ -398,7 +428,7 @@ Tensor<T, N> operator+(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
 template <typename T, uint32_t N>
 Tensor<T, N> operator-(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_2)
 {
-  if (!DimensionsMatch(tensor_1, tensor_2))
+  if (!util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, N))
     throw std::logic_error("operator-(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
