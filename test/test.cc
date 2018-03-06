@@ -7,7 +7,7 @@ using namespace tensor;
 using namespace std;
 
 // Initialize a tensor 
-Tensor<int32_t> t1{1, 2, 3, 4};
+auto t1 = Tensor<int32_t, 4>({1, 2, 3, 4});
 
 // Initialize a scalar tensor;
 Tensor<int32_t> st1{};
@@ -48,7 +48,7 @@ TEST_CASE("Intializing Tensors ") {
 
 TEST_CASE("Tensor Assignment") {
   SECTION("Assigning Tensors to Tensors") {
-    Tensor<int32_t> t2{3, 4};
+    Tensor<int32_t, 2> t2({3, 4});
     for (uint32_t i = 1; i <= t2.dimension(1); ++i)
       for (uint32_t j = 1; j <= t2.dimension(2); ++j)
         t2(i, j) = t1(1, 1, i, j) - 1000;
@@ -64,7 +64,7 @@ TEST_CASE("Tensor Assignment") {
       for (uint32_t j = 1; j <= t1.dimension(4); ++j)
         REQUIRE(t1(1, 2, i, j) == (int)(1000 + 200 + 10 * i + j));
 
-    Tensor<int32_t> t3{1, 2, 3, 4};
+    Tensor<int32_t, 4> t3({1, 2, 3, 4});
     for (uint32_t i = 1; i <= t3.dimension(1); ++i)
       for (uint32_t j = 1; j <= t3.dimension(2); ++j)
         for (uint32_t k = 1; k <= t3.dimension(3); ++k)

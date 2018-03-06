@@ -1,4 +1,4 @@
-CXX = g++
+CXX = g++ -std=c++14
 CXXFLAGS = -O3 -I../ -Wall -Wextra -fmax-errors=3
 LINK = g++
 LINKFLAGS =
