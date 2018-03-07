@@ -15,9 +15,8 @@ namespace util {
 inline uint32_t ArrayProduct(const uint32_t *xs, uint32_t size)
 {
   uint32_t product = 1;
-  for (uint32_t i = 0; i < size; ++i) {
+  for (uint32_t i = 0; i < size; ++i) 
     product *= xs[i];
-  }
   return product;
 }
 
@@ -28,19 +27,6 @@ template <typename T> inline T *ArrayCopy(T const *xs, uint32_t size)
   for (uint32_t i = 0; i < size; ++i) 
     copy[i] = xs[i];
   return copy;
-}
-
-template <typename T> inline void ArrayCopy(T *dest, T const *src, uint32_t size)
-{
-  for (uint32_t i = 0; i < size; ++i) 
-    dest[i] = src[i];
-}
-
-// Compares uint32_t arrays of equivalent sizes
-inline bool ArrayCompare(uint32_t const *xs, uint32_t const *ys, uint32_t size)
-{
-  for (uint32_t i = 0; i < size; ++i) if (xs[i] != ys[i]) return false;
-  return true;
 }
 
 } // namespace util
@@ -167,6 +153,7 @@ Tensor<T, N>::Tensor(uint32_t const (&indices)[N])
   // default constructor should be used instead
   static_assert(N != 0);
 
+  // memcpy is safe here
   memcpy(dimensions_, indices, sizeof(dimensions_));
   uint32_t num_elements = util::ArrayProduct(dimensions_, N);
   elements_ = new T[num_elements];
@@ -175,7 +162,6 @@ Tensor<T, N>::Tensor(uint32_t const (&indices)[N])
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(const Tensor<T, N> &tensor): is_owner_(true)
 {
-  // memcpy is safe here
   memcpy(dimensions_, tensor.dimensions_, sizeof(dimensions_));
   elements_ = util::ArrayCopy(tensor.elements_, util::ArrayProduct(dimensions_, N));
 }
@@ -183,7 +169,6 @@ Tensor<T, N>::Tensor(const Tensor<T, N> &tensor): is_owner_(true)
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): is_owner_(tensor.is_owner_)
 {
-  // memcpy is safe here
   memcpy(dimensions_, tensor.dimensions_, sizeof(dimensions_));
   elements_ = tensor.elements_;
   tensor.is_owner_ = false;
@@ -282,7 +267,7 @@ decltype(auto) Tensor<T, N>::operator()(Args... args)
 template <typename T, uint32_t N>
 bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
 {
-  if (!util::ArrayCompare(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
+  if (memcmp(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
 
   uint32_t indices_product = util::ArrayProduct(dimensions_, N);
   for (uint32_t i = 0; i < indices_product; ++i)
@@ -294,7 +279,7 @@ template <typename T, uint32_t N>
 template <typename X>
 bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
 {
-  if (!util::ArrayCompare(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
+  if (memcmp(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
 
   uint32_t indices_product = util::ArrayProduct(dimensions_, N);
   for (uint32_t i = 0; i < indices_product; ++i)
@@ -382,7 +367,7 @@ template <typename T, uint32_t N> Tensor<T, N> Tensor<T, N>::operator-() const
 template <typename T, uint32_t N> 
 void Tensor<T, N>::operator+=(const Tensor<T, N> &tensor)
 {
-  if (!util::ArrayCompare(dimensions_, tensor.dimensions_, N)) 
+  if (memcmp(dimensions_, tensor.dimensions_, N)) 
     throw std::logic_error("Tensor::operator+=(Tensor const&) Failed :: Incompatible Dimensions");
 
   uint32_t total_dims = util::ArrayProduct(dimensions_, N);
@@ -392,7 +377,7 @@ void Tensor<T, N>::operator+=(const Tensor<T, N> &tensor)
 
 template <typename T, uint32_t N> void Tensor<T, N>::operator-=(const Tensor<T, N> &tensor)
 {
-  if (!util::ArrayCompare(dimensions_, tensor.dimensions_, N)) 
+  if (memcmp(dimensions_, tensor.dimensions_, N)) 
     throw std::logic_error("Tensor::operator-=(Tensor const&) Failed :: Incompatible Dimensions");
 
   uint32_t total_dims = util::ArrayProduct(dimensions_, N);
@@ -404,7 +389,7 @@ template <typename T, uint32_t N> void Tensor<T, N>::operator-=(const Tensor<T, 
 template <typename T, uint32_t N>
 Tensor<T, N> operator+(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_2)
 {
-  if (!util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, N))
+  if (memcmp(tensor_1.dimensions_, tensor_2.dimensions_, N))
     throw std::logic_error("operator+(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
@@ -416,7 +401,7 @@ Tensor<T, N> operator+(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
 template <typename T, uint32_t N>
 Tensor<T, N> operator-(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_2)
 {
-  if (!util::ArrayCompare(tensor_1.dimensions_, tensor_2.dimensions_, N))
+  if (memcmp(tensor_1.dimensions_, tensor_2.dimensions_, N))
     throw std::logic_error("operator-(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
