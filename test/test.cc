@@ -142,7 +142,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
   SECTION("Assigning Scalar Values to Tensors") {
     int32_t VALUE = -1200;
     t1(1, 1, 1, 1) = VALUE;
-    REQUIRE(t1(1, 1, 1, 1) == VALUE);
+    REQUIRE(t1(1, 1, 1, 1) == -1200);
     VALUE = -1500;
     t1(t1.dimension(1), t1.dimension(2), t1.dimension(3), t1.dimension(4)) = VALUE;
     REQUIRE(
@@ -153,7 +153,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
   SECTION("Assigning Scalar Integral Different-Type Values to Tensors") {
     long double VALUE = -1200;
     t1(1, 1, 1, 1) = VALUE;
-    REQUIRE(t1(1, 1, 1, 1) == VALUE);
+    REQUIRE(t1(1, 1, 1, 1) == -1200);
     VALUE = -1500;
     t1(t1.dimension(1), t1.dimension(2), t1.dimension(3), t1.dimension(4)) = VALUE;
     REQUIRE(
@@ -171,6 +171,16 @@ TEST_CASE("Tensor Assignment", "[int]") {
     int32_t VALUE = -1200;
     st1 = VALUE;
     REQUIRE(st1 == VALUE);
+  }
+
+  SECTION("Assigning Tensors to Lvalues") {
+    int32_t VALUE = -t1(1, 1, 1, 1);
+    REQUIRE(VALUE == -1111);
+  }
+
+  SECTION("Assigning Scalar Tensors to Lvalues") {
+    int32_t VALUE = st1;
+    REQUIRE(VALUE == 0);
   }
 }
 

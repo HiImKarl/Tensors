@@ -81,18 +81,18 @@ public:
             typename std::remove_reference<X>::type>::value>::type>
   Tensor<T, N> &operator=(X&& elem);
 
-  // print
+  // Print
   template <typename X, uint32_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
-  // equivalence
+  // Equivalence
   bool operator==(Tensor<T, N> const& tensor) const;
   bool operator!=(Tensor<T, N> const& tensor) const { return !(*this == tensor); }
 
   template <typename X>
   bool operator==(Tensor<X, N> const& tensor) const;
 
-  // single val equivalence
+  // Single val equivalence
   template <typename X,
             typename = typename std::enable_if<std::is_convertible<
             typename std::remove_reference<T>::type, 
@@ -103,6 +103,10 @@ public:
             typename std::remove_reference<T>::type, 
             typename std::remove_reference<X>::type>::value>::type>
   bool operator!=(X val) const { return !(*this == val); }
+
+  // Type conversion for single element values
+  operator T &();
+  operator T const&() const;
 
   // Example operations that can be implemented
   Tensor<T, N> operator-() const;
@@ -127,7 +131,7 @@ public:
   // Smart ptr is unecessary
   bool is_owner_;
 
-  // declare all fields of the constructor at once
+  // Declare all fields of the constructor at once
   Tensor(uint32_t const *dimensions, T *elements);
 
   // Access Expansion for operator()
@@ -276,36 +280,6 @@ decltype(auto) Tensor<T, N>::operator()(Args... args)
 }
 
 template <typename T, uint32_t N>
-template <uint32_t M>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices)
-{
-  uint32_t indices_product = pCumulativeIndex(indices, M);
-  return Tensor<T, N - M>(dimensions_ + M, elements_ + indices_product);
-}
-
-template <typename T, uint32_t N>
-template <uint32_t M, typename... Args>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices, uint32_t next_index, Args... rest)
-{
-  if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0) throw std::logic_error("Tensor::operator(Args...) failed -- Index Out of Bounds");
-  // adjust for 1 index array access
-  indices[N - sizeof...(rest) - 1] = --next_index;
-  return pAccessExpansion<M>(indices, rest...);
-}
-
-template <typename T, uint32_t N>
-uint32_t Tensor<T, N>::pCumulativeIndex(uint32_t *xs, uint32_t size)
-{
-  uint32_t total_elems = util::ArrayProduct(dimensions_, size);
-  uint32_t cumul = 0;
-  for (uint32_t i = 0; i < size; ++i) {
-    total_elems /= dimensions_[i];
-    cumul += xs[i] * total_elems;
-  }
-  return cumul;
-}
-
-template <typename T, uint32_t N>
 bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
 {
   if (!util::ArrayCompare(this->dimensions_, tensor.dimensions_, N)) throw std::logic_error("Tensor::operator==(Tensor const&) Failure, rank/dimension mismatch");
@@ -350,6 +324,20 @@ Tensor<T, N> Tensor<T, N>::operator-(X &&val) const
 {
   static_assert(N == 0, "Tensor::operator+(X) -- Non-zero rank");
   return Tensor(*elements_ - val);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::operator T &()
+{
+  static_assert(N == 0, "Tensor Implicit Cast to ValueType failed -- Tensor must be of rank zero to cast to a scalar");
+  return *elements_;
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::operator T const&() const
+{
+  static_assert(N == 0, "Tensor Implicit Cast to ValueType failed -- Tensor must be of rank zero to cast to a scalar");
+  return *elements_;
 }
 
 /*  EXAMPLE OPERATORS THAT CAN BE IMPLEMENTED   */
@@ -437,6 +425,36 @@ Tensor<T, N> operator-(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
   return new_tensor;
 }
 
+// private methods
+template <typename T, uint32_t N>
+template <uint32_t M>
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices)
+{
+  uint32_t indices_product = pCumulativeIndex(indices, M);
+  return Tensor<T, N - M>(dimensions_ + M, elements_ + indices_product);
+}
+
+template <typename T, uint32_t N>
+template <uint32_t M, typename... Args>
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices, uint32_t next_index, Args... rest)
+{
+  if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0) throw std::logic_error("Tensor::operator(Args...) failed -- Index Out of Bounds");
+  // adjust for 1 index array access
+  indices[N - sizeof...(rest) - 1] = --next_index;
+  return pAccessExpansion<M>(indices, rest...);
+}
+
+template <typename T, uint32_t N>
+uint32_t Tensor<T, N>::pCumulativeIndex(uint32_t *xs, uint32_t size)
+{
+  uint32_t total_elems = util::ArrayProduct(dimensions_, size);
+  uint32_t cumul = 0;
+  for (uint32_t i = 0; i < size; ++i) {
+    total_elems /= dimensions_[i];
+    cumul += xs[i] * total_elems;
+  }
+  return cumul;
+}
 } // tensor
 
 #endif // TENSORS_H_
