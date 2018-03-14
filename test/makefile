@@ -16,4 +16,4 @@ test.o : test.cc ../tensor.hh
 .PHONY : clean
 
 clean : 
-	rm -f *.o test
+	rm -f *.o test *~

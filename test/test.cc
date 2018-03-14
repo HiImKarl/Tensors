@@ -75,7 +75,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
 
     for (uint32_t i = 1; i <= t2.dimension(1); ++i)
       for (uint32_t j = 1; j <= t2.dimension(2); ++j)
-        REQUIRE(t2(i, j) == t1(1, 1, i, j) - 1000);
+        REQUIRE(t2(i, j) == (int)(100 + 10 * i + j));
 
     t1(1, 1) = t2;
 

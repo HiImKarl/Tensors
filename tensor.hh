@@ -15,7 +15,7 @@ namespace util {
 inline uint32_t ArrayProduct(const uint32_t *xs, uint32_t size)
 {
   uint32_t product = 1;
-  for (uint32_t i = 0; i < size; ++i) 
+  for (uint32_t i = 0; i < size; ++i)
     product *= xs[i];
   return product;
 }
@@ -24,7 +24,7 @@ inline uint32_t ArrayProduct(const uint32_t *xs, uint32_t size)
 template <typename T> inline T *ArrayCopy(T const *xs, uint32_t size)
 {
   T *copy = new T[size];
-  for (uint32_t i = 0; i < size; ++i) 
+  for (uint32_t i = 0; i < size; ++i)
     copy[i] = xs[i];
   return copy;
 }
@@ -61,9 +61,9 @@ public:
   template <typename... Args> decltype(auto) operator()(Args... args);
 
   // Setters
-  template <typename X, 
+  template <typename X,
             typename = typename std::enable_if<std::is_convertible<
-            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
   Tensor<T, N> &operator=(X&& elem);
 
@@ -81,12 +81,12 @@ public:
   // Single val equivalence
   template <typename X,
             typename = typename std::enable_if<std::is_convertible<
-            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
   bool operator==(X val) const;
   template <typename X,
             typename = typename std::enable_if<std::is_convertible<
-            typename std::remove_reference<T>::type, 
+            typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
   bool operator!=(X val) const { return !(*this == val); }
 
@@ -122,10 +122,10 @@ public:
 
   // Access Expansion for operator()
   template <uint32_t M>
-  Tensor<T, N - M> pAccessExpansion(uint32_t *indices);
+  Tensor<T, N - M> pAccessExpansion(uint32_t, uint32_t cumul_index);
   template <uint32_t M, typename... Args>
-  Tensor<T, N - M> pAccessExpansion(uint32_t *indices, uint32_t next_index, Args...);
-  uint32_t pCumulativeIndex(uint32_t *xs, uint32_t size);
+  Tensor<T, N - M> pAccessExpansion(uint32_t weight, uint32_t cumul_index,
+    uint32_t next_index, Args...);
 
 }; // Tensor
 
@@ -145,11 +145,11 @@ Tensor<T, N>::Tensor(T &&val) : is_owner_(true)
   elements_ = new T(std::forward<T>(val));
 }
 
-template <typename T, uint32_t N> 
+template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&indices)[N])
 : is_owner_(true)
 {
-  // ill defined if N is zero, 
+  // ill defined if N is zero,
   // default constructor should be used instead
   static_assert(N != 0);
 
@@ -187,13 +187,13 @@ template <typename T, uint32_t N> Tensor<T, N>::~Tensor()
   if (is_owner_) delete[] elements_;
 }
 
-template <typename T, uint32_t N> 
+template <typename T, uint32_t N>
 Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
 {
   for (uint32_t i = 0; i < N; ++i) {
-    if (dimensions_[i] != tensor.dimensions_[i]) 
+    if (dimensions_[i] != tensor.dimensions_[i])
       throw std::logic_error("Tensor::operator=(Tensor const&) Failed -- Tensor dimension mismatch");
-  } 
+  }
   uint32_t total_elems = util::ArrayProduct(tensor.dimensions_, N);
   for (uint32_t i = 0; i < total_elems; ++i)
     elements_[i] = tensor.elements_[i];
@@ -201,11 +201,11 @@ Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
   return *this;
 }
 
-template <typename T, uint32_t N> 
+template <typename T, uint32_t N>
 Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T, N> &&tensor)
 {
-  for (uint32_t i = 0; i < N; ++i) 
-    if (dimensions_[i] != tensor.dimensions_[i]) 
+  for (uint32_t i = 0; i < N; ++i)
+    if (dimensions_[i] != tensor.dimensions_[i])
       throw std::logic_error("Tensor assignment failed, tensor dimension mismatch");
 
   // DO NOT MOVE DATA unless boths tensors are principle owners
@@ -220,22 +220,21 @@ Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T, N> &&tensor)
   return *this;
 }
 
-template <typename T, uint32_t N> 
-template <typename X> 
+template <typename T, uint32_t N>
+template <typename X>
 Tensor<T, N> &Tensor<T, N>::operator=(Tensor<X, N> const &tensor)
 {
-  for (uint32_t i = 0; i < N; ++i) {
-    if (dimensions_[i] != tensor.dimensions_[i]) 
+  for (uint32_t i = 0; i < N; ++i)
+    if (dimensions_[i] != tensor.dimensions_[i])
       throw std::logic_error("Tensor::operator=(Tensor const&) Failed -- Tensor dimension mismatch");
-  } 
+
   uint32_t total_elems = util::ArrayProduct(tensor.dimensions_, N);
   for (uint32_t i = 0; i < total_elems; ++i)
     elements_[i] = tensor.elements_[i];
-
   return *this;
 }
 
-template <typename T, uint32_t N> 
+template <typename T, uint32_t N>
 template <typename X, typename>
 Tensor<T, N> &Tensor<T, N>::operator=(X&& elem)
 {
@@ -245,10 +244,10 @@ Tensor<T, N> &Tensor<T, N>::operator=(X&& elem)
 }
 
 // Getters
-template <typename T, uint32_t N> 
-uint32_t Tensor<T, N>::dimension(uint32_t index) const 
+template <typename T, uint32_t N>
+uint32_t Tensor<T, N>::dimension(uint32_t index) const
 {
-  if (N < index || index == 0) 
+  if (N < index || index == 0)
     throw std::logic_error("Attempt to access invalid dimension");
 
   // indexing begins at 1
@@ -257,11 +256,11 @@ uint32_t Tensor<T, N>::dimension(uint32_t index) const
 
 template <typename T, uint32_t N>
 template <typename... Args>
-decltype(auto) Tensor<T, N>::operator()(Args... args) 
+decltype(auto) Tensor<T, N>::operator()(Args... args)
 {
   static_assert(N >= sizeof...(args), "Tensor::operator(Args...) -- Rank Requested Out of Bounds");
-  uint32_t *indices = new uint32_t[sizeof...(args)];
-  return pAccessExpansion<sizeof...(args)>(indices, args...);
+  uint32_t weight = util::ArrayProduct(dimensions_, N);
+  return pAccessExpansion<sizeof...(args)>(weight, 0, args...);
 }
 
 template <typename T, uint32_t N>
@@ -327,9 +326,9 @@ Tensor<T, N>::operator T const&() const
 
 /*  EXAMPLE OPERATORS THAT CAN BE IMPLEMENTED   */
 
-// possible iostream overload implemention 
+// possible iostream overload implemention
 template <typename T, uint32_t N>
-std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor) 
+std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 {
   uint32_t indices_product = util::ArrayProduct(tensor.dimensions_, N);
   uint32_t bracket_mod_arr[N];
@@ -359,25 +358,25 @@ template <typename T, uint32_t N> Tensor<T, N> Tensor<T, N>::operator-() const
 {
   Tensor<T, N> neg_tensor = *this;
   uint32_t total_dims = util::ArrayProduct(dimensions_, N);
-  for (uint32_t i = 0; i < total_dims; ++i) 
+  for (uint32_t i = 0; i < total_dims; ++i)
     neg_tensor.elements_[i] *= -1;
   return neg_tensor;
 }
 
-template <typename T, uint32_t N> 
+template <typename T, uint32_t N>
 void Tensor<T, N>::operator+=(const Tensor<T, N> &tensor)
 {
-  if (memcmp(dimensions_, tensor.dimensions_, N)) 
+  if (memcmp(dimensions_, tensor.dimensions_, N))
     throw std::logic_error("Tensor::operator+=(Tensor const&) Failed :: Incompatible Dimensions");
 
   uint32_t total_dims = util::ArrayProduct(dimensions_, N);
-  for (uint32_t i = 0; i < total_dims; ++i) 
+  for (uint32_t i = 0; i < total_dims; ++i)
     elements_[i] += tensor.elements_[i];
 }
 
 template <typename T, uint32_t N> void Tensor<T, N>::operator-=(const Tensor<T, N> &tensor)
 {
-  if (memcmp(dimensions_, tensor.dimensions_, N)) 
+  if (memcmp(dimensions_, tensor.dimensions_, N))
     throw std::logic_error("Tensor::operator-=(Tensor const&) Failed :: Incompatible Dimensions");
 
   uint32_t total_dims = util::ArrayProduct(dimensions_, N);
@@ -393,7 +392,7 @@ Tensor<T, N> operator+(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
     throw std::logic_error("operator+(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
-  for (uint32_t i = 0; i < total_dims; ++i) 
+  for (uint32_t i = 0; i < total_dims; ++i)
     new_tensor.elements_[i] = tensor_1.elements_[i] + tensor_2.elements_[i];
   return new_tensor;
 }
@@ -405,7 +404,7 @@ Tensor<T, N> operator-(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
     throw std::logic_error("operator-(Tensor, Tensor) Failed :: Incompatible Dimensions");
   Tensor<T, N> new_tensor{tensor_1.dimensions_};
   uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
-  for (uint32_t i = 0; i < total_dims; ++i) 
+  for (uint32_t i = 0; i < total_dims; ++i)
     new_tensor.elements_[i] = tensor_1.elements_[i] - tensor_2.elements_[i];
   return new_tensor;
 }
@@ -413,32 +412,23 @@ Tensor<T, N> operator-(const Tensor<T, N> &tensor_1, const Tensor<T, N> &tensor_
 // private methods
 template <typename T, uint32_t N>
 template <uint32_t M>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices)
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index)
 {
-  uint32_t indices_product = pCumulativeIndex(indices, M);
-  return Tensor<T, N - M>(dimensions_ + M, elements_ + indices_product);
+  return Tensor<T, N - M>(dimensions_ + M, elements_ + cumul_index);
 }
 
 template <typename T, uint32_t N>
 template <uint32_t M, typename... Args>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t *indices, uint32_t next_index, Args... rest)
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
+ uint32_t weight, uint32_t cumul_index, uint32_t next_index, Args... rest)
 {
-  if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0) throw std::logic_error("Tensor::operator(Args...) failed -- Index Out of Bounds");
-  // adjust for 1 index array access
-  indices[N - sizeof...(rest) - 1] = --next_index;
-  return pAccessExpansion<M>(indices, rest...);
-}
+  if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
+    throw std::logic_error("Tensor::operator(Args...) failed -- Index Out of Bounds");
 
-template <typename T, uint32_t N>
-uint32_t Tensor<T, N>::pCumulativeIndex(uint32_t *xs, uint32_t size)
-{
-  uint32_t total_elems = util::ArrayProduct(dimensions_, size);
-  uint32_t cumul = 0;
-  for (uint32_t i = 0; i < size; ++i) {
-    total_elems /= dimensions_[i];
-    cumul += xs[i] * total_elems;
-  }
-  return cumul;
+  weight /= dimensions_[N - sizeof...(rest) - 1];
+  // adjust for 1 index array access
+  cumul_index += weight * (next_index - 1);
+  return pAccessExpansion<M>(weight, cumul_index, rest...);
 }
 } // tensor
 
