@@ -113,7 +113,7 @@ public:
   bool is_owner_;
 
   // Declare all fields of the constructor at once
-  Tensor(uint32_t const *dimensions, T *elements);
+  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data);
 
   // Access expansion for operator()
   template <uint32_t M>
@@ -121,6 +121,7 @@ public:
   template <uint32_t M, typename... Args>
   Tensor<T, N - M> pAccessExpansion(uint32_t weight, uint32_t cumul_index,
     uint32_t next_index, Args...);
+
 
 }; // Tensor
 
@@ -141,13 +142,13 @@ Tensor<T, N>::Tensor(T &&val) : is_owner_(true)
 }
 
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const (&indices)[N])
+Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
 : is_owner_(true)
 {
   // ill defined if N is zero
   static_assert(N != 0, NCONSTRUCTOR_0TENSOR);
 
-  std::copy_n(indices, N, dimensions_);
+  std::copy_n(dimensions, N, dimensions_);
   std::fill_n(steps_, N, 1);
   uint32_t num_elements =
     std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
@@ -170,16 +171,18 @@ template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): is_owner_(tensor.is_owner_)
 {
   std::copy_n(tensor.dimensions_, N, dimensions_);
+  std::copy_n(tensor.steps_, N, steps_);
   data_ = tensor.data_;
   tensor.is_owner_ = false;
 }
 
 // private constructor
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const *dimensions, T *elements)
-  : data_(elements), is_owner_(false)
+Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data)
+  : data_(data), is_owner_(false)
 {
   std::copy_n(dimensions, N, dimensions_);
+  std::copy_n(steps, N, steps_);
 }
 
 template <typename T, uint32_t N> Tensor<T, N>::~Tensor()
@@ -193,11 +196,16 @@ Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
   if (!std::equal(dimensions_, dimensions_ + N, tensor.dimensions_))
       throw std::logic_error("Tensor::operator=(Tensor const&) Failed -- Tensor dimension mismatch");
 
-  uint32_t total_elems =
-      std::accumulate(tensor.dimensions_, tensor.dimensions_ + N, 1, std::multiplies<size_t>());
+  size_t index = 0;
+  size_t tensor_index = 0;
 
-  for (uint32_t i = 0; i < total_elems; ++i)
-    data_[i] = tensor.data_[i];
+  for (uint32_t i = 0; i < N; ++i) {
+    for (uint32_t j = 0; j < dimensions_[i]; ++j) {
+      data_[index] = tensor.data_[tensor_index];
+      index += steps_[i];
+      tensor_index += tensor.steps_[i];
+    }
+  }
 
   return *this;
 }
@@ -213,10 +221,16 @@ Tensor<T, N> &Tensor<T, N>::operator=(Tensor<T, N> &&tensor)
     data_ = tensor.data_;
     tensor.is_owner_ = false;
   } else {
-    uint32_t total_elems =
-      std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-    for (uint32_t i = 0; i < total_elems; ++i)
-      data_[i] = tensor.data_[i];
+    size_t index = 0;
+    size_t tensor_index = 0;
+
+    for (uint32_t i = 0; i < N; ++i) {
+      for (uint32_t j = 0; j < dimensions_[i]; ++j) {
+        data_[index] = tensor.data_[tensor_index];
+        index += steps_[i];
+        tensor_index += tensor.steps_[i];
+      }
+    }
   }
   return *this;
 }
@@ -228,10 +242,17 @@ Tensor<T, N> &Tensor<T, N>::operator=(Tensor<X, N> const &tensor)
   if (!std::equal(dimensions_, dimensions_ + N, tensor.dimensions_))
     throw std::logic_error("Tensor::operator=(Tensor const&) Failed -- Tensor dimension mismatch");
 
-  uint32_t total_elems =
-      std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  for (uint32_t i = 0; i < total_elems; ++i)
-    data_[i] = tensor.data_[i];
+  size_t index = 0;
+  size_t tensor_index = 0;
+
+  for (uint32_t i = 0; i < N; ++i) {
+    for (uint32_t j = 0; j < dimensions_[i]; ++j) {
+      data_[index] = tensor.data_[tensor_index];
+      index += steps_[i];
+      tensor_index += tensor.steps_[i];
+    }
+  }
+
   return *this;
 }
 
@@ -425,7 +446,7 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index)
 {
-  return Tensor<T, N - M>(dimensions_ + M, data_ + cumul_index);
+  return Tensor<T, N - M>(dimensions_ + M, steps_ + M, data_ + cumul_index);
 }
 
 template <typename T, uint32_t N>

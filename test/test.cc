@@ -49,7 +49,6 @@ TEST_CASE("Intializing Tensors", "[int]") {
   }
 }
 
-
 TEST_CASE("Tensor Assignment", "[int]") {
   /*     -- Tensor Initialization --   */
   auto t1 = Tensor<int32_t, 4>({1, 2, 3, 4});
@@ -94,7 +93,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
         for (uint32_t k = 1; k <= t3.dimension(3); ++k)
           for (uint32_t l = 1; l <= t3.dimension(4); ++l)
             t3(i, j, k, l) = -1 * (int)(i + 10 * j + 100 * k + 1000 * l);
-    
+
     t1 = t3;
     for (uint32_t i = 1; i <= t3.dimension(1); ++i)
       for (uint32_t j = 1; j <= t3.dimension(2); ++j)
@@ -130,7 +129,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
         for (uint32_t k = 1; k <= t3.dimension(3); ++k)
           for (uint32_t l = 1; l <= t3.dimension(4); ++l)
             t3(i, j, k, l) = -1 * (int)(i + 10 * j + 100 * k + 1000 * l);
-    
+
     t1 = t3;
     for (uint32_t i = 1; i <= t3.dimension(1); ++i)
       for (uint32_t j = 1; j <= t3.dimension(2); ++j)
