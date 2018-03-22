@@ -60,8 +60,9 @@ TEST_CASE("Tensor Assignment", "[int]") {
   for (uint32_t i = 1; i <= t1.dimension(1); ++i)
     for (uint32_t j = 1; j <= t1.dimension(2); ++j)
       for (uint32_t k = 1; k <= t1.dimension(3); ++k)
-        for (uint32_t l = 1; l <= t1.dimension(4); ++l)
+        for (uint32_t l = 1; l <= t1.dimension(4); ++l) {
           t1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
+        }
 
   st1 = 0;
   /*     --------------------------   */
@@ -69,11 +70,11 @@ TEST_CASE("Tensor Assignment", "[int]") {
   SECTION("Assigning Tensors to Tensors") {
     Tensor<int32_t, 2> t2({3, 4});
     for (uint32_t i = 1; i <= t2.dimension(1); ++i)
-      for (uint32_t j = 1; j <= t2.dimension(2); ++j)
+      for (uint32_t j = 1; j <= t2.dimension(2); ++j) 
         t2(i, j) = t1(1, 1, i, j) - 1000;
 
     for (uint32_t i = 1; i <= t2.dimension(1); ++i)
-      for (uint32_t j = 1; j <= t2.dimension(2); ++j)
+      for (uint32_t j = 1; j <= t2.dimension(2); ++j) 
         REQUIRE(t2(i, j) == (int)(100 + 10 * i + j));
 
     t1(1, 1) = t2;
