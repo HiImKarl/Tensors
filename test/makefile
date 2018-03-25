@@ -1,19 +1,21 @@
-CXX = g++ -std=c++14
-CXXFLAGS = -O3 -I../ -Wall -Wextra -fmax-errors=3
+CXX = g++
+CXXFLAGS = -O3 -I../ -Wall -Wextra -fmax-errors=3 -std=c++14 -MMD
 LINK = g++
 LINKFLAGS =
+
+SRC := $(wildcard *.cc)
+OBJ := $(SRC:.cc=.o)
 
 .PHONY : all
 
 all : test
 
-test : test.o
+test : $(OBJ)
 	$(LINK) $(LINKFLAGS) $^ -o $@
 
-test.o : test.cc ../tensor.hh
-	$(CXX) -c $(CXXFLAGS) $< -o $@
+-include $(OBJ:.o=.d)
 
 .PHONY : clean
 
-clean : 
+clean :
 	rm -f *.o test *~
