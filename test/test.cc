@@ -1,6 +1,6 @@
-#include "tensor.hh"
+/* ---------------------------------- CATCH MAIN DRIVER FILE ---------------------------- */
 
 #define CATCH_CONFIG_MAIN
 #include "catch.hh"
 
-/*            CATCH MAIN DRIVER FILE          */
+/* -------------------------------------------------------------------------------------- */

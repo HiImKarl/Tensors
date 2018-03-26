@@ -10,18 +10,30 @@
 #include <numeric>
 #include <functional>
 
-// FIXME -- Debug macros for convenience
+/* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
 
-#define ARR_SIZE(x) sizeof(x)/sizeof(x[0])
+#define GET_MACRO(_1,_2,_3,NAME,...) NAME
+
+#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
 #define PRINT(x) std::cout << x << '\n';
 #define PRINTV(x) std::cout << #x << ": " << x << '\n';
-#define PRINT_ARR(x) \
+#define PRINT_ARRAY1(x) \
   std::cout << #x << ": "; \
-  for (size_t i = 0; i < ARR_SIZE(x); ++i) std::cout << x[i] << ' '; \
+  for (size_t i = 0; i < ARRAY_SIZE(x); ++i) std::cout << x[i] << ' '; \
   std::cout << '\n';
 
+#define PRINT_ARRAY2(x, n) \
+  std::cout << #x << ": "; \
+  for (size_t i = 0; i < n; ++i) std::cout << x[i] << ' '; \
+  std::cout << '\n';
+
+#define PRINT_ARRAY(...) \
+  GET_MACRO(__VA_ARGS__, PRINT_ARRAY1, PRINT_ARRAY2)(__VA_ARGS__)
+
 #endif
+
+/* --------------------------- */
 
 // Error messages
 #define NTENSOR_0CONSTRUCTOR \
@@ -31,11 +43,19 @@
 #define DIMENSION_MISMATCH(METHOD) \
   METHOD " Failed -- Tensor Dimension Mismatch"
 #define DIMENSION_INVALID(METHOD) \
-  METHOD " Failed -- Attempt to access invalid dimension"
+  METHOD " Failed -- Attempt To Access Invalid Dimension"
 #define RANK_OUT_OF_BOUNDS(METHOD) \
   METHOD " Failed -- Rank Requested Out of Bounds"
 #define INDEX_OUT_OF_BOUNDS(METHOD) \
   METHOD " Failed -- Index Requested Out of Bounds"
+#define ZERO_INDEX(METHOD) \
+  METHOD " Failed -- Tensors are Indexed Beginning at 1"
+#define SLICES_OUT_OF_BOUNDS \
+  "Tensor::slice(Indices...) Failed -- Slices Out of Bounds"
+#define SLICE_INDICES_REPEATED \
+  "Tensor::slice(Indices...) Failed -- Repeated Slice Indices"
+#define SLICE_INDICES_DESCENDING \
+  "Tensor::slice(Indices...) Failed -- Slice Indices Must Be Listed In Ascending Order"
 
 namespace tensor {
 
@@ -70,11 +90,12 @@ public:
   uint32_t dimension(uint32_t index) const;
 
   // Access to data
-  template <typename... Args> decltype(auto) operator()(Args... args);
-  template <typename... Args> decltype(auto) operator()(Args... args) const;
-  template <uint32_t... Slices> decltype(auto) slice(uint32_t const (&indices)[N - sizeof...(Slices)]);
-  template <uint32_t... Slices> decltype(auto) slice(uint32_t const (&indices)[N - sizeof...(Slices)]) const;
-
+  template <typename... Indices> decltype(auto) operator()(Indices... args);
+  template <typename... Indices> decltype(auto) operator()(Indices... args) const;
+  template <uint32_t... Slices, typename... Indices>
+  decltype(auto) slice(Indices... indices);
+  template <uint32_t... Slices, typename... Indices>
+  decltype(auto) slice(Indices... indices) const;
 
   // Print
   template <typename X, uint32_t M>
@@ -88,6 +109,12 @@ public:
   template <typename X>
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
 
+/* --------------------------- Debug Information --------------------------- */
+#ifndef _NDBEUG
+  bool is_owner() const noexcept { return is_owner_; }
+
+#endif
+/* ------------------------------------------------------------------------- */
 
   // FIXME :: IMPLEMENT EXPRESSION TEMPLATES
   Tensor<T, N> operator-() const;
@@ -100,14 +127,14 @@ public:
   template <typename X, uint32_t M>
   friend Tensor<X, M> operator*(const Tensor<X, M> &tensor_1, const Tensor<X, M> &tensor_2);
 
-  private:
+private:
   // Dimensions and access step, offset
   // Note that the steps are the products of lower dimenions
   uint32_t dimensions_[N];
   uint32_t steps_[N];
 
   // Data
-  value_type *data_;
+  value_type * const data_;
 
   // This flag denotes the tensor object's ownership of memory
   bool is_owner_;
@@ -118,16 +145,31 @@ public:
   // Expansion for operator()
   template <uint32_t M>
   Tensor<T, N - M> pAccessExpansion(uint32_t, uint32_t cumul_index);
-  template <uint32_t M, typename... Args>
-  Tensor<T, N - M> pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Args...);
+  template <uint32_t M, typename... Indices>
+  Tensor<T, N - M> pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices...);
   template <uint32_t M>
   Tensor<T, N - M> const pAccessExpansion(uint32_t, uint32_t cumul_index) const;
-  template <uint32_t M, typename... Args>
-  Tensor<T, N - M> const pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Args...) const;
+  template <uint32_t M, typename... Indices>
+  Tensor<T, N - M> const pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices...) const;
+
+  /* ------------- Expansion for slice() ------------- */
+  template <uint32_t M, typename... Indices>
+  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices);
+  template <uint32_t M>
+  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t); 
+
+  // Index checking and placement for slice()
+  template <uint32_t I1, uint32_t I2, uint32_t... Indices>
+  void pSliceIndex(uint32_t *placed_indices);
+  template <uint32_t I1>
+  void pSliceIndex(uint32_t *placed_indices);
+  void pSliceIndex(uint32_t *placed_indices);
+  /* ------------------------------------------------- */
 
   // Tensor assignment
   template <typename X>
   void pAssignment(Tensor<X, N> const &tensor);
+  value_type * pDuplicateData() const;
 
 }; // Tensor
 
@@ -216,7 +258,7 @@ public:
   friend Tensor<X, M> operator*(const Tensor<X, M> &tensor_1, const Tensor<X, M> &tensor_2);
 
 private:
-  value_type *data_;
+  value_type * const data_;
   bool is_owner_;
 
   // overload of direct data constructor
@@ -228,27 +270,17 @@ private:
 // Tensor Methods
 // Constructors, Destructor, Assignment
 template <typename T>
-Tensor<T, 0>::Tensor() : is_owner_(true)
-{
-  data_ = new T;
-}
+Tensor<T, 0>::Tensor() : data_(new T), is_owner_(true) {}
 
 template <typename T>
-Tensor<T, 0>::Tensor(T &&val) : is_owner_(true)
-{
-  data_ = new T(std::forward<T>(val));
-}
+Tensor<T, 0>::Tensor(T &&val) : data_(new T(std::forward<T>(val))), is_owner_(true) {}
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): is_owner_(true)
-{
-  data_ = new T(*tensor.data_);
-}
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): data_(new T(*tensor.data_)), is_owner_(true) {}
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): is_owner_(tensor.is_owner_)
+Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): data_(tensor.data_), is_owner_(tensor.is_owner_)
 {
-  data_ = data_;
   tensor.is_owner_ = false;
 }
 
@@ -283,7 +315,7 @@ Tensor<T, 0>::~Tensor()
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
-: is_owner_(true)
+  : data_(new T[std::accumulate(dimensions, dimensions + N, 1, std::multiplies<uint32_t>())]), is_owner_(true)
 {
   std::copy_n(dimensions, N, dimensions_);
   size_t accumulator = 1;
@@ -291,26 +323,21 @@ Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
     steps_[N - i - 1] = accumulator;
     accumulator *= dimensions_[N - i - 1];
   }
-  uint32_t num_elements = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<uint32_t>());
-  data_ = new T[num_elements];
 }
 
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(const Tensor<T, N> &tensor): is_owner_(true)
+Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
+  : data_(tensor.pDuplicateData()), is_owner_(true)
 {
   std::copy_n(tensor.dimensions_, N, dimensions_);
   std::copy_n(tensor.steps_, N, steps_);
-  size_t count = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  data_ = new T[count];
-  std::copy_n(tensor.data_, count, data_);
 }
 
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): is_owner_(tensor.is_owner_)
+Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): data_(tensor.data_), is_owner_(tensor.is_owner_)
 {
   std::copy_n(tensor.dimensions_, N, dimensions_);
   std::copy_n(tensor.steps_, N, steps_);
-  data_ = tensor.data_;
   tensor.is_owner_ = false;
 }
 
@@ -361,28 +388,36 @@ uint32_t Tensor<T, N>::dimension(uint32_t index) const
 }
 
 template <typename T, uint32_t N>
-template <typename... Args>
-decltype(auto) Tensor<T, N>::operator()(Args... args)
+template <typename... Indices>
+decltype(auto) Tensor<T, N>::operator()(Indices... args)
 {
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Args...)"));
+  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
   uint32_t weight = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
   return pAccessExpansion<sizeof...(args)>(weight, 0, args...);
 }
 
 template <typename T, uint32_t N>
-template <typename... Args>
-decltype(auto) Tensor<T, N>::operator()(Args... args) const
+template <typename... Indices>
+decltype(auto) Tensor<T, N>::operator()(Indices... args) const
 {
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Args...)"));
+  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
   uint32_t weight = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
   return pAccessExpansion<sizeof...(args)>(weight, 0, args...);
 }
 
 template <typename T, uint32_t N>
-template <uint32_t... Slices> 
-decltype(auto) Tensor<T, N>::slice(uint32_t const (&indices)[N - sizeof...(Slices)])
+template <uint32_t... Slices, typename... Indices>
+decltype(auto) Tensor<T, N>::slice(Indices... indices)
 {
-  
+  static_assert(N == sizeof...(Slices) + sizeof...(indices), SLICES_OUT_OF_BOUNDS);
+  uint32_t placed_indices[N];
+  // Initially fill the array with 1s
+  // place 0s where the indices are sliced
+  std::fill_n(placed_indices, N, 1);
+  this->pSliceIndex<Slices...>(placed_indices);
+  uint32_t index = 0;
+  for (; index < N && !placed_indices[index]; ++index);
+  return pSliceExpansion<sizeof...(Slices)>(placed_indices, index, indices...);
 }
 
 template <typename T, uint32_t N>
@@ -537,12 +572,12 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index)
 }
 
 template <typename T, uint32_t N>
-template <uint32_t M, typename... Args>
+template <uint32_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
- uint32_t weight, uint32_t cumul_index, uint32_t next_index, Args... rest)
+ uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices... rest)
 {
   if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
-    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Args...)"));
+    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
 
   weight /= dimensions_[N - sizeof...(rest) - 1];
   // adjust for 1 index array access
@@ -558,17 +593,73 @@ Tensor<T, N - M> const Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_i
 }
 
 template <typename T, uint32_t N>
-template <uint32_t M, typename... Args>
+template <uint32_t M, typename... Indices>
 Tensor<T, N - M> const Tensor<T, N>::pAccessExpansion(
- uint32_t weight, uint32_t cumul_index, uint32_t next_index, Args... rest) const
+ uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices... rest) const
 {
   if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
-    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Args...)"));
+    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
 
   weight /= dimensions_[N - sizeof...(rest) - 1];
   // adjust for 1 index array access
   cumul_index += weight * (next_index - 1);
   return pAccessExpansion<M>(weight, cumul_index, rest...);
+}
+
+/* ------------- Slice Expansion ------------- */
+
+template <typename T, uint32_t N>
+template <uint32_t I1, uint32_t I2, uint32_t... Indices>
+void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
+{
+  static_assert(N >= I1, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
+  static_assert(I1 != I2, SLICE_INDICES_REPEATED);
+  static_assert(I1 < I2, SLICE_INDICES_DESCENDING);
+  static_assert(I1, ZERO_INDEX("Tensor::Slice(Indices...)"));
+  placed_indices[I1 - 1] = 0;
+  this->pSliceIndex<I2, Indices...>(placed_indices);
+}
+
+template <typename T, uint32_t N>
+template <uint32_t Index>
+void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
+{
+  static_assert(N >= Index, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
+  static_assert(Index, ZERO_INDEX("Tensor::Slice(Indices...)"));
+  placed_indices[Index - 1] = 0;
+}
+
+template <typename T, uint32_t N>
+template <uint32_t M, typename... Indices>
+Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices)
+{
+  if (N < next_index) 
+    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
+  if (!next_index)
+    throw std::logic_error(ZERO_INDEX("Tensor::Slice(Indices...)"));
+  placed_indices[array_index] = --next_index;
+  for (; array_index < N && !placed_indices[array_index]; ++array_index);
+  return pSliceExpansion<M>(placed_indices, array_index, indices...); 
+}
+
+template <typename T, uint32_t N>
+template <uint32_t M>
+Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_t)
+{
+  return Tensor<T, N - M>(dimensions_ + M, steps_ + M, data_);
+}
+
+/* ------------------------------------------- */
+
+/* ------------ Utility Methods ------------ */
+
+template <typename T, uint32_t N>
+T * Tensor<T, N>::pDuplicateData() const
+{
+  uint32_t count = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<uint32_t>());
+  T * data = new T[count];
+  std::copy_n(this->data_, count, data);
+  return data;
 }
 
 template <typename T, uint32_t N>
@@ -603,6 +694,8 @@ void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
   }
 }
 
+/* ----------------------------------------- */
+
 } // tensor
 
 #undef NTENSOR_0CONSTRUCTOR
@@ -611,5 +704,9 @@ void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS
+#undef ZERO_INDEX
+#undef SLICES_OUT_OF_BOUNDS
+#undef SLICE_INDICES_REPEATED
+#undef SLICE_INDICES_DESCENDING
 
 #endif // TENSORS_H_

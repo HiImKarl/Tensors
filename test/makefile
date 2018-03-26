@@ -18,4 +18,4 @@ test : $(OBJ)
 .PHONY : clean
 
 clean :
-	rm -f *.o test *~
+	rm -f *.o test *~ *.d
