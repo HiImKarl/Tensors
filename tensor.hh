@@ -112,7 +112,8 @@ public:
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
   bool is_owner() const noexcept { return is_owner_; }
-
+  uint32_t const *dimensions() const noexcept { return dimensions_; }
+  uint32_t const *steps() const noexcept { return steps_; }
 #endif
 /* ------------------------------------------------------------------------- */
 
@@ -417,7 +418,7 @@ decltype(auto) Tensor<T, N>::slice(Indices... indices)
   this->pSliceIndex<Slices...>(placed_indices);
   uint32_t index = 0;
   for (; index < N && !placed_indices[index]; ++index);
-  return pSliceExpansion<sizeof...(Slices)>(placed_indices, index, indices...);
+  return pSliceExpansion<sizeof...(indices)>(placed_indices, index, indices...);
 }
 
 template <typename T, uint32_t N>
@@ -473,28 +474,38 @@ Tensor<T, 0> Tensor<T, 0>::operator-(X &&val) const
 template <typename T, uint32_t N>
 std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 {
-  uint32_t indices_product =
-    std::accumulate(tensor.dimensions_, tensor.dimensions_ + N, 1, std::multiplies<size_t>());
-  uint32_t bracket_mod_arr[N];
-  uint32_t prod = 1;
-  for (uint32_t i = 0; i < N; ++i) {
-    prod *= tensor.dimensions_[N - i - 1];
-    bracket_mod_arr[i] = prod;
-  }
-  for (size_t i = 0; i < N; ++i) os << '[';
-  os << tensor.data_[0] << ", ";
-  for (uint32_t i = 1; i < indices_product - 1; ++i) {
-    os << tensor.data_[i];
-    uint32_t num_brackets = 0;
-    for (; num_brackets < N; ++num_brackets) {
-      if (!((i + 1) % bracket_mod_arr[num_brackets]) == 0) break;
+  auto add_brackets = [&os](uint32_t n, bool left)
+  {
+    for (uint32_t i = 0; i < n; ++i) os << (left ?'[' : ']');
+  };
+  uint32_t cumul_index = std::accumulate(tensor.dimensions_, tensor.dimensions_ + N, 1, std::multiplies<uint32_t>());
+  uint32_t dim_trackers[N];
+  std::copy_n(tensor.dimensions_, N, dim_trackers);
+
+  add_brackets(N, true); // opening brackets
+  os << tensor.data_[0]; // first element
+  for (size_t i = 0; i < cumul_index - 1; ++i) {
+    uint32_t index = 0, dim_index = N;
+    bool propogate = true;
+    uint32_t bracket_count = 0;
+    // find the correct index to "step" to
+    while (dim_index && propogate) {
+      --dim_trackers[dim_index - 1];
+      ++bracket_count;
+      if (!dim_trackers[dim_index - 1]) 
+        dim_trackers[dim_index - 1] = tensor.dimensions_[dim_index - 1];
+      else 
+        propogate = false;
+      --dim_index;
     }
-    for (size_t i = 0; i < num_brackets; ++i) os << ']';
+    for (size_t j = 0; j < N; ++j) 
+      index += tensor.steps_[j] * (tensor.dimensions_[j] - dim_trackers[j]);
+    add_brackets(bracket_count - 1, false);
     os << ", ";
-    for (size_t i = 0; i < num_brackets; ++i) os << '[';
+    add_brackets(bracket_count - 1, true);
+    os << tensor.data_[index];
   }
-  if (indices_product - 1) os << tensor.data_[indices_product - 1];
-  for (size_t i = 0; i < N; ++i) os << ']';
+  add_brackets(N, false); // closing brackets
   return os;
 }
 
@@ -637,7 +648,8 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   if (!next_index)
     throw std::logic_error(ZERO_INDEX("Tensor::Slice(Indices...)"));
-  placed_indices[array_index] = --next_index;
+  placed_indices[array_index] = next_index;
+  ++array_index;
   for (; array_index < N && !placed_indices[array_index]; ++array_index);
   return pSliceExpansion<M>(placed_indices, array_index, indices...); 
 }
@@ -646,7 +658,21 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_t)
 {
-  return Tensor<T, N - M>(dimensions_ + M, steps_ + M, data_);
+  PRINT_ARRAY(placed_indices, N);
+  uint32_t offset = 0;
+  uint32_t dimensions[N - M];
+  uint32_t steps[N - M];
+  uint32_t array_index = 0;
+  for (uint32_t i = 0; i < N; ++i) {
+    if (placed_indices[i]) {
+      offset += (placed_indices[i] - 1) * steps_[i]; // adjust for 1-based indexing
+    } else {
+      steps[array_index] = steps_[i];
+      dimensions[array_index] = dimensions_[i];
+      ++array_index;
+    }
+  }
+  return Tensor<T, N - M>(dimensions, steps, data_ + offset);
 }
 
 /* ------------------------------------------- */
@@ -671,19 +697,17 @@ void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
 
   uint32_t dim_trackers[N];
   std::copy_n(dimensions_, N, dim_trackers);
-
+  ++dim_trackers[N - 1]; // adjust last index to start at zero
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = 0, t_index = 0;
-    uint32_t dim_index = N;
+    uint32_t index = 0, t_index = 0, dim_index = N;
     bool propogate = true;
     // find the correct index to "step" to
     while (dim_index && propogate) {
       --dim_trackers[dim_index - 1];
-      if (!dim_trackers[dim_index - 1]) {
+      if (!dim_trackers[dim_index - 1]) 
         dim_trackers[dim_index - 1] = dimensions_[dim_index - 1];
-      } else {
+      else 
         propogate = false;
-      }
       --dim_index;
     }
     for (size_t j = 0; j < N; ++j) {
