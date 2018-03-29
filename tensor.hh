@@ -41,21 +41,23 @@
 #define NCONSTRUCTOR_0TENSOR \
   "Invalid Instantiation of 0-Tensor -- Use a 0-Constructor"
 #define DIMENSION_MISMATCH(METHOD) \
-  METHOD " Failed -- Tensor Dimension Mismatch"
+  METHOD " Failed -- Tensor dimension mismatch"
 #define DIMENSION_INVALID(METHOD) \
   METHOD " Failed -- Attempt To Access Invalid Dimension"
 #define RANK_OUT_OF_BOUNDS(METHOD) \
-  METHOD " Failed -- Rank Requested Out of Bounds"
+  METHOD " Failed -- Rank requested out of bounds"
 #define INDEX_OUT_OF_BOUNDS(METHOD) \
-  METHOD " Failed -- Index Requested Out of Bounds"
+  METHOD " Failed -- Index requested out of bounds"
 #define ZERO_INDEX(METHOD) \
-  METHOD " Failed -- Tensors are Indexed Beginning at 1"
+  METHOD " Failed -- Tensors are indexed beginning at 1"
+#define SLICES_EMPTY \
+  "Tensor::slice(Indices...) Failed -- At least one dimension must be sliced"
 #define SLICES_OUT_OF_BOUNDS \
-  "Tensor::slice(Indices...) Failed -- Slices Out of Bounds"
+  "Tensor::slice(Indices...) Failed -- Slices out of bounds"
 #define SLICE_INDICES_REPEATED \
-  "Tensor::slice(Indices...) Failed -- Repeated Slice Indices"
+  "Tensor::slice(Indices...) Failed -- repeated slice indices"
 #define SLICE_INDICES_DESCENDING \
-  "Tensor::slice(Indices...) Failed -- Slice Indices Must Be Listed In Ascending Order"
+  "Tensor::slice(Indices...) Failed -- slice indices must be listed in ascending order"
 
 namespace tensor {
 
@@ -90,12 +92,13 @@ public:
   uint32_t dimension(uint32_t index) const;
 
   // Access to data
-  template <typename... Indices> decltype(auto) operator()(Indices... args);
-  template <typename... Indices> decltype(auto) operator()(Indices... args) const;
+  template <typename... Indices> Tensor<T, N - sizeof...(Indices)> operator()(Indices... args);
+  template <typename... Indices> 
+  Tensor<T, N - sizeof...(Indices)> const operator()(Indices... args) const;
   template <uint32_t... Slices, typename... Indices>
-  decltype(auto) slice(Indices... indices);
+  Tensor<T, sizeof...(Slices)> slice(Indices... indices);
   template <uint32_t... Slices, typename... Indices>
-  decltype(auto) slice(Indices... indices) const;
+  Tensor<T, sizeof...(Slices)> const slice(Indices... indices) const;
 
   // Print
   template <typename X, uint32_t M>
@@ -145,26 +148,24 @@ private:
 
   // Expansion for operator()
   template <uint32_t M>
-  Tensor<T, N - M> pAccessExpansion(uint32_t, uint32_t cumul_index);
+  Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index);
   template <uint32_t M, typename... Indices>
-  Tensor<T, N - M> pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices...);
-  template <uint32_t M>
-  Tensor<T, N - M> const pAccessExpansion(uint32_t, uint32_t cumul_index) const;
-  template <uint32_t M, typename... Indices>
-  Tensor<T, N - M> const pAccessExpansion(uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices...) const;
+  Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index, uint32_t next_index, Indices...);
 
   /* ------------- Expansion for slice() ------------- */
+
+  // Expansion
   template <uint32_t M, typename... Indices>
   Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices);
   template <uint32_t M>
   Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t); 
 
-  // Index checking and placement for slice()
+  // Index checking and placement
   template <uint32_t I1, uint32_t I2, uint32_t... Indices>
-  void pSliceIndex(uint32_t *placed_indices);
+  static void pSliceIndex(uint32_t *placed_indices);
   template <uint32_t I1>
-  void pSliceIndex(uint32_t *placed_indices);
-  void pSliceIndex(uint32_t *placed_indices);
+  static void pSliceIndex(uint32_t *placed_indices);
+
   /* ------------------------------------------------- */
 
   // Tensor assignment
@@ -390,26 +391,24 @@ uint32_t Tensor<T, N>::dimension(uint32_t index) const
 
 template <typename T, uint32_t N>
 template <typename... Indices>
-decltype(auto) Tensor<T, N>::operator()(Indices... args)
+Tensor<T, N - sizeof...(Indices)> Tensor<T, N>::operator()(Indices... args)
 {
   static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-  uint32_t weight = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  return pAccessExpansion<sizeof...(args)>(weight, 0, args...);
-}
+  return pAccessExpansion<sizeof...(args)>(0, args...);
+} 
 
 template <typename T, uint32_t N>
 template <typename... Indices>
-decltype(auto) Tensor<T, N>::operator()(Indices... args) const
-{
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-  uint32_t weight = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  return pAccessExpansion<sizeof...(args)>(weight, 0, args...);
+Tensor<T, N - sizeof...(Indices)> const Tensor<T, N>::operator()(Indices... args) const
+{ 
+  return (*const_cast<self_type*>(this))(args...); 
 }
 
 template <typename T, uint32_t N>
 template <uint32_t... Slices, typename... Indices>
-decltype(auto) Tensor<T, N>::slice(Indices... indices)
+Tensor<T, sizeof...(Slices)> Tensor<T, N>::slice(Indices... indices)
 {
+  static_assert(sizeof...(Slices));
   static_assert(N == sizeof...(Slices) + sizeof...(indices), SLICES_OUT_OF_BOUNDS);
   uint32_t placed_indices[N];
   // Initially fill the array with 1s
@@ -419,6 +418,13 @@ decltype(auto) Tensor<T, N>::slice(Indices... indices)
   uint32_t index = 0;
   for (; index < N && !placed_indices[index]; ++index);
   return pSliceExpansion<sizeof...(indices)>(placed_indices, index, indices...);
+}
+
+template <typename T, uint32_t N>
+template <uint32_t... Slices, typename... Indices>
+Tensor<T, sizeof...(Slices)> const Tensor<T, N>::slice(Indices... indices) const
+{
+  return const_cast<self_type*>(this)->slice<Slices...>(indices...);
 }
 
 template <typename T, uint32_t N>
@@ -577,7 +583,7 @@ Tensor<T, N> operator-(Tensor<T, N> const &tensor_1, Tensor<T, N> const &tensor_
 // private methods
 template <typename T, uint32_t N>
 template <uint32_t M>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index)
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t cumul_index)
 {
   return Tensor<T, N - M>(dimensions_ + M, steps_ + M, data_ + cumul_index);
 }
@@ -585,50 +591,28 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index)
 template <typename T, uint32_t N>
 template <uint32_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
- uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices... rest)
+ uint32_t cumul_index, uint32_t next_index, Indices... rest)
 {
   if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
 
-  weight /= dimensions_[N - sizeof...(rest) - 1];
   // adjust for 1 index array access
-  cumul_index += weight * (next_index - 1);
-  return pAccessExpansion<M>(weight, cumul_index, rest...);
-}
-
-template <typename T, uint32_t N>
-template <uint32_t M>
-Tensor<T, N - M> const Tensor<T, N>::pAccessExpansion(uint32_t, uint32_t cumul_index) const 
-{
-  return Tensor<T, N - M>(dimensions_ + M, steps_ + M, data_ + cumul_index);
-}
-
-template <typename T, uint32_t N>
-template <uint32_t M, typename... Indices>
-Tensor<T, N - M> const Tensor<T, N>::pAccessExpansion(
- uint32_t weight, uint32_t cumul_index, uint32_t next_index, Indices... rest) const
-{
-  if (next_index > dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
-    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-
-  weight /= dimensions_[N - sizeof...(rest) - 1];
-  // adjust for 1 index array access
-  cumul_index += weight * (next_index - 1);
-  return pAccessExpansion<M>(weight, cumul_index, rest...);
+  cumul_index += steps_[N - sizeof...(rest) - 1] * (next_index - 1);
+  return pAccessExpansion<M>(cumul_index, rest...);
 }
 
 /* ------------- Slice Expansion ------------- */
 
 template <typename T, uint32_t N>
 template <uint32_t I1, uint32_t I2, uint32_t... Indices>
-void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
+void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices) 
 {
   static_assert(N >= I1, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   static_assert(I1 != I2, SLICE_INDICES_REPEATED);
   static_assert(I1 < I2, SLICE_INDICES_DESCENDING);
   static_assert(I1, ZERO_INDEX("Tensor::Slice(Indices...)"));
   placed_indices[I1 - 1] = 0;
-  this->pSliceIndex<I2, Indices...>(placed_indices);
+  pSliceIndex<I2, Indices...>(placed_indices);
 }
 
 template <typename T, uint32_t N>
@@ -644,7 +628,7 @@ template <typename T, uint32_t N>
 template <uint32_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices)
 {
-  if (N < next_index) 
+  if (dimensions_[array_index] < next_index) 
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   if (!next_index)
     throw std::logic_error(ZERO_INDEX("Tensor::Slice(Indices...)"));
@@ -658,7 +642,6 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_t)
 {
-  PRINT_ARRAY(placed_indices, N);
   uint32_t offset = 0;
   uint32_t dimensions[N - M];
   uint32_t steps[N - M];

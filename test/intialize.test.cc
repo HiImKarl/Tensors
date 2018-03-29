@@ -2,7 +2,6 @@
 #include "catch.hh"
 
 using namespace tensor;
-using namespace std;
 
 TEST_CASE("Intializing Tensors", "[int]") {
 
@@ -17,6 +16,12 @@ TEST_CASE("Intializing Tensors", "[int]") {
           tensor_1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
 
   /*     --------------------------   */
+
+  SECTION("Const correctness") {
+    const auto& const_tensor = tensor_1;
+    REQUIRE(!std::is_const<decltype(tensor_1(1, 2, 3))>::value);
+    REQUIRE(std::is_const<decltype(const_tensor(1, 2, 3))>::value);
+  }
 
   SECTION("Rank and Dimensions") {
     REQUIRE(tensor_1.rank() == 4);

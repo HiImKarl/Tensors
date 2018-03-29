@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3 -I../ -Wall -Wextra -fmax-errors=3 -std=c++14 -MMD
+CXXFLAGS = -O3 -I../ -Wall -Wextra -fmax-errors=3 -std=c++11 -MMD
 LINK = g++
 LINKFLAGS =
 
