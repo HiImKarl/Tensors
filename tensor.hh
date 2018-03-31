@@ -33,9 +33,8 @@
 
 #endif
 
-/* --------------------------- */
+/* ---------------- Error Messages ---------------- */
 
-// Error messages
 #define NTENSOR_0CONSTRUCTOR \
   "Invalid Instantiation of N-Tensor -- Use a N-Constructor"
 #define NCONSTRUCTOR_0TENSOR \
@@ -59,12 +58,26 @@
 #define SLICE_INDICES_DESCENDING \
   "Tensor::slice(Indices...) Failed -- slice indices must be listed in ascending order"
 
+
 namespace tensor {
 
-template <typename T, uint32_t N = 0>
-class Tensor {
+template <typename LHSType, typename RHSType>
+class BinaryAdd: public Expression<BinaryAdd<LHSType, RHSType> {
 public:
-  // typedefs
+  typedef typename LHSType::value_type value_type;
+  typedef typename LHSType::value_type T;
+  static const uint32_t N = LHSType::rank();
+  BinaryAdd(LHSType const &lhs, RHSType const &rhs);
+  template <typename... Indices>
+  Tensor<value_type, N> operator()
+
+};
+
+template <typename T, uint32_t N = 0>
+class Tensor: Expression<Tensor<T, N>> {
+public:
+  /* ------------------ Type Definitions --------------- */
+
   typedef T                 value_type;
   typedef T&                reference;
   typedef T const&          const_reference;
@@ -72,26 +85,35 @@ public:
   typedef ptrdiff_t         difference_type;
   typedef Tensor<T, N>      self_type;
 
-  // friend classes
+  /* ----------------- Friend Classes ----------------- */
+
   template <typename X, uint32_t M> friend class Tensor;
 
-  // Constructors
+  /* ----------------- Constructors ----------------- */
+
   explicit Tensor(uint32_t const (&indices)[N]);
   Tensor(Tensor<T, N> const &tensor);
   Tensor(Tensor<T, N> &&tensor);
 
-  // Assignment
+  /* ----------------- Assignment ----------------- */
+
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
   template <typename X> Tensor<T, N> &operator=(Tensor<X, N> const &tensor);
 
-  // Destructor
+  template <typename NodeType>
+  Tensor<T, N> &operator=(Expression<NodeType> const &rhs);
+
+  /* ----------------- Destructor ----------------- */
+
   ~Tensor();
 
-  // Getters
-  constexpr uint32_t rank() const noexcept { return N; }
+  /* ----------------- Getters ----------------- */
+  
+  static constexpr uint32_t rank() const noexcept { return N; }
   uint32_t dimension(uint32_t index) const;
 
-  // Access to data
+  /* ------------------ Access To Data --------------- */
+
   template <typename... Indices> Tensor<T, N - sizeof...(Indices)> operator()(Indices... args);
   template <typename... Indices> 
   Tensor<T, N - sizeof...(Indices)> const operator()(Indices... args) const;
@@ -100,11 +122,11 @@ public:
   template <uint32_t... Slices, typename... Indices>
   Tensor<T, sizeof...(Slices)> const slice(Indices... indices) const;
 
-  // Print
+  /* ------------------ print to ostream --------------- */
   template <typename X, uint32_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
-  // Equivalence
+  /* ----------------- Equivalnce ------------------ */
   bool operator==(Tensor<T, N> const& tensor) const;
   bool operator!=(Tensor<T, N> const& tensor) const { return !(*this == tensor); }
   template <typename X>
@@ -120,20 +142,11 @@ public:
 #endif
 /* ------------------------------------------------------------------------- */
 
-  // FIXME :: IMPLEMENT EXPRESSION TEMPLATES
-  Tensor<T, N> operator-() const;
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator+(Tensor<X, M> const &tensor_1, Tensor<X, M> const &tensor_2);
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator-(Tensor<X, M> const &tensor_1, Tensor<X, M> const &tensor_2);
-  void operator-=(const Tensor<T, N> &tensor);
-  void operator+=(const Tensor<T, N> &tensor);
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator*(const Tensor<X, M> &tensor_1, const Tensor<X, M> &tensor_2);
-
 private:
+
+  /* ----------------- Data ---------------- */
+
   // Dimensions and access step, offset
-  // Note that the steps are the products of lower dimenions
   uint32_t dimensions_[N];
   uint32_t steps_[N];
 
@@ -143,10 +156,9 @@ private:
   // This flag denotes the tensor object's ownership of memory
   bool is_owner_;
 
-  // Declare all fields of the constructor at once
-  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data);
-
-  // Expansion for operator()
+  /* ------------- Expansion for operator()() ------------- */
+  
+  // Expansion
   template <uint32_t M>
   Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index);
   template <uint32_t M, typename... Indices>
@@ -166,18 +178,24 @@ private:
   template <uint32_t I1>
   static void pSliceIndex(uint32_t *placed_indices);
 
-  /* ------------------------------------------------- */
+  /* ----------------- Utility -------------------------- */
 
-  // Tensor assignment
+  // assigns tensor's data to this
   template <typename X>
   void pAssignment(Tensor<X, N> const &tensor);
+
+  // allocate new space and copy data
   value_type * pDuplicateData() const;
+
+  // Declare all fields of the constructor at once
+  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data);
+
 
 }; // Tensor
 
 // Scalar specialization
 template <typename T>
-class Tensor<T, 0> {
+class Tensor<T, 0>: public Expression<Tensor<T, 0>> {
 public:
   typedef T                 value_type;
   typedef T&                reference;
@@ -246,18 +264,6 @@ public:
   // Print
   template <typename X>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X> &tensor);
-
-  // FIXME :: IMPLEMENT EXPRESSION TEMPLATES
-  template <typename X>
-  Tensor<T, 0> operator+(X &&val) const;
-  template <typename X>
-  Tensor<T, 0> operator-(X &&val) const;
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator+(Tensor<X, M> const &tensor_1, Tensor<X, M> const &tensor_2);
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator-(Tensor<X, M> const &tensor_1, Tensor<X, M> const &tensor_2);
-  template <typename X, uint32_t M>
-  friend Tensor<X, M> operator*(const Tensor<X, M> &tensor_1, const Tensor<X, M> &tensor_2);
 
 private:
   value_type * const data_;
@@ -712,6 +718,7 @@ void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS
 #undef ZERO_INDEX
+#undef SLICES_EMPTY 
 #undef SLICES_OUT_OF_BOUNDS
 #undef SLICE_INDICES_REPEATED
 #undef SLICE_INDICES_DESCENDING
