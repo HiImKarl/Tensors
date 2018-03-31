@@ -35,12 +35,13 @@
 
 /* ---------------- Error Messages ---------------- */
 
+// Constructors
 #define NTENSOR_0CONSTRUCTOR \
   "Invalid Instantiation of N-Tensor -- Use a N-Constructor"
 #define NCONSTRUCTOR_0TENSOR \
   "Invalid Instantiation of 0-Tensor -- Use a 0-Constructor"
-#define DIMENSION_MISMATCH(METHOD) \
-  METHOD " Failed -- Tensor dimension mismatch"
+
+// Out of bounds
 #define DIMENSION_INVALID(METHOD) \
   METHOD " Failed -- Attempt To Access Invalid Dimension"
 #define RANK_OUT_OF_BOUNDS(METHOD) \
@@ -49,17 +50,31 @@
   METHOD " Failed -- Index requested out of bounds"
 #define ZERO_INDEX(METHOD) \
   METHOD " Failed -- Tensors are indexed beginning at 1"
+
+// Slicing
 #define SLICES_EMPTY \
   "Tensor::slice(Indices...) Failed -- At least one dimension must be sliced"
 #define SLICES_OUT_OF_BOUNDS \
   "Tensor::slice(Indices...) Failed -- Slices out of bounds"
 #define SLICE_INDICES_REPEATED \
-  "Tensor::slice(Indices...) Failed -- repeated slice indices"
+  "Tensor::slice(Indices...) Failed -- Repeated slice indices"
 #define SLICE_INDICES_DESCENDING \
-  "Tensor::slice(Indices...) Failed -- slice indices must be listed in ascending order"
+  "Tensor::slice(Indices...) Failed -- Slice indices must be listed in ascending order"
 
+// Arithmetic Operations
+#define RANK_MISMATCH(METHOD) \
+  METHOD "Failed -- Tensors have different ranks"
+
+#define DIMENSION_MISMATCH(METHOD) \
+  METHOD " Failed -- Tensor have different dimensions"
+/* ----------------------------------------------- */
 
 namespace tensor {
+
+template <typename NodeType>
+struct Expression {
+  inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }
+}
 
 template <typename LHSType, typename RHSType>
 class BinaryAdd: public Expression<BinaryAdd<LHSType, RHSType> {
@@ -67,11 +82,97 @@ public:
   typedef typename LHSType::value_type value_type;
   typedef typename LHSType::value_type T;
   static const uint32_t N = LHSType::rank();
+  static uint32_t rank() { return N; }
   BinaryAdd(LHSType const &lhs, RHSType const &rhs);
   template <typename... Indices>
-  Tensor<value_type, N> operator()
+  Tensor<T, N - sizeof...(Indices)> operator(Indices... indices);
+  template <typename... Indices>
+  Tensor<T, N - sizeof...(Indices)> const operator(Indices... indices) const;
 
+private:
+  LHSType const &lhs_;
+  RHSType const &rhs_;
 };
+
+template <typename LHSType, typename RHSType>
+BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
+  : lhs_(lhs), rhs_(rhs)
+{
+  static_assert(lhs::rank() == rhs::rank(), RANK_MISMATCH("Binary Addition"));
+  for (uint32_t i = 1; i <= lhs::rank(); ++i)
+    if (lhs.dimension(i) != rhs.dimension(i))
+      throw std::logic_error(DIMENSION_MISMATCH("Binary Addition"));
+}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<T, N - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator() 
+{
+  static_assert(N >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
+  return lhs_(indices...) + rhs_(indices...);
+}
+
+template <typename LHSType, typename RHSType>
+BinaryAdd<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
+{
+  return BinaryAdd<LHSType, RHSType>(lhs, rhs);
+}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<T, N - sizeof...(Indices)> const BinaryAdd<LHSType, RHSType>::operator() const
+{
+  return const_cast<self_type*>(this)->slice<Slices...>(indices...);
+}
+
+template <typename LHSType, typename RHSType>
+class BinarySub: public Expression<BinarySub<LHSType, RHSType> {
+public:
+  typedef typename LHSType::value_type value_type;
+  typedef typename LHSType::value_type T;
+  static const uint32_t N = LHSType::rank();
+  BinarySub(LHSType const &lhs, RHSType const &rhs);
+  static uint32_t rank() { return N; }
+  template <typename... Indices>
+  Tensor<T, N - sizeof...(Indices)> operator(Indices... indices);
+  template <typename... Indices>
+  Tensor<T, N - sizeof...(Indices)> const operator(Indices... indices) const;
+
+private:
+  LHSType const &lhs_;
+  RHSType const &rhs_;
+};
+
+template <typename LHSType, typename RHSType>
+BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
+  : lhs_(lhs), rhs_(rhs)
+{
+  static_assert(lhs::rank() == rhs::rank(), RANK_MISMATCH("Binary Subtraction"));
+  for (uint32_t i = 1; i <= lhs::rank(); ++i)
+    if (lhs.dimension(i) != rhs.dimension(i))
+      throw std::logic_error(DIMENSION_MISMATCH("Binary Subtraction"));
+}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<T, N - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator() 
+{
+  static_assert(N >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
+  return lhs_(indices...) - rhs_(indices...);
+}
+
+template <typename LHSType, typename RHSType>
+BinarySub<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
+{
+  return BinarySub<LHSType, RHSType>(lhs, rhs);
+}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<T, N - sizeof...(Indices)> const BinarySub<LHSType, RHSType>::operator() const
+{
+  return const_cast<self_type*>(this)->slice<Slices...>(indices...);
+}
 
 template <typename T, uint32_t N = 0>
 class Tensor: Expression<Tensor<T, N>> {
@@ -88,6 +189,8 @@ public:
   /* ----------------- Friend Classes ----------------- */
 
   template <typename X, uint32_t M> friend class Tensor;
+  template <typename LHSType, typename RHSType> friend class BinaryAdd;
+  template <typename LHSType, typename RHSType> friend class BinarySub;
 
   /* ----------------- Constructors ----------------- */
 
@@ -98,8 +201,6 @@ public:
   /* ----------------- Assignment ----------------- */
 
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
-  template <typename X> Tensor<T, N> &operator=(Tensor<X, N> const &tensor);
-
   template <typename NodeType>
   Tensor<T, N> &operator=(Expression<NodeType> const &rhs);
 
@@ -109,7 +210,7 @@ public:
 
   /* ----------------- Getters ----------------- */
   
-  static constexpr uint32_t rank() const noexcept { return N; }
+  static uint32_t rank() { return N; }
   uint32_t dimension(uint32_t index) const;
 
   /* ------------------ Access To Data --------------- */
@@ -156,6 +257,10 @@ private:
   // This flag denotes the tensor object's ownership of memory
   bool is_owner_;
 
+  /* --------------- Getters --------------- */
+
+  uint32_t const *steps() const noexcept { return steps_; }
+
   /* ------------- Expansion for operator()() ------------- */
   
   // Expansion
@@ -181,8 +286,8 @@ private:
   /* ----------------- Utility -------------------------- */
 
   // assigns tensor's data to this
-  template <typename X>
-  void pAssignment(Tensor<X, N> const &tensor);
+  template <typename RHS>
+  void pAssignment(RHS const &rhs);
 
   // allocate new space and copy data
   value_type * pDuplicateData() const;
@@ -192,134 +297,6 @@ private:
 
 
 }; // Tensor
-
-// Scalar specialization
-template <typename T>
-class Tensor<T, 0>: public Expression<Tensor<T, 0>> {
-public:
-  typedef T                 value_type;
-  typedef T&                reference;
-  typedef T const&          const_reference;
-  typedef Tensor<T, 0>      self_type;
-
-  // friend classes
-  template <typename X, uint32_t M> friend class Tensor;
-
-  // Constructors
-  Tensor();
-  explicit Tensor(value_type &&val);
-  Tensor(Tensor<T, 0> const &tensor);
-  Tensor(Tensor<T, 0> &&tensor);
-
-  // Assignment
-  Tensor<T, 0> &operator=(Tensor<T, 0> const &tensor);
-  template <typename X> Tensor<T, 0> &operator=(Tensor<X, 0> const &tensor);
-
-  // Destructor
-  ~Tensor();
-
-  // Getters
-  constexpr uint32_t rank() const noexcept { return 0; }
-
-  // Access to data_
-  value_type &operator()() { return *data_; }
-
-  // Print
-  template <typename X, uint32_t M>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
-
-  // Setters
-  template <typename X,
-            typename = typename std::enable_if<std::is_convertible<
-            typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type>
-  Tensor<T, 0> &operator=(X&& elem);
-
-  // Equivalence
-  bool operator==(Tensor<T, 0> const& tensor) const { return *data_ == *(tensor.data_); }
-  bool operator!=(Tensor<T, 0> const& tensor) const { return !(*this == tensor); }
-  template <typename X>
-  bool operator==(Tensor<X, 0> const& tensor) const { return *data_ == *(tensor.data_); }
-  template <typename X>
-  bool operator!=(Tensor<X, 0> const& tensor) const { return !(*this == tensor); }
-
-  // Value type equivalence
-  template <typename X,
-            typename = typename std::enable_if
-            <std::is_convertible
-            <typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type
-  > bool operator==(X val) const;
-  template <typename X,
-            typename = typename std::enable_if
-            <std::is_convertible
-            <typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type
-  > bool operator!=(X val) const { return !(*this == val); }
-
-  // Type conversion for single element values
-  operator T &() { return *data_; }
-  operator T const&() const { return *data_; }
-
-  // Print
-  template <typename X>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X> &tensor);
-
-private:
-  value_type * const data_;
-  bool is_owner_;
-
-  // overload of direct data constructor
-  Tensor(uint32_t const *, uint32_t const *, T *data)
-    : data_(data), is_owner_(false) {}
-
-};
-
-// Tensor Methods
-// Constructors, Destructor, Assignment
-template <typename T>
-Tensor<T, 0>::Tensor() : data_(new T), is_owner_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(T &&val) : data_(new T(std::forward<T>(val))), is_owner_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): data_(new T(*tensor.data_)), is_owner_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): data_(tensor.data_), is_owner_(tensor.is_owner_)
-{
-  tensor.is_owner_ = false;
-}
-
-template <typename T>
-Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<T, 0> const &tensor)
-{
-  *data_ = *(tensor.data_);
-  return *this;
-}
-
-template <typename T> 
-template <typename X>
-Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<X, 0> const &tensor)
-{
-  *data_ = *(tensor.data_);
-  return *this;
-}
-
-template <typename T>
-template <typename X, typename>
-Tensor<T, 0> &Tensor<T, 0>::operator=(X&& elem)
-{
-  *data_ = std::forward<X>(elem);
-  return *this;
-}
-
-template <typename T>
-Tensor<T, 0>::~Tensor()
-{
-  if (is_owner_) delete data_;
-} 
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
@@ -373,13 +350,12 @@ Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
   return *this;
 }
 
-template <typename T, uint32_t N>
-template <typename X>
-Tensor<T, N> &Tensor<T, N>::operator=(Tensor<X, N> const &tensor)
+template <typename NodeType>
+Tensor<T, N> &operator=(Expression<NodeType> const &rhs)
 {
   if (!std::equal(dimensions_, dimensions_ + N, tensor.dimensions_))
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator=(Tensor const&)"));
-
+  NodeType const& tensor = rhs.self();
   pAssignment(tensor);
   return *this;
 }
@@ -480,8 +456,6 @@ Tensor<T, 0> Tensor<T, 0>::operator-(X &&val) const
   return Tensor(*data_ - val);
 }
 
-/*  EXAMPLE OPERATORS THAT CAN BE IMPLEMENTED   */
-
 // possible iostream overload implemention
 template <typename T, uint32_t N>
 std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
@@ -521,69 +495,11 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
   return os;
 }
 
-template <typename X>
-std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
-{
-  os << *(tensor.data_);
-  return os;
-}
-
 template <typename T, uint32_t N> Tensor<T, N> Tensor<T, N>::operator-() const
 {
-  Tensor<T, N> neg_tensor = *this;
-  uint32_t total_dims =
-    std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  for (uint32_t i = 0; i < total_dims; ++i)
-    neg_tensor.data_[i] *= -1;
-  return neg_tensor;
-}
-
-template <typename T, uint32_t N>
-void Tensor<T, N>::operator+=(const Tensor<T, N> &tensor)
-{
-  if (!std::equal(dimensions_, dimensions_ + N, tensor.dimensions_))
-    throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator+=(Tensor const&)"));
-
-  uint32_t total_dims =
-    std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  for (uint32_t i = 0; i < total_dims; ++i)
-    data_[i] += tensor.data_[i];
-}
-
-template <typename T, uint32_t N> void Tensor<T, N>::operator-=(const Tensor<T, N> &tensor)
-{
-  if (!std::equal(dimensions_, dimensions_ + N, tensor.dimensions_))
-    throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator-=(Tensor const&)"));
-
-  uint32_t total_dims =
-    std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
-  for (uint32_t i = 0; i < total_dims; ++i) {
-    data_[i] -= tensor.data_[i];
-  }
-}
-
-template <typename T, uint32_t N>
-Tensor<T, N> operator+(Tensor<T, N> const &tensor_1, Tensor<T, N> const &tensor_2)
-{
-  if (!std::equal(tensor_1.dimensions_, tensor_1.dimensions_ + N, tensor_2.dimensions_))
-    throw std::logic_error(DIMENSION_MISMATCH("operator+(Tensor const&, Tensor const&)"));
-  Tensor<T, N> new_tensor{tensor_1.dimensions_};
-  uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
-  for (uint32_t i = 0; i < total_dims; ++i)
-    new_tensor.data_[i] = tensor_1.data_[i] + tensor_2.data_[i];
-  return new_tensor;
-}
-
-template <typename T, uint32_t N>
-Tensor<T, N> operator-(Tensor<T, N> const &tensor_1, Tensor<T, N> const &tensor_2)
-{
-  if (!std::equal(tensor_1.dimensions_, tensor_1.dimensions_ + N, tensor_2.dimensions_))
-    throw std::logic_error(DIMENSION_MISMATCH("operator-(Tensor const&, Tensor const&)"));
-  Tensor<T, N> new_tensor{tensor_1.dimensions_};
-  uint32_t total_dims = pVectorProduct(tensor_1.dimensions_);
-  for (uint32_t i = 0; i < total_dims; ++i)
-    new_tensor.data_[i] = tensor_1.data_[i] - tensor_2.data_[i];
-  return new_tensor;
+  // FIXME
+  static_assert(0);
+  return *this;
 }
 
 // private methods
@@ -678,8 +594,8 @@ T * Tensor<T, N>::pDuplicateData() const
 }
 
 template <typename T, uint32_t N>
-template <typename X>
-void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
+template <typename RHS>
+void Tensor<T, N>::pAssignment(RHS const &rhs)
 {
   // this is the index upper bound for iteration
   uint32_t cumul_index = std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<uint32_t>());
@@ -701,26 +617,182 @@ void Tensor<T, N>::pAssignment(Tensor<X, N> const &tensor)
     }
     for (size_t j = 0; j < N; ++j) {
       index += steps_[j] * (dimensions_[j] - dim_trackers[j]);
-      t_index += tensor.steps_[j] * (dimensions_[j] - dim_trackers[j]);
+      t_index += rhs.steps()[j] * (dimensions_[j] - dim_trackers[j]);
     }
-    data_[index] = tensor.data_[t_index];
+    data_[index] = rhs.data()[t_index];
   }
 }
 
-/* ----------------------------------------- */
+
+// Scalar specialization
+template <typename T>
+class Tensor<T, 0>: public Expression<Tensor<T, 0>> {
+public:
+  typedef T                 value_type;
+  typedef T&                reference;
+  typedef T const&          const_reference;
+  typedef Tensor<T, 0>      self_type;
+
+  // friend classes
+  template <typename X, uint32_t M> friend class Tensor;
+
+  // Constructors
+  Tensor();
+  explicit Tensor(value_type &&val);
+  Tensor(Tensor<T, 0> const &tensor);
+  Tensor(Tensor<T, 0> &&tensor);
+
+  // Assignment
+  Tensor<T, 0> &operator=(Tensor<T, 0> const &tensor);
+  template <typename X> Tensor<T, 0> &operator=(Tensor<X, 0> const &tensor);
+
+  // Destructor
+  ~Tensor();
+
+  // Getters
+  static uint32_t rank() { return 0; }
+  uint32_t dimension() const noexcept 
+  {
+#ifndef _NDEBUG
+    static_assert(0, "Something went wrong");
+#endif
+    return 0; 
+  }
+
+  // Access to data_
+  value_type &operator()() { return *data_; }
+
+  // Print
+  template <typename X, uint32_t M>
+  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
+
+  // Setters
+  template <typename X,
+            typename = typename std::enable_if<std::is_convertible<
+            typename std::remove_reference<T>::type,
+            typename std::remove_reference<X>::type>::value>::type>
+  Tensor<T, 0> &operator=(X&& elem);
+
+  // Equivalence
+  bool operator==(Tensor<T, 0> const& tensor) const { return *data_ == *(tensor.data_); }
+  bool operator!=(Tensor<T, 0> const& tensor) const { return !(*this == tensor); }
+  template <typename X>
+  bool operator==(Tensor<X, 0> const& tensor) const { return *data_ == *(tensor.data_); }
+  template <typename X>
+  bool operator!=(Tensor<X, 0> const& tensor) const { return !(*this == tensor); }
+
+  // Value type equivalence
+  template <typename X,
+            typename = typename std::enable_if
+            <std::is_convertible
+            <typename std::remove_reference<T>::type,
+            typename std::remove_reference<X>::type>::value>::type
+  > bool operator==(X val) const;
+  template <typename X,
+            typename = typename std::enable_if
+            <std::is_convertible
+            <typename std::remove_reference<T>::type,
+            typename std::remove_reference<X>::type>::value>::type
+  > bool operator!=(X val) const { return !(*this == val); }
+
+  // Type conversion for single element values
+  operator T &() { return *data_; }
+  operator T const&() const { return *data_; }
+
+  // Print
+  template <typename X>
+  friend std::ostream &operator<<(std::ostream &os, const Tensor<X> &tensor);
+
+private:
+  value_type * const data_;
+  bool is_owner_;
+
+  /* --------------- Getters --------------- */
+
+  uint32_t const *steps() const noexcept 
+  {
+#ifndef _NDEBUG
+    static_assert(0, "Something went wrong");
+#endif
+    return nullptr; 
+  }
+
+  /* --------------- Utility --------------- */
+  Tensor(uint32_t const *, uint32_t const *, T *data)
+    : data_(data), is_owner_(false) {}
+
+};
+
+// Tensor Methods
+// Constructors, Destructor, Assignment
+template <typename T>
+Tensor<T, 0>::Tensor() : data_(new T), is_owner_(true) {}
+
+template <typename T>
+Tensor<T, 0>::Tensor(T &&val) : data_(new T(std::forward<T>(val))), is_owner_(true) {}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): data_(new T(*tensor.data_)), is_owner_(true) {}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): data_(tensor.data_), is_owner_(tensor.is_owner_)
+{
+  tensor.is_owner_ = false;
+}
+
+template <typename T>
+Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<T, 0> const &tensor)
+{
+  *data_ = *(tensor.data_);
+  return *this;
+}
+
+template <typename T> 
+template <typename X>
+Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<X, 0> const &tensor)
+{
+  *data_ = *(tensor.data_);
+  return *this;
+}
+
+template <typename T>
+template <typename X, typename>
+Tensor<T, 0> &Tensor<T, 0>::operator=(X&& elem)
+{
+  *data_ = std::forward<X>(elem);
+  return *this;
+}
+
+template <typename T>
+Tensor<T, 0>::~Tensor()
+{
+  if (is_owner_) delete data_;
+} 
+
+/* ------------------------ Overloads ------------------------ */
+
+template <typename X>
+std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
+{
+  os << *(tensor.data_);
+  return os;
+}
+
+/* ----------------------------------------------------------- */
 
 } // tensor
 
 #undef NTENSOR_0CONSTRUCTOR
 #undef NCONSTRUCTOR_0TENSOR
-#undef DIMENSION_MISMATCH
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS
 #undef ZERO_INDEX
-#undef SLICES_EMPTY 
+#undef SLICES_EMPTY
 #undef SLICES_OUT_OF_BOUNDS
 #undef SLICE_INDICES_REPEATED
 #undef SLICE_INDICES_DESCENDING
+#undef RANK_MISMATCH
+#undef DIMENSION_MISMATCH
 
 #endif // TENSORS_H_
