@@ -241,7 +241,11 @@ template <uint32_t N>
 Shape<N>::Shape(Shape const &shape)
 {
   std::copy_n(shape.dimensions_, N, dimensions_);
-  std::copy_n(shape.steps_, N, steps_);
+  size_t accumulator = 1;
+  for (size_t i = 0; i < N; ++i) {
+    steps_[N - i - 1] = accumulator;
+    accumulator *= dimensions_[N - i - 1];
+  }
 }
 
 template <uint32_t N>
@@ -302,6 +306,7 @@ public:
   /* ----------------- Constructors ----------------- */
 
   explicit Tensor(uint32_t const (&indices)[N]);
+  explicit Tensor(Shape<N> shape);
   Tensor(Tensor<T, N> const &tensor);
   Tensor(Tensor<T, N> &&tensor);
 
@@ -318,7 +323,7 @@ public:
   /* ----------------- Getters ----------------- */
   
   static uint32_t rank() { return N; }
-  uint32_t dimension(uint32_t index) const noexcept { return shape_.dimension(index); }
+  uint32_t dimension(uint32_t index) const { return shape_.dimension(index); }
 
   /* ------------------ Access To Data --------------- */
 
@@ -416,9 +421,15 @@ private:
 
 }; // Tensor
 
+/* ----------------------------- Constructor ------------------------- */
+
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), data_(new T[std::accumulate(dimensions, dimensions + N, 1, std::multiplies<uint32_t>())]), is_owner_(true) {}
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), is_owner_(true) {}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::Tensor(Shape<N> shape)
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), is_owner_(true) {} 
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
@@ -715,19 +726,35 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
   }
 }
 
+/* -------------------------- Expressions -------------------------- */
+
 template <typename X, typename Y, uint32_t N>
 Tensor<X, N> operator+(Tensor<X, N> tensor_1, Tensor<Y, N> tensor_2)
 {
-  // FIXME :: IMPLEMENT 
-  return tensor_1;
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("operator+(Tensor const&, Tensor const&)"));
+  Tensor<X, N> tensor(tensor_1.shape_);
+  std::function<void(X *, X*, Y*)> fn = [](X *x, X *y, Y *z) -> void 
+  {
+    *x = *y + *z;
+  };
+  tensor.pBinaryMap(tensor_1, tensor_2, fn);
+  return tensor;
 }
 
 template <typename X, typename Y, uint32_t N>
 Tensor<X, N> operator-(Tensor<X, N> tensor_1, Tensor<Y, N> tensor_2)
 {
-  // FIXME :: IMPLEMENT 
-  return tensor_1;
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("operator-(Tensor const&, Tensor const&)"));
+  Tensor<X, N> tensor(tensor_1.shape_);
+  std::function<void(X *, X*, Y*)> fn = [](X *x, X *y, Y *z) -> void 
+  {
+    *x = *y - *z;
+  };
+  tensor.pBinaryMap(tensor_1, tensor_2, fn);
+  return tensor;
 }
+
+/* ----------------------------------------------------------------- */
 
 // Scalar specialization
 template <typename T>
@@ -748,36 +775,36 @@ public:
   explicit Tensor(value_type &&val);
   Tensor(Tensor<T, 0> const &tensor);
   Tensor(Tensor<T, 0> &&tensor);
+  ~Tensor();
 
   /* ------------- Assignment ------------- */
+
   Tensor<T, 0> &operator=(Tensor<T, 0> const &tensor);
   template <typename X> Tensor<T, 0> &operator=(Tensor<X, 0> const &tensor);
 
-  // Destructor
-  ~Tensor();
+  /* -------------- Getters -------------- */
 
-  // Getters
   static uint32_t rank() { return 0; }
-  uint32_t dimension() const noexcept 
-  {
-    return 0; 
-  }
-
-  // Access to data_
   value_type &operator()() { return *data_; }
 
-  // Print
-  template <typename X, uint32_t M>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
+  /* -------------- Setters -------------- */
 
-  // Setters
   template <typename X,
             typename = typename std::enable_if<std::is_convertible<
             typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
   Tensor<T, 0> &operator=(X&& elem);
 
-  // Equivalence
+
+  /* --------------- Print --------------- */
+
+  template <typename X, uint32_t M>
+  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
+  template <typename X>
+  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor);
+
+  /* ------------ Equivalence ------------ */
+
   bool operator==(Tensor<T, 0> const& tensor) const { return *data_ == *(tensor.data_); }
   bool operator!=(Tensor<T, 0> const& tensor) const { return !(*this == tensor); }
   template <typename X>
@@ -785,7 +812,6 @@ public:
   template <typename X>
   bool operator!=(Tensor<X, 0> const& tensor) const { return !(*this == tensor); }
 
-  // Value type equivalence
   template <typename X,
             typename = typename std::enable_if
             <std::is_convertible
@@ -799,39 +825,35 @@ public:
             typename std::remove_reference<X>::type>::value>::type
   > bool operator!=(X val) const { return !(*this == val); }
 
+  /* ------------ Expressions ------------- */
+
   template <typename X>
   Tensor<T, 0> operator+(X &&val) const;
 
   template <typename X>
   Tensor<T, 0> operator-(X &&val) const;
 
-  // Type conversion for single element values
+  /* ---------- Type Conversion ----------- */
+
   operator T &() { return *data_; }
   operator T const&() const { return *data_; }
 
-  // Print
-  template <typename X>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X> &tensor);
-
 private:
+
+  /* ------------------- Data ------------------- */
+  
   value_type * const data_;
   bool is_owner_;
 
-  /* --------------- Getters --------------- */
+  /* ------------------ Utility ----------------- */
 
-  uint32_t const *steps() const noexcept 
-  {
-    return nullptr; 
-  }
-
-  /* --------------- Utility --------------- */
   Tensor(uint32_t const *, uint32_t const *, T *data)
     : data_(data), is_owner_(false) {}
 
 };
 
-// Tensor Methods
-// Constructors, Destructor, Assignment
+/* ------------------- Constructors ----------------- */
+
 template <typename T>
 Tensor<T, 0>::Tensor() : data_(new T), is_owner_(true) {}
 
@@ -852,6 +874,8 @@ Tensor<T, 0>::~Tensor()
 {
   if (is_owner_) delete data_;
 } 
+
+/* ---------------------- Assignment ---------------------- */
 
 template <typename T>
 Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<T, 0> const &tensor)
@@ -876,12 +900,16 @@ Tensor<T, 0> &Tensor<T, 0>::operator=(X&& elem)
   return *this;
 }
 
+/* ------------------------------ Equality ----------------------- */
+
 template <typename T>
 template <typename X, typename>
 bool Tensor<T, 0>::operator==(X val) const
 {
   return *data_ == val;
 }
+
+/* ---------------------------- Expressions ----------------------- */
 
 template <typename T>
 template <typename X>

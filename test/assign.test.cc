@@ -2,7 +2,6 @@
 #include "catch.hh"
 
 using namespace tensor;
-using namespace std;
 
 TEST_CASE("Tensor Assignment", "[int]") {
 
