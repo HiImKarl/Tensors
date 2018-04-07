@@ -72,10 +72,14 @@
 namespace tensor {
 
 /* --------------- Forward Declerations --------------- */
+template <uint32_t N> class Shape;
 template <typename T, uint32_t N = 0> class Tensor;
 
 template <typename NodeType>
-struct Expression { inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }};
+struct Expression { 
+  inline NodeType &self() { return *static_cast<NodeType *>(this); }
+  inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }
+};
 
 template <typename LHSType, typename RHSType>
 class BinaryAdd: public Expression<BinaryAdd<LHSType, RHSType>> {
@@ -95,9 +99,8 @@ public:
   constexpr static uint32_t rank() { return LHSType::rank(); }
   uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
   template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices);
-  template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> const operator()(Indices... indices) const;
+  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
+  Shape<LHSType::rank()> const &shape() const noexcept { return lhs_.shape(); }
 
 private:
   LHSType const &lhs_;
@@ -116,17 +119,10 @@ BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
 
 template <typename LHSType, typename RHSType>
 template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices)
+Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
   return Add(lhs_(indices...), rhs_(indices...));
-}
-
-template <typename LHSType, typename RHSType>
-template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> const BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
-{
-  return (*const_cast<self_type*>(this))(indices...); 
 }
 
 template <typename LHSType, typename RHSType>
@@ -136,12 +132,15 @@ BinaryAdd<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression
 }
 
 /* ----------------- Print ----------------- */
+
 template <typename LHSType, typename RHSType>
 std::ostream &operator<<(std::ostream &os, BinaryAdd<LHSType, RHSType> const &binary_add)
 {
   os << binary_add();
   return os;
 }
+
+/* ----------------------------------------- */
 
 template <typename LHSType, typename RHSType>
 class BinarySub: public Expression<BinarySub<LHSType, RHSType>> {
@@ -159,10 +158,9 @@ public:
 
   constexpr static uint32_t rank() { return LHSType::rank(); }
   uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
+  Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
   template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices);
-  template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> const operator()(Indices... indices) const;
+  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
 
   /* ------------------------------------------ */
 
@@ -178,22 +176,15 @@ BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
   static_assert(lhs.rank() == rhs.rank(), RANK_MISMATCH("Binary Addition"));
   for (uint32_t i = 1; i <= lhs.rank(); ++i)
     if (lhs.dimension(i) != rhs.dimension(i))
-      throw std::logic_error(DIMENSION_MISMATCH("Binary Addition"));
+      throw std::logic_error(DIMENSION_MISMATCH("Binary Subtraction"));
 }
 
 template <typename LHSType, typename RHSType>
 template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator()(Indices... indices)
+Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
 {
-  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
+  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
   return Subtract(lhs_(indices...), rhs_(indices...));
-}
-
-template <typename LHSType, typename RHSType>
-template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> const BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
-{
-  return (*const_cast<self_type*>(this))(indices...); 
 }
 
 template <typename LHSType, typename RHSType>
@@ -201,6 +192,17 @@ BinarySub<LHSType, RHSType> operator-(Expression<LHSType> const &lhs, Expression
 {
   return BinarySub<LHSType, RHSType>(lhs.self(), rhs.self());
 }
+
+/* ----------------- Print ----------------- */
+
+template <typename LHSType, typename RHSType>
+std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &binary_sub)
+{
+  os << binary_sub();
+  return os;
+}
+
+/* ----------------------------------------- */
 
 // Tensor Shape
 template <uint32_t N>
@@ -333,6 +335,8 @@ public:
   explicit Tensor(Shape<N> shape);
   Tensor(Tensor<T, N> const &tensor);
   Tensor(Tensor<T, N> &&tensor);
+  template <typename NodeType>
+  Tensor(Expression<NodeType> const& expression);
 
   /* ----------------- Assignment ----------------- */
 
@@ -348,6 +352,7 @@ public:
   
   constexpr static uint32_t rank() { return N; }
   uint32_t dimension(uint32_t index) const { return shape_.dimension(index); }
+  Shape<N> const& shape() const noexcept { return shape_; }
 
   /* ------------------ Access To Data ----------------- */
 
@@ -433,6 +438,8 @@ private:
 
   // allocate new space and copy data
   value_type * pDuplicateData() const;
+  // move data pointer
+  value_type * pMoveData();
 
   // Declare all fields of the constructor at once
   Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data);
@@ -440,7 +447,7 @@ private:
 
 }; // Tensor
 
-/* ----------------------------- Constructor ------------------------- */
+/* ----------------------------- Constructors ------------------------- */
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
@@ -459,6 +466,12 @@ Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): shape_(tensor.shape_), data_(tensor
 {
   tensor.owner_flag_ = false;
 }
+
+template <typename T, uint32_t N>
+template <typename NodeType>
+Tensor<T, N>::Tensor(Expression<NodeType> const& expression) 
+  : shape_(expression.self().shape()), data_(expression.self()().pMoveData()), owner_flag_(true)
+{}
 
 // private constructor
 template <typename T, uint32_t N>
@@ -685,6 +698,13 @@ T * Tensor<T, N>::pDuplicateData() const
 }
 
 template <typename T, uint32_t N>
+T * Tensor<T, N>::pMoveData() 
+{
+  owner_flag_ = false;
+  return data_;
+}
+
+template <typename T, uint32_t N>
 template <typename X>
 void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor, 
     std::function<void(T *lhs, X *rhs)> const &fn)
@@ -763,11 +783,11 @@ Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 template <typename X, typename Y, uint32_t M>
 Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2) 
 {
-  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("operator+(Tensor const&, Tensor const&)"));
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Subtract(Tensor const&, Tensor const&)"));
   Tensor<X, M> diff_tensor(tensor_1.shape_);
   std::function<void(X *, X*, Y*)> sub = [](X *x, X *y, Y *z) -> void 
   {
-    *x = *y + *z;
+    *x = *y - *z;
   };
   diff_tensor.pBinaryMap(tensor_1, tensor_2, sub);
   return diff_tensor;
@@ -844,6 +864,7 @@ public:
   /* -------------- Getters -------------- */
 
   constexpr static uint32_t rank() { return 0; }
+  Shape<0> const &shape() const noexcept { return shape_; }
   value_type &operator()() { return *data_; }
   value_type const &operator()() const { return *data_; }
 

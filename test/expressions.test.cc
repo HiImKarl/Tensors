@@ -16,20 +16,35 @@ TEST_CASE("Basic Tensor Arithmetic") {
       for (uint32_t k = 1; k <= tensor_2.dimension(3); ++k) 
         tensor_2(i, j, k) = 100 * i + 10 * j + 1 * k;
 
-  auto tensor_3 = tensor_1 + tensor_2; 
-  auto tensor_4 = tensor_3 - tensor_1;
 
-  SECTION("Two Term Addition") {
+  SECTION("Two Term Addition/Subtract") {
+    auto tensor_3 = tensor_1 + tensor_2; 
+    auto tensor_4 = tensor_3 - tensor_1;
+
     for (uint32_t i = 1; i <= tensor_3.dimension(1); ++i) 
       for (uint32_t j = 1; j <= tensor_3.dimension(2); ++j) 
         for (uint32_t k = 1; k <= tensor_3.dimension(3); ++k) 
           REQUIRE(tensor_3(i, j, k) == 100100 * i + 10010 * j + 1001 * k);
-  }
 
-  SECTION("Two Term Subtraction") {
     for (uint32_t i = 1; i <= tensor_4.dimension(1); ++i) 
       for (uint32_t j = 1; j <= tensor_4.dimension(2); ++j) 
         for (uint32_t k = 1; k <= tensor_4.dimension(3); ++k) 
-          tensor_4(i, j, k) = 100 * i + 10 * j + 1 * k;
+          REQUIRE(tensor_4(i, j, k) == 100 * i + 10 * j + 1 * k);
+  }
+
+  SECTION("Three Term Addition/Subtract") {
+    Tensor<uint32_t, 3> tensor_3 = tensor_2 + tensor_1 + tensor_2;
+
+    for (uint32_t i = 1; i <= tensor_3.dimension(1); ++i) 
+      for (uint32_t j = 1; j <= tensor_3.dimension(2); ++j) 
+        for (uint32_t k = 1; k <= tensor_3.dimension(3); ++k) 
+          REQUIRE(tensor_3(i, j, k) == 100200 * i + 10020 * j + 1002 * k);
+
+    Tensor<uint32_t, 3> tensor_4 = tensor_3 - tensor_2 + tensor_1;
+
+    for (uint32_t i = 1; i <= tensor_4.dimension(1); ++i) 
+      for (uint32_t j = 1; j <= tensor_4.dimension(2); ++j) 
+        for (uint32_t k = 1; k <= tensor_4.dimension(3); ++k) 
+          REQUIRE(tensor_4(i, j, k) == 200100 * i + 20010 * j + 2001 * k);
   }
 }
