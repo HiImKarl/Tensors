@@ -49,7 +49,7 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
   }
 
   SECTION("Negation") {
-    auto tensor_3 = tensor_1.negative();
+    auto tensor_3 = -tensor_1;
     for (uint32_t i = 1; i <= tensor_3.dimension(1); ++i) 
       for (uint32_t j = 1; j <= tensor_3.dimension(2); ++j) 
         for (uint32_t k = 1; k <= tensor_3.dimension(3); ++k) 
@@ -81,7 +81,7 @@ TEST_CASE("Basic Tensor Arithmetic, Scalar") {
   }
 
   SECTION("Negation") {
-    REQUIRE(tensor_1.negative() == -10);
-    REQUIRE(tensor_1.negative() - 10 + tensor_2.negative() - 5 == -15);
+    REQUIRE(-tensor_1 == -10);
+    REQUIRE(-tensor_1 - 10 + -tensor_2 - 5 == -15);
   }
 }

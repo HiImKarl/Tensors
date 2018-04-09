@@ -304,7 +304,7 @@ public:
   friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
   template <typename X, typename Y, uint32_t M>
   friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
-  Tensor<T, N> negative() const;
+  Tensor<T, N> operator-() const;
 
   /* ------------------ Print to ostream --------------- */
 
@@ -764,7 +764,7 @@ Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
 }
 
 template <typename T, uint32_t N>
-Tensor<T, N> Tensor<T, N>::negative() const
+Tensor<T, N> Tensor<T, N>::operator-() const
 {
   Tensor<T, N> neg_tensor(shape_);
   std::function<void(T *, T *)> neg = [](T *x, T *y) -> void 
@@ -932,7 +932,7 @@ public:
   friend Tensor<X, 0> Subtract(X const& value, Tensor<Y, 0> const &tensor); 
 
   // negation
-  Tensor<T, 0> negative() const;
+  Tensor<T, 0> operator-() const;
 
   /* ---------- Type Conversion ----------- */
 
@@ -1058,7 +1058,7 @@ template <typename X, typename Y, typename = typename std::enable_if<
 inline Tensor<X, 0> Subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
 
 template <typename T>
-Tensor<T, 0> Tensor<T, 0>::negative() const
+Tensor<T, 0> Tensor<T, 0>::operator-() const
 {
   return Tensor<T, 0>(-(*data_));
 }
