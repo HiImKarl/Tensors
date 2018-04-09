@@ -12,9 +12,9 @@ OBJ := $(SRC:.cc=.o)
 
 .PHONY : all
 
-all : run_tests
+all : test.exe
 
-run_tests : $(OBJ)
+test.exe : $(OBJ)
 	$(LINK) $(LINKFLAGS) $^ -o $@
 
 -include $(OBJ:.o=.d)
