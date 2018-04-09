@@ -74,135 +74,68 @@ namespace tensor {
 /* --------------- Forward Declerations --------------- */
 template <uint32_t N> class Shape;
 template <typename T, uint32_t N = 0> class Tensor;
+template <typename LHS, typename RHS> class BinaryAdd;
+template <typename LHS, typename RHS> class BinarySub;
+
+/* ----------------- Template Meta-Patterns ----------------- */
+
+// does this really not exist in the standard library?
+template <bool B1, bool B2>
+struct LogicalAnd { static bool const value = B1 && B2; };
+
+template <typename T>
+struct IsTensor { static bool const value = false; };
+
+template <>
+template <typename T, uint32_t N>
+struct IsTensor<Tensor<T, N>> { static bool const value = true; };
+
+template <typename T>
+struct IsScalar { static bool const value = true; };
+
+template <>
+template <typename T>
+struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
+
+template <>
+template <typename T, uint32_t N>
+struct IsScalar<Tensor<T, N>> { static bool const value = false; };
+
+template <typename T>
+struct ValueToTensor {
+  ValueToTensor(T&& val): value(std::forward<T>(val)) {}
+  Tensor<T, 0> value;
+};
+
+template <>
+template <typename T, uint32_t N>
+struct ValueToTensor<Tensor<T, N>> {
+  ValueToTensor(Tensor<T, N> const &val): value(val) {}
+  Tensor<T, N> const &value;
+};
+
+template <>
+template <typename LHS, typename RHS>
+struct ValueToTensor<BinaryAdd<LHS, RHS>> {
+  ValueToTensor(BinaryAdd<LHS, RHS> const &val): value(val) {}
+  BinaryAdd<LHS, RHS> const &value;
+};
+
+template <>
+template <typename LHS, typename RHS>
+struct ValueToTensor<BinarySub<LHS, RHS>> {
+  ValueToTensor(BinarySub<LHS, RHS> const &val): value(val) {}
+  BinarySub<LHS, RHS> const &value;
+};
+
+/* ---------------------------------------------------------- */
+
 
 template <typename NodeType>
 struct Expression { 
   inline NodeType &self() { return *static_cast<NodeType *>(this); }
   inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }
 };
-
-template <typename LHSType, typename RHSType>
-class BinaryAdd: public Expression<BinaryAdd<LHSType, RHSType>> {
-public:
-
-  /* ---------------- typedefs --------------- */
-
-  typedef typename LHSType::value_type value_type;
-  typedef BinaryAdd                    self_type;         
-
-  /* -------------- Constructors -------------- */
-
-  BinaryAdd(LHSType const &lhs, RHSType const &rhs);
-
-  /* ---------------- Getters ----------------- */
-
-  constexpr static uint32_t rank() { return LHSType::rank(); }
-  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
-  template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
-  Shape<LHSType::rank()> const &shape() const noexcept { return lhs_.shape(); }
-
-private:
-  LHSType const &lhs_;
-  RHSType const &rhs_;
-};
-
-template <typename LHSType, typename RHSType>
-BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
-  : lhs_(lhs), rhs_(rhs)
-{
-  static_assert(lhs.rank() == rhs.rank(), RANK_MISMATCH("Binary Addition"));
-  for (uint32_t i = 1; i <= lhs.rank(); ++i)
-    if (lhs.dimension(i) != rhs.dimension(i))
-      throw std::logic_error(DIMENSION_MISMATCH("Binary Addition"));
-}
-
-template <typename LHSType, typename RHSType>
-template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
-{
-  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
-  return Add(lhs_(indices...), rhs_(indices...));
-}
-
-template <typename LHSType, typename RHSType>
-BinaryAdd<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
-{
-  return BinaryAdd<LHSType, RHSType>(lhs.self(), rhs.self());
-}
-
-/* ----------------- Print ----------------- */
-
-template <typename LHSType, typename RHSType>
-std::ostream &operator<<(std::ostream &os, BinaryAdd<LHSType, RHSType> const &binary_add)
-{
-  os << binary_add();
-  return os;
-}
-
-/* ----------------------------------------- */
-
-template <typename LHSType, typename RHSType>
-class BinarySub: public Expression<BinarySub<LHSType, RHSType>> {
-public:
-  /* ---------------- typedefs --------------- */
-
-  typedef typename LHSType::value_type value_type;
-  typedef BinarySub                    self_type;         
-
-  /* -------------- Constructors -------------- */
-
-  BinarySub(LHSType const &lhs, RHSType const &rhs);
-
-  /* ---------------- Getters ----------------- */
-
-  constexpr static uint32_t rank() { return LHSType::rank(); }
-  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
-  Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
-  template <typename... Indices>
-  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
-
-  /* ------------------------------------------ */
-
-private:
-  LHSType const &lhs_;
-  RHSType const &rhs_;
-};
-
-template <typename LHSType, typename RHSType>
-BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
-  : lhs_(lhs), rhs_(rhs)
-{
-  static_assert(lhs.rank() == rhs.rank(), RANK_MISMATCH("Binary Addition"));
-  for (uint32_t i = 1; i <= lhs.rank(); ++i)
-    if (lhs.dimension(i) != rhs.dimension(i))
-      throw std::logic_error(DIMENSION_MISMATCH("Binary Subtraction"));
-}
-
-template <typename LHSType, typename RHSType>
-template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
-{
-  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
-  return Subtract(lhs_(indices...), rhs_(indices...));
-}
-
-template <typename LHSType, typename RHSType>
-BinarySub<LHSType, RHSType> operator-(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
-{
-  return BinarySub<LHSType, RHSType>(lhs.self(), rhs.self());
-}
-
-/* ----------------- Print ----------------- */
-
-template <typename LHSType, typename RHSType>
-std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &binary_sub)
-{
-  os << binary_sub();
-  return os;
-}
-
-/* ----------------------------------------- */
 
 // Tensor Shape
 template <uint32_t N>
@@ -371,6 +304,7 @@ public:
   friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
   template <typename X, typename Y, uint32_t M>
   friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+  Tensor<T, N> negative() const;
 
   /* ------------------ Print to ostream --------------- */
 
@@ -385,6 +319,14 @@ public:
   bool operator==(Tensor<X, N> const& tensor) const;
   template <typename X>
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
+
+  /* -------------- Useful Functions ------------------- */
+
+  template <typename U, uint32_t M>
+  friend Tensor<U, M> Zeros(uint32_t const (&dimensions)[M]);
+  template <typename U, uint32_t M>
+  friend Tensor<U, M> Ones(uint32_t const (&dimensions)[M]);
+
 
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
@@ -430,6 +372,7 @@ private:
   /* ----------------- Utility -------------------- */
 
   // Data mapping
+  void pMap(std::function<void(T *lhs)> const &fn);
   template <typename X>
   void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn); 
   template <typename X, typename Y>
@@ -705,6 +648,33 @@ T * Tensor<T, N>::pMoveData()
 }
 
 template <typename T, uint32_t N>
+void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
+{
+  // this is the index upper bound for iteration
+  uint32_t cumul_index = shape_.IndexProduct();
+
+  uint32_t dim_trackers[N];
+  std::copy_n(shape_.dimensions_, N, dim_trackers);
+  for (size_t i = 0; i < cumul_index; ++i) {
+    uint32_t index = 0;
+    for (size_t j = 0; j < N; ++j) 
+      index += shape_.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+    uint32_t dim_index = N;
+    bool propogate = true;
+    fn(&(data_[index]));
+    // find the correct index to "step" to
+    while (dim_index && propogate) {
+      --dim_trackers[dim_index - 1];
+      --dim_index;
+      if (!dim_trackers[dim_index - 1]) 
+        dim_trackers[dim_index - 1] = shape_.dimensions_[dim_index - 1];
+      else 
+        propogate = false;
+    }
+  }
+}
+
+template <typename T, uint32_t N>
 template <typename X>
 void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor, 
     std::function<void(T *lhs, X *rhs)> const &fn)
@@ -793,9 +763,46 @@ Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
   return diff_tensor;
 }
 
-/* ----------------------------------------------------------------- */
+template <typename T, uint32_t N>
+Tensor<T, N> Tensor<T, N>::negative() const
+{
+  Tensor<T, N> neg_tensor(shape_);
+  std::function<void(T *, T *)> neg = [](T *x, T *y) -> void 
+  {
+    *x = -(*y);
+  };
+  neg_tensor.pUnaryMap(*this, neg);
+  return neg_tensor;
+}
 
-// Scalar specialization for Tensor Shape
+/* ------------------------ Useful Functions ------------------- */
+
+template <typename U, uint32_t M>
+Tensor<U, M> Zeros(uint32_t const (&dimensions)[M]) 
+{
+  Tensor<U, M> zero_tensor(dimensions);
+  std::function<void(U *)> zero = [](U *x) -> void 
+  {
+    *x = 0;
+  };
+  zero_tensor.pMap(zero);
+  return zero_tensor;
+}
+
+template <typename U, uint32_t M>
+Tensor<U, M> Ones(uint32_t const (&dimensions)[M]) 
+{
+  Tensor<U, M> one_tensor(dimensions);
+  std::function<void(U *)> one = [](U *x) -> void 
+  {
+    *x = 1;
+  };
+  one_tensor.pMap(one);
+  return one_tensor;
+}
+
+/* ------------------------ Scalar Specialization ----------------------- */
+
 template <>
 class Shape<0> {
 public:
@@ -912,17 +919,20 @@ public:
   template <typename X, typename Y>
   friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
   template <typename X, typename Y>
-  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const &value);
+  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const& value);
   template <typename X, typename Y>
-  friend Tensor<X, 0> Add(X const &value, Tensor<X, 0> const &tensor);
+  friend Tensor<X, 0> Add(X const& value, Tensor<Y, 0> const &tensor); 
 
   // Subtraction
   template <typename X, typename Y>
   friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
   template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const &value);
+  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const& value);
   template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(X const &value, Tensor<X, 0> const &tensor);
+  friend Tensor<X, 0> Subtract(X const& value, Tensor<Y, 0> const &tensor); 
+
+  // negation
+  Tensor<T, 0> negative() const;
 
   /* ---------- Type Conversion ----------- */
 
@@ -1010,16 +1020,20 @@ Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 }
 
 template <typename X, typename Y>
-Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const &value)
+Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const& value)
 {
   return Tensor<X, 0>(tensor() + value);
 }
 
 template <typename X, typename Y>
-Tensor<X, 0> Add(X const &value, Tensor<X, 0> const &tensor)
+Tensor<X, 0> Add(X const& value, Tensor<Y, 0> const &tensor)
 {
-  return Tensor<X, 0>(value + tensor());
+  return Tensor<X, 0>(tensor() + value);
 }
+
+template <typename X, typename Y, typename = typename std::enable_if<
+          LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
+inline Tensor<X, 0> Add(X const& x, Y const & y) { return Tensor<X, 0>(x + y); }
 
 template <typename X, typename Y>
 Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
@@ -1028,15 +1042,25 @@ Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2
 }
 
 template <typename X, typename Y>
-Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const &value)
+Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const& value)
 {
   return Tensor<X, 0>(tensor() - value);
 }
 
 template <typename X, typename Y>
-Tensor<X, 0> Subtract(X const &value, Tensor<X, 0> const &tensor)
+Tensor<X, 0> Subtract(X const& value, Tensor<Y, 0> const &tensor)
 {
   return Tensor<X, 0>(value - tensor());
+}
+
+template <typename X, typename Y, typename = typename std::enable_if<
+          LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
+inline Tensor<X, 0> Subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
+
+template <typename T>
+Tensor<T, 0> Tensor<T, 0>::negative() const
+{
+  return Tensor<T, 0>(-(*data_));
 }
 
 /* ------------------------ Overloads ------------------------ */
@@ -1048,7 +1072,125 @@ std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
   return os;
 }
 
-/* ----------------------------------------------------------- */
+/* ---------------------- Expressions ------------------------ */
+
+template <typename LHSType, typename RHSType>
+class BinaryAdd: public Expression<BinaryAdd<LHSType, RHSType>> {
+public:
+
+  /* ---------------- typedefs --------------- */
+
+  typedef typename LHSType::value_type value_type;
+  typedef BinaryAdd                    self_type;         
+
+  /* -------------- Constructors -------------- */
+
+  BinaryAdd(LHSType const &lhs, RHSType const &rhs);
+
+  /* ---------------- Getters ----------------- */
+
+  constexpr static uint32_t rank() { return LHSType::rank(); }
+  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
+  template <typename... Indices>
+  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
+  Shape<LHSType::rank()> const &shape() const noexcept { return lhs_.shape(); }
+
+private:
+  LHSType const &lhs_;
+  RHSType const &rhs_;
+};
+
+template <typename LHSType, typename RHSType>
+BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
+{
+  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
+  return Add(ValueToTensor<LHSType>(lhs_).value(indices...), 
+             ValueToTensor<RHSType>(rhs_).value(indices...));
+}
+
+template <typename LHSType, typename RHSType>
+BinaryAdd<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
+{
+  return BinaryAdd<LHSType, RHSType>(lhs.self(), rhs.self());
+}
+
+/* ----------------- Print ----------------- */
+
+template <typename LHSType, typename RHSType>
+std::ostream &operator<<(std::ostream &os, BinaryAdd<LHSType, RHSType> const &binary_add)
+{
+  os << binary_add();
+  return os;
+}
+
+/* ----------------------------------------- */
+
+template <typename LHSType, typename RHSType>
+class BinarySub: public Expression<BinarySub<LHSType, RHSType>> {
+public:
+  /* ---------------- typedefs --------------- */
+
+  typedef typename LHSType::value_type value_type;
+  typedef BinarySub                    self_type;         
+
+  /* -------------- Constructors -------------- */
+
+  BinarySub(LHSType const &lhs, RHSType const &rhs);
+
+  /* ---------------- Getters ----------------- */
+
+  constexpr static uint32_t rank() { return LHSType::rank(); }
+  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
+  Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
+  template <typename... Indices>
+  Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
+
+  /* ------------------------------------------ */
+
+private:
+  LHSType const &lhs_;
+  RHSType const &rhs_;
+};
+
+template <typename LHSType, typename RHSType>
+BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
+{
+  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
+  return Subtract(
+      ValueToTensor<LHSType>(lhs_).value(indices...), 
+      ValueToTensor<RHSType>(rhs_).value(indices...));
+}
+
+template <typename LHSType, typename RHSType>
+BinarySub<LHSType, RHSType> operator-(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
+{
+  return BinarySub<LHSType, RHSType>(lhs.self(), rhs.self());
+}
+
+/* ----------------- Print ----------------- */
+
+template <typename LHSType, typename RHSType>
+std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &binary_sub)
+{
+  os << binary_sub();
+  return os;
+}
+
+
+/*
+ * The following methods are built on top of the core of the libarary
+ */
+
 
 } // tensor
 
