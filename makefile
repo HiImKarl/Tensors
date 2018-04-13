@@ -12,9 +12,11 @@ OBJ := $(SRC:.cc=.o)
 
 .PHONY : all
 
-all : test.exe
+all : run_tests
+	./run_tests
+	rm run_tests
 
-test.exe : $(OBJ)
+run_tests : $(OBJ)
 	$(LINK) $(LINKFLAGS) $^ -o $@
 
 -include $(OBJ:.o=.d)
@@ -22,4 +24,4 @@ test.exe : $(OBJ)
 .PHONY : clean
 
 clean :
-	rm -f $(TEMPORARIES) run_tests
+	rm -f $(TEMPORARIES) 
