@@ -18,6 +18,17 @@ TEST_CASE("Tensor Access", "[int]") {
 
   /*     --------------------------   */
 
+  SECTION("Dimensions and Rank") {
+    auto tensor_2 = tensor_1(1);
+    REQUIRE(tensor_2.rank() == 3);
+    for (uint32_t i = 1; i <= tensor_2.rank(); ++i)
+      REQUIRE(tensor_2.dimension(i) == i + 1);
+    auto tensor_3 = tensor_2(2);
+    REQUIRE(tensor_3.rank() == 2);
+    for (uint32_t i = 1; i <= tensor_3.rank(); ++i)
+      REQUIRE(tensor_3.dimension(i) == i + 2);
+  }
+
   SECTION("Using Indices") {
     Indices<4> indices({1, 1, 1, 1});
     REQUIRE(tensor_1[indices] == 1111);

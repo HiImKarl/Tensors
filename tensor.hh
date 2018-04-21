@@ -89,6 +89,7 @@ template <uint32_t N> class Shape;
 template <typename T, uint32_t N = 0> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
 template <typename LHS, typename RHS> class BinarySub;
+template <typename LHS, typename RHS> class BinaryMul;
 
 /* ----------------- Template Meta-Patterns ----------------- */
 
@@ -141,6 +142,14 @@ struct ValueToTensor<BinarySub<LHS, RHS>> {
   BinarySub<LHS, RHS> const &value;
 };
 
+/* ---------------- Template Meta-Functions ---------------- */
+
+template <typename T, uint32_t N>
+Tensor<T, N> CopyTensor(Tensor<T, N> &&tensor)
+{
+  return Tensor<T, N>(tensor);
+}
+
 /* ---------------------------------------------------------- */
 
 
@@ -162,6 +171,9 @@ public:
   /* ----------------- friend classes ----------------- */
 
   template <typename X, uint32_t M> friend class Tensor;
+  template <typename LHSType, typename RHSType> friend class BinaryAdd;
+  template <typename LHSType, typename RHSType> friend class BinarySub;
+  template <typename LHSType, typename RHSType> friend class BinaryMul;
 
   /* ------------------ Constructors ------------------ */
 
@@ -187,11 +199,16 @@ public:
   template <uint32_t M>
   bool operator!=(Shape<M> const& shape) const noexcept { return !(*this == shape); }
 
+  /* ----------------- Expressions ------------------ */
+
+  template <typename X, typename Y, uint32_t M1, uint32_t M2>
+  friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+
   /* ------------------- Utility -------------------- */
 
   uint32_t IndexProduct() const noexcept;
 
-  /* ---------------- Print ----------------- */
+  /* -------------------- Print --------------------- */
 
   template <typename X, uint32_t M>
   friend std::ostream &operator<<(std::ostream &os, Tensor<X, M> const&tensor);
@@ -314,6 +331,7 @@ public:
   template <typename X, uint32_t M> friend class Tensor;
   template <typename LHSType, typename RHSType> friend class BinaryAdd;
   template <typename LHSType, typename RHSType> friend class BinarySub;
+  template <typename LHSType, typename RHSType> friend class BinaryMul;
 
   /* ----------------- Constructors ----------------- */
 
@@ -664,11 +682,11 @@ template <uint32_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
  uint32_t cumul_index, uint32_t next_index, Indices... rest)
 {
-  if (next_index > shape_.dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
+  if (next_index > shape_.dimensions_[M - sizeof...(rest) - 1] || next_index == 0)
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
 
   // adjust for 1 index array access
-  cumul_index += steps_[N - sizeof...(rest) - 1] * (next_index - 1);
+  cumul_index += steps_[M - sizeof...(rest) - 1] * (next_index - 1);
   return pAccessExpansion<M>(cumul_index, rest...);
 }
 
@@ -796,11 +814,11 @@ void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
     // find the correct index to "step" to
     while (dim_index && propogate) {
       --dim_trackers[dim_index - 1];
-      --dim_index;
       if (!dim_trackers[dim_index - 1]) 
         dim_trackers[dim_index - 1] = shape_.dimensions_[dim_index - 1];
       else 
         propogate = false;
+      --dim_index;
     }
   }
 }
@@ -828,9 +846,9 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
     // find the correct index to "step" to
     while (dim_index && propogate) {
       --dim_trackers[dim_index - 1];
-      --dim_index;
       if (!dim_trackers[dim_index - 1]) dim_trackers[dim_index - 1] = shape_.dimensions_[dim_index - 1];
       else propogate = false;
+      --dim_index;
     }
   }
 }
@@ -872,50 +890,45 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   if (tensor_1.shape_.dimensions_[0] != tensor_2.shape_.dimensions_[M2 - 1])
     throw std::logic_error(INNER_DIMENSION_MISMATCH("Multiply(Tensor const&, Tensor const&)"));
   auto shape = Shape<M1 + M2 - 2>();
-  for (size_t i = 0; i < M1 - 1; ++i)
-    shape.dimensions_[i] = tensor_1.shape_.dimensions_[i];
-  for (size_t i = 0; i < M2 - 1; ++i)
-    shape.dimensions_[i + M1 - 1] = tensor_2.shape_.dimensions_[i];
+  std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
+  std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2> prod_tensor(shape);
-  
-  uint32_t cumul_index = 
-    (tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1]) *
-    (tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[M2 - 1]);
+  uint32_t cumul_index_1 = tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1];
+  uint32_t cumul_index_2 = tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[0];
   uint32_t dim_trackers_1[M1 - 1], dim_trackers_2[M2 - 1];
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_trackers_1);
-  std::copy_n(tensor_2.shape_.dimensions_, M2 - 1, dim_trackers_2);
-  for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = 0, t1_index = 0, t2_index = 0;
-    for (size_t j = 0; j < M1 - 1; ++j) {
-      index += shape.dimensions_[j] - dim_trackers_1[j];
-      t1_index += tensor_1.steps_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
+  std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_trackers_2);
+  uint32_t index = 0;
+  for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
+    for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
+      uint32_t t1_index = 0, t2_index = 0;
+      for (size_t j = 0; j < M1 - 1; ++j) 
+        t1_index += tensor_1.steps_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
+      for (size_t j = 0; j < M2 - 1; ++j) 
+        t2_index += tensor_2.steps_[j + 1] * (tensor_2.shape_.dimensions_[j + 1] - dim_trackers_2[j]);
+      X value {};
+      for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x) 
+          value += *(tensor_1.data_ + t1_index + tensor_1.steps_[M1 - 1] * x) *
+            *(tensor_2.data_ + t2_index + tensor_2.steps_[0] * x);
+      prod_tensor.data_[index] = value;
+      uint32_t dim_index = M2 - 1;
+      bool propogate = true;
+      while (dim_index && propogate) {
+        --dim_trackers_2[dim_index - 1];
+        if (!dim_trackers_2[dim_index - 1]) dim_trackers_2[dim_index - 1] = tensor_2.shape_.dimensions_[dim_index];
+        else propogate = false;
+        --dim_index;
+      }
+      ++index;
     }
-    for (size_t j = 0; j < M2 - 1; ++j) {
-      index += shape.dimensions_[j + M1 - 1] - dim_trackers_2[j];
-      t1_index += tensor_2.steps_[j] * (tensor_2.shape_.dimensions_[j] - dim_trackers_2[j]);
-    }
-    X value {};
-    for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x) {
-        value += *(tensor_1.data_ + t1_index + tensor_1.steps_[M1 - 1] * x) *
-          *(tensor_2.data_ + t2_index + tensor_2.steps_[0] * x);
-    }
-    prod_tensor.data_[index] = value;
     uint32_t dim_index = M1 - 1;
     bool propogate = true;
     // find the correct index to "step" to
     while (dim_index && propogate) {
       --dim_trackers_1[dim_index - 1];
-      --dim_index;
       if (!dim_trackers_1[dim_index - 1]) dim_trackers_1[dim_index - 1] = tensor_1.shape_.dimensions_[dim_index - 1];
       else propogate = false;
-    }
-    dim_index = M2 - 1;
-    propogate = true;
-    while (dim_index && propogate) {
-      --dim_trackers_2[dim_index - 1];
       --dim_index;
-      if (!dim_trackers_2[dim_index - 1]) dim_trackers_2[dim_index - 1] = tensor_2.shape_.dimensions_[dim_index - 1];
-      else propogate = false;
     }
   }
   return prod_tensor;
@@ -972,6 +985,9 @@ public:
   /* ----------------- friend classes ----------------- */
 
   template <typename X, uint32_t M> friend class Tensor;
+  template <typename LHSType, typename RHSType> friend class BinaryAdd;
+  template <typename LHSType, typename RHSType> friend class BinarySub;
+  template <typename LHSType, typename RHSType> friend class BinaryMul;
 
   /* ------------------ Constructors ------------------ */
 
@@ -1362,8 +1378,16 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const 
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Multiplication"));
-  return Multiply(ValueToTensor<LHSType>(lhs_).value(),
-                  ValueToTensor<RHSType>(rhs_).value())();
+  auto temporary = Multiply(ValueToTensor<LHSType>(lhs_).value(),
+                  ValueToTensor<RHSType>(rhs_).value());
+  // FIXME :: Forced copy here -- find something more efficient
+  return CopyTensor(temporary(indices...));
+}
+
+template <typename LHSType, typename RHSType>
+BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
+{
+  return BinaryMul<LHSType, RHSType>(lhs.self(), rhs.self());
 }
 
 /* FIXME
