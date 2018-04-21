@@ -30,6 +30,7 @@ TEST_CASE("Intializing Tensors", "[int]") {
     REQUIRE(tensor_1(1, 1, 1).rank() == 1);
     REQUIRE(tensor_1(1, 1, 1, 1).rank() == 0);
     for (int i = 1; i <= 4; ++i) REQUIRE(tensor_1.dimension(i) == i);
+    for (int i = 1; i <= 3; ++i) REQUIRE(tensor_1(1).dimension(i) == i + 1);
   }
 
   SECTION("Initializing Values") {

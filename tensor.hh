@@ -64,9 +64,22 @@
 // Arithmetic Operations
 #define RANK_MISMATCH(METHOD) \
   METHOD "Failed -- Tensors have different ranks"
-
 #define DIMENSION_MISMATCH(METHOD) \
   METHOD " Failed -- Tensor have different dimensions"
+#define INNER_DIMENSION_MISMATCH(METHOD) \
+  METHOD " Failed -- Tensors have different inner dimensions"
+#define SCALAR_TENSOR_MULT(METHOD) \
+  METHOD " Failed -- Cannot multiple tensors with scalars"
+
+/* ----------------------------------------------- */
+
+/* ---------------- Debug Messages --------------- */
+
+#define DEBUG \
+  "This static assertion should never fire"
+#define OVERLOAD_RESOLUTION(METHOD) \
+  METHOD " :: Overload resolution :: " DEBUG
+
 /* ----------------------------------------------- */
 
 namespace tensor {
@@ -155,6 +168,10 @@ public:
   explicit Shape(uint32_t const (&dimensions)[N]);
   Shape(Shape<N> const &shape);
 
+  /* ------------------ Assignment -------------------- */
+  
+  Shape<N> &operator=(Shape<N> const &shape);
+
   /* -------------------- Getters --------------------- */
 
   constexpr static uint32_t rank() { return N; }
@@ -177,7 +194,9 @@ public:
   /* ---------------- Print ----------------- */
 
   template <typename X, uint32_t M>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
+  friend std::ostream &operator<<(std::ostream &os, Tensor<X, M> const&tensor);
+  template <uint32_t M>
+  friend std::ostream &operator<<(std::ostream &os, Shape<M> const &shape);
 
 private:
   /* ------------------ Data ------------------ */
@@ -188,6 +207,7 @@ private:
 
   // FIXME :: dumb hack to avoid ambiguous overload
   Shape(uint32_t const *dimensions, int); 
+  Shape() {}
 };
 
 template <uint32_t N>
@@ -206,6 +226,13 @@ template <uint32_t N>
 Shape<N>::Shape(uint32_t const *dimensions, int)
 {
   std::copy_n(dimensions, N, dimensions_);
+}
+
+template <uint32_t N>
+Shape<N> &Shape<N>::operator=(Shape<N> const &shape)
+{
+  std::copy_n(shape.dimensions_, N, dimensions_);
+  return *this;
 }
 
 template <uint32_t N>
@@ -238,6 +265,16 @@ uint32_t Shape<N>::IndexProduct() const noexcept
   return std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
 }
 
+template <uint32_t N>
+std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
+{
+  os << "S{";
+  for (size_t i = 0; i < N - 1; ++i) os << shape.dimensions_[i] << ", ";
+  os << shape.dimensions_[N - 1] << "}";
+  return os;
+}
+
+// Is this really necessary?
 template <uint32_t N>
 class Indices {
 public:
@@ -301,7 +338,7 @@ public:
   
   constexpr static uint32_t rank() { return N; }
   uint32_t dimension(uint32_t index) const { return shape_.dimension(index); }
-  Shape<N> const& shape() const noexcept { return shape_; }
+  Shape<N> shape() const noexcept { return shape_; }
 
   /* ------------------ Access To Data ----------------- */
 
@@ -329,6 +366,8 @@ public:
   friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
   template <typename X, typename Y, uint32_t M>
   friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+  template <typename X, typename Y, uint32_t M1, uint32_t M2>
+  friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
   Tensor<T, N> operator-() const;
 
   /* ------------------ Print to ostream --------------- */
@@ -352,7 +391,6 @@ public:
   template <typename U, uint32_t M>
   friend Tensor<U, M> Ones(uint32_t const (&dimensions)[M]);
 
-
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
   bool owner_flag() const noexcept { return owner_flag_; }
@@ -366,7 +404,7 @@ private:
 
   Shape<N> shape_;
   uint32_t steps_[N];
-  value_type *const data_;
+  value_type *data_;
   bool owner_flag_;           // ownership of memory
 
   /* --------------- Getters --------------- */
@@ -457,9 +495,12 @@ Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): shape_(tensor.shape_), data_(tensor
 template <typename T, uint32_t N>
 template <typename NodeType>
 Tensor<T, N>::Tensor(Expression<NodeType> const& expression) 
-  : shape_(expression.self().shape()), data_(expression.self()().pMoveData()), owner_flag_(true)
+  : owner_flag_(true)
 {
-  std::copy_n(expression.self().steps(), N, steps_);
+  auto result = expression.self()();
+  std::copy_n(result.steps_, N, steps_);
+  shape_ = result.shape_;
+  data_ = result.pMoveData();
 }
 
 // private constructor
@@ -489,7 +530,7 @@ template <typename T, uint32_t N>
 template <typename NodeType>
 Tensor<T, N> &Tensor<T, N>::operator=(Expression<NodeType> const &rhs)
 {
-  NodeType const& tensor = rhs.self();
+  auto tensor = rhs.self()();
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator=(Tensor const&)"));
   std::function<void(T *, typename NodeType::value_type*)> fn = 
@@ -781,9 +822,9 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
       t1_index += tensor_1.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
       t2_index += tensor_2.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
     }
+    fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]); 
     uint32_t dim_index = N;
     bool propogate = true;
-    fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]); 
     // find the correct index to "step" to
     while (dim_index && propogate) {
       --dim_trackers[dim_index - 1];
@@ -820,6 +861,64 @@ Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
   };
   diff_tensor.pBinaryMap(tensor_1, tensor_2, sub);
   return diff_tensor;
+}
+
+template <typename X, typename Y, uint32_t M1, uint32_t M2>
+Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2)
+{
+  static_assert(M1 || M2, OVERLOAD_RESOLUTION("Multiply(Tensor const&, Tensor const&)"));
+  static_assert(M1, SCALAR_TENSOR_MULT("Multiply(Tensor const&, Tensor const&)"));
+  static_assert(M2, SCALAR_TENSOR_MULT("Multiply(Tensor const&, Tensor const&)"));
+  if (tensor_1.shape_.dimensions_[0] != tensor_2.shape_.dimensions_[M2 - 1])
+    throw std::logic_error(INNER_DIMENSION_MISMATCH("Multiply(Tensor const&, Tensor const&)"));
+  auto shape = Shape<M1 + M2 - 2>();
+  for (size_t i = 0; i < M1 - 1; ++i)
+    shape.dimensions_[i] = tensor_1.shape_.dimensions_[i];
+  for (size_t i = 0; i < M2 - 1; ++i)
+    shape.dimensions_[i + M1 - 1] = tensor_2.shape_.dimensions_[i];
+  Tensor<X, M1 + M2 - 2> prod_tensor(shape);
+  
+  uint32_t cumul_index = 
+    (tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1]) *
+    (tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[M2 - 1]);
+  uint32_t dim_trackers_1[M1 - 1], dim_trackers_2[M2 - 1];
+  std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_trackers_1);
+  std::copy_n(tensor_2.shape_.dimensions_, M2 - 1, dim_trackers_2);
+  for (size_t i = 0; i < cumul_index; ++i) {
+    uint32_t index = 0, t1_index = 0, t2_index = 0;
+    for (size_t j = 0; j < M1 - 1; ++j) {
+      index += shape.dimensions_[j] - dim_trackers_1[j];
+      t1_index += tensor_1.steps_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
+    }
+    for (size_t j = 0; j < M2 - 1; ++j) {
+      index += shape.dimensions_[j + M1 - 1] - dim_trackers_2[j];
+      t1_index += tensor_2.steps_[j] * (tensor_2.shape_.dimensions_[j] - dim_trackers_2[j]);
+    }
+    X value {};
+    for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x) {
+        value += *(tensor_1.data_ + t1_index + tensor_1.steps_[M1 - 1] * x) *
+          *(tensor_2.data_ + t2_index + tensor_2.steps_[0] * x);
+    }
+    prod_tensor.data_[index] = value;
+    uint32_t dim_index = M1 - 1;
+    bool propogate = true;
+    // find the correct index to "step" to
+    while (dim_index && propogate) {
+      --dim_trackers_1[dim_index - 1];
+      --dim_index;
+      if (!dim_trackers_1[dim_index - 1]) dim_trackers_1[dim_index - 1] = tensor_1.shape_.dimensions_[dim_index - 1];
+      else propogate = false;
+    }
+    dim_index = M2 - 1;
+    propogate = true;
+    while (dim_index && propogate) {
+      --dim_trackers_2[dim_index - 1];
+      --dim_index;
+      if (!dim_trackers_2[dim_index - 1]) dim_trackers_2[dim_index - 1] = tensor_2.shape_.dimensions_[dim_index - 1];
+      else propogate = false;
+    }
+  }
+  return prod_tensor;
 }
 
 template <typename T, uint32_t N>
@@ -930,7 +1029,7 @@ public:
   /* -------------- Getters -------------- */
 
   constexpr static uint32_t rank() { return 0; }
-  Shape<0> const &shape() const noexcept { return shape_; }
+  Shape<0> shape() const noexcept { return shape_; }
   value_type &operator()() { return *data_; }
   value_type const &operator()() const { return *data_; }
 
@@ -977,20 +1076,16 @@ public:
   // Addition
   template <typename X, typename Y>
   friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
-  template <typename X, typename Y>
-  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const& value);
-  template <typename X, typename Y>
-  friend Tensor<X, 0> Add(X const& value, Tensor<Y, 0> const &tensor); 
 
   // Subtraction
   template <typename X, typename Y>
   friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
-  template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const& value);
-  template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(X const& value, Tensor<Y, 0> const &tensor); 
 
-  // negation
+  // Multiplication
+  template <typename X, typename Y>
+  friend Tensor<X, 0> Multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
+
+  // Negation
   Tensor<T, 0> operator-() const;
 
   /* ---------- Type Conversion ----------- */
@@ -1078,18 +1173,6 @@ Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
   return Tensor<X, 0>(tensor_1() + tensor_2());
 }
 
-template <typename X, typename Y>
-Tensor<X, 0> Add(Tensor<X, 0> const &tensor, Y const& value)
-{
-  return Tensor<X, 0>(tensor() + value);
-}
-
-template <typename X, typename Y>
-Tensor<X, 0> Add(X const& value, Tensor<Y, 0> const &tensor)
-{
-  return Tensor<X, 0>(tensor() + value);
-}
-
 template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
 inline Tensor<X, 0> Add(X const& x, Y const & y) { return Tensor<X, 0>(x + y); }
@@ -1100,21 +1183,19 @@ Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2
   return Tensor<X, 0>(tensor_1() - tensor_2());
 }
 
-template <typename X, typename Y>
-Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor, Y const& value)
-{
-  return Tensor<X, 0>(tensor() - value);
-}
+template <typename X, typename Y, typename = typename std::enable_if<
+          LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
+inline Tensor<X, 0> Subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
 
 template <typename X, typename Y>
-Tensor<X, 0> Subtract(X const& value, Tensor<Y, 0> const &tensor)
+Tensor<X, 0> Multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
-  return Tensor<X, 0>(value - tensor());
+  return Tensor<X, 0>(tensor_1() * tensor_2());
 }
 
 template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
-inline Tensor<X, 0> Subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
+inline Tensor<X, 0> Multiply(X const& x, Y const & y) { return Tensor<X, 0>(x * y); }
 
 template <typename T>
 Tensor<T, 0> Tensor<T, 0>::operator-() const
@@ -1152,8 +1233,6 @@ public:
   uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
-  Shape<LHSType::rank()> const &shape() const noexcept { return lhs_.shape(); }
-  uint32_t const *steps() const noexcept { return lhs_.steps(); }
 
 private:
   LHSType const &lhs_;
@@ -1206,10 +1285,8 @@ public:
 
   constexpr static uint32_t rank() { return LHSType::rank(); }
   uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
-  Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
-  uint32_t const *steps() const noexcept { return lhs_.steps(); }
 
   /* ------------------------------------------ */
 
@@ -1247,11 +1324,55 @@ std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &bi
   return os;
 }
 
-
-/*
- * The following methods are built on top of the core of the libarary
+/**
+ * Multiplies the inner dimensions
+ * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor 
  */
 
+template <typename LHSType, typename RHSType>
+class BinaryMul: public Expression<BinaryMul<LHSType, RHSType>> {
+public:
+  /* ---------------- typedefs --------------- */
+
+  typedef typename LHSType::value_type value_type;
+  typedef BinaryMul                    self_type;         
+
+  /* -------------- Constructors -------------- */
+
+  BinaryMul(LHSType const &lhs, RHSType const &rhs);
+
+  /* ---------------- Getters ----------------- */
+
+  constexpr static uint32_t rank() { return LHSType::rank() + RHSType::rank() - 2; }
+  uint32_t dimension(uint32_t index) const; 
+  template <typename... Indices>
+  Tensor<value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> operator()(Indices... indices) const;
+
+private:
+  LHSType const &lhs_;
+  RHSType const &rhs_;
+};
+
+template <typename LHSType, typename RHSType>
+BinaryMul<LHSType, RHSType>::BinaryMul(LHSType const &lhs, RHSType const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
+
+template <typename LHSType, typename RHSType>
+template <typename... Indices>
+Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const 
+{
+  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Multiplication"));
+  return Multiply(ValueToTensor<LHSType>(lhs_).value(),
+                  ValueToTensor<RHSType>(rhs_).value())();
+}
+
+/* FIXME
+template <typename LHSType, typename RHSType>
+BinaryMul<LHSType, RHSType>::
+
+template <typename LHSType, typename RHSType>
+uint32_t BinaryMul<LHSType, RHSType>::dimension(uint32_t index) const; 
+*/
 
 } // tensor
 
