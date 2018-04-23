@@ -314,6 +314,17 @@ uint32_t Indices<N>::operator[](size_t index) const
   return indices_[index];
 }
 
+/* ------------ Reference Counting ------------ */
+
+template <typename T>
+struct ReferenceFrame {
+  typedef T value_type;
+
+  ReferenceFrame(T *data_) : data(data_), count(1) {}
+  value_type *data;
+  size_t count;
+};
+
 template <typename T, uint32_t N>
 class Tensor: public Expression<Tensor<T, N>> {
 public:
@@ -411,19 +422,19 @@ public:
 
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
-  bool owner_flag() const noexcept { return owner_flag_; }
   uint32_t const *dimensions() const noexcept { return shape_.dimensions_; }
 #endif
 /* ------------------------------------------------------------------------- */
 
 private:
 
+
   /* ----------------- Data ---------------- */
 
   Shape<N> shape_;
   uint32_t steps_[N];
   value_type *data_;
-  bool owner_flag_;           // ownership of memory
+  ReferenceFrame<T> *frame_;
 
   /* --------------- Getters --------------- */
 
@@ -463,11 +474,9 @@ private:
 
   // allocate new space and copy data
   value_type * pDuplicateData() const;
-  // move data pointer
-  value_type * pMoveData();
 
   // Declare all fields of the constructor at once
-  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data);
+  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data, ReferenceFrame<T> *frame);
 
 
 }; // Tensor
@@ -476,62 +485,78 @@ private:
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), owner_flag_(true) 
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()])
 {
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
     steps_[N - i - 1] = accumulator;
     accumulator *= shape_.dimensions_[N - i - 1];
   }
+
+  // create a new reference 
+  frame_ = new ReferenceFrame<T>(data_);
 }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), owner_flag_(true) 
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()])
 {
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
     steps_[N - i - 1] = accumulator;
     accumulator *= shape_.dimensions_[N - i - 1];
   }
+
+  // create a new reference
+  frame_ = new ReferenceFrame<T>(data_);
 }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
-  : shape_(tensor.shape_), data_(tensor.pDuplicateData()), owner_flag_(true) 
+  : shape_(tensor.shape_), data_(tensor.pDuplicateData())
 {
   std::copy_n(tensor.steps_, N, steps_);
+
+  // create a new reference 
+  frame_ = new ReferenceFrame<T>(data_);
 }
 
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(Tensor<T, N> &&tensor): shape_(tensor.shape_), data_(tensor.data_), owner_flag_(tensor.owner_flag_)
+Tensor<T, N>::Tensor(Tensor<T, N> &&tensor)
+  : shape_(tensor.shape_), data_(tensor.data_), frame_(tensor.frame_)
 {
   std::copy_n(tensor.steps_, N, steps_);
-  tensor.owner_flag_ = false;
+  ++frame_->count;
 }
 
 template <typename T, uint32_t N>
 template <typename NodeType>
 Tensor<T, N>::Tensor(Expression<NodeType> const& expression) 
-  : owner_flag_(true)
 {
   auto result = expression.self()();
   std::copy_n(result.steps_, N, steps_);
   shape_ = result.shape_;
-  data_ = result.pMoveData();
+  data_ = result.data_;
+  frame_ = result.frame_;
+  ++frame_->count;
 }
 
 // private constructor
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data)
-  : shape_(Shape<N>(dimensions, 0)), data_(data), owner_flag_(false)
+Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data, ReferenceFrame<T> *frame)
+  : shape_(Shape<N>(dimensions, 0)), data_(data), frame_(frame)
 {
   std::copy_n(steps, N, steps_);
+  ++frame_->count;
 }
 
 template <typename T, uint32_t N> Tensor<T, N>::~Tensor()
 {
-  if (owner_flag_) delete[] data_;
+  --frame_->count;
+  if (!frame_->count) {
+    delete[] frame_->data;
+    delete frame_;
+  }
 }
 
 template <typename T, uint32_t N>
@@ -579,7 +604,7 @@ Tensor<T, N - M> Tensor<T, N>::operator[](Indices<M> const &indices)
   uint32_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i) 
     cumul_index += steps_[N - i - 1] * (indices[i] - 1);
-  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M,  data_ + cumul_index);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M,  data_ + cumul_index, frame_);
 }
 
 template <typename T, uint32_t N>
@@ -674,7 +699,7 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t cumul_index)
 {
-  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M, data_ + cumul_index);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M, data_ + cumul_index, frame_);
 }
 
 template <typename T, uint32_t N>
@@ -744,7 +769,7 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_
       ++array_index;
     }
   }
-  return Tensor<T, N - M>(dimensions, steps, data_ + offset);
+  return Tensor<T, N - M>(dimensions, steps, data_ + offset, frame_);
 }
 
 /* ------------ Utility Methods ------------ */
@@ -756,13 +781,6 @@ T * Tensor<T, N>::pDuplicateData() const
   T * data = new T[count];
   std::copy_n(this->data_, count, data);
   return data;
-}
-
-template <typename T, uint32_t N>
-T * Tensor<T, N>::pMoveData() 
-{
-  owner_flag_ = false;
-  return data_;
 }
 
 template <typename T, uint32_t N>
@@ -1021,8 +1039,8 @@ template <typename T>
 class Tensor<T, 0>: public Expression<Tensor<T, 0>> {
 public:
   typedef T                 value_type;
-  typedef T&                reference;
-  typedef T const&          const_reference;
+  typedef T&                reference_type;
+  typedef T const&          const_reference_type;
   typedef Tensor<T, 0>      self_type;
 
   /* ------------- Friend Classes ------------- */
@@ -1110,42 +1128,62 @@ public:
   operator T const&() const { return *data_; }
 
 private:
-
+  
   /* ------------------- Data ------------------- */
   
   Shape<0> shape_;
   value_type * const data_;
-  bool owner_flag_;
+  ReferenceFrame<T> *frame_;
 
   /* ------------------ Utility ----------------- */
 
-  Tensor(uint32_t const *, uint32_t const *, T *data)
-    : data_(data), owner_flag_(false) {}
+  Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame);
 
 };
 
 /* ------------------- Constructors ----------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T), owner_flag_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T(std::forward<T>(val))), owner_flag_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(new T(*tensor.data_)), owner_flag_(true) {}
-
-template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): shape_(Shape<0>()), data_(tensor.data_), owner_flag_(tensor.owner_flag_)
+Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1])
 {
-  tensor.owner_flag_ = false;
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T[1])
+{
+  *data_ = std::forward<T>(val);
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(new T(*tensor.data_))
+{
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): shape_(Shape<0>()), data_(tensor.data_), frame_(tensor.frame_)
+{
+  ++frame_->count;
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame)
+  : data_(data), frame_(frame) 
+{
+  ++frame_->count;
 }
 
 template <typename T>
 Tensor<T, 0>::~Tensor()
 {
-  if (owner_flag_) delete data_;
-} 
+  --frame_->count;
+  if (!frame_->count) {
+    delete[] frame_->data;
+    delete frame_;
+  }
+}
 
 /* ---------------------- Assignment ---------------------- */
 
@@ -1378,10 +1416,8 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const 
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Multiplication"));
-  auto temporary = Multiply(ValueToTensor<LHSType>(lhs_).value(),
-                  ValueToTensor<RHSType>(rhs_).value());
-  // FIXME :: Forced copy here -- find something more efficient
-  return CopyTensor(temporary(indices...));
+  return Multiply(ValueToTensor<LHSType>(lhs_).value(),
+                  ValueToTensor<RHSType>(rhs_).value())(indices...);
 }
 
 template <typename LHSType, typename RHSType>

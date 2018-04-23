@@ -66,7 +66,6 @@ TEST_CASE("Intializing Tensors", "[int]") {
         for (uint32_t k = 1; k <= tensor_1.dimension(3); ++k)
           for (uint32_t l = 1; l <= tensor_1.dimension(4); ++l)
             REQUIRE(move_tensor(i, j, k, l) == (int)(1000 * i + 100 * j + 10 * k + l));
-    REQUIRE(!tensor_1.owner_flag());
   }
 
 }
