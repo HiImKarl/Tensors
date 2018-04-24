@@ -119,5 +119,12 @@ TEST_CASE("Tensor Multplication, Scalar") {
     for (uint32_t i = 1; i <= tensor_4.dimension(1); ++i) 
       for (uint32_t j = 1; j <= tensor_4.dimension(2); ++j) 
         REQUIRE(tensor_4(i, j) == 3);
+
+    Tensor<int32_t, 4> tensor_5 = tensor_4 * tensor_3 * tensor_4;
+    REQUIRE(tensor_5.rank() == 4);
+    REQUIRE(tensor_5.dimension(1) == 2);
+    REQUIRE(tensor_5.dimension(2) == 3);
+    REQUIRE(tensor_5.dimension(3) == 3);
+    REQUIRE(tensor_5.dimension(4) == 2);
   }
 }

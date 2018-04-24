@@ -137,22 +137,6 @@ TEST_CASE("Tensor Assignment", "[int]") {
     float fVALUE = -tensor_1(1,1,1,1);
     REQUIRE(fVALUE == -1111);
   }
-
-  SECTION("Zeros and Ones") {
-   auto zeros = Zeros<int32_t, 4>({2, 4, 6, 8});
-   for (uint32_t i = 1; i <= zeros.dimension(1); ++i) 
-     for (uint32_t j = 1; j <= zeros.dimension(2); ++j) 
-      for (uint32_t k = 1; k <= zeros.dimension(3); ++k) 
-        for (uint32_t l = 1; l <= zeros.dimension(4); ++l) 
-          REQUIRE(zeros(i, j, k, l) == 0);
-
-   auto ones = Ones<int32_t, 4>({2, 4, 6, 8});
-   for (uint32_t i = 1; i <= ones.dimension(1); ++i) 
-     for (uint32_t j = 1; j <= ones.dimension(2); ++j) 
-      for (uint32_t k = 1; k <= ones.dimension(3); ++k) 
-        for (uint32_t l = 1; l <= ones.dimension(4); ++l) 
-          REQUIRE(ones(i, j, k, l) == 1);
-  }
 }
 
 TEST_CASE("Scalar Assignment", "[int]") {

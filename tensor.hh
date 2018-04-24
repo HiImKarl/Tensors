@@ -117,7 +117,7 @@ struct IsScalar<Tensor<T, N>> { static bool const value = false; };
 
 template <typename T>
 struct ValueToTensor {
-  ValueToTensor(T&& val): value(std::forward<T>(val)) {}
+  ValueToTensor(T &&val): value(std::forward<T>(val)) {}
   Tensor<T, 0> value;
 };
 
@@ -140,6 +140,13 @@ template <typename LHS, typename RHS>
 struct ValueToTensor<BinarySub<LHS, RHS>> {
   ValueToTensor(BinarySub<LHS, RHS> const &val): value(val) {}
   BinarySub<LHS, RHS> const &value;
+};
+
+template <>
+template <typename LHS, typename RHS>
+struct ValueToTensor<BinaryMul<LHS, RHS>> {
+  ValueToTensor(BinaryMul<LHS, RHS> const &val): value(val) {}
+  BinaryMul<LHS, RHS> const &value;
 };
 
 /* ---------------- Template Meta-Functions ---------------- */
@@ -347,7 +354,9 @@ public:
   /* ----------------- Constructors ----------------- */
 
   explicit Tensor(uint32_t const (&indices)[N]);
+  Tensor(uint32_t const (&dimensions)[N], T const &value);
   explicit Tensor(Shape<N> shape);
+  Tensor(Shape<N> shape, T const &value);
   Tensor(Tensor<T, N> const &tensor);
   Tensor(Tensor<T, N> &&tensor);
   template <typename NodeType>
@@ -415,10 +424,6 @@ public:
 
   /* -------------- Useful Functions ------------------- */
 
-  template <typename U, uint32_t M>
-  friend Tensor<U, M> Zeros(uint32_t const (&dimensions)[M]);
-  template <typename U, uint32_t M>
-  friend Tensor<U, M> Ones(uint32_t const (&dimensions)[M]);
 
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
@@ -475,6 +480,9 @@ private:
   // allocate new space and copy data
   value_type * pDuplicateData() const;
 
+  // Initialize steps :: DIMENSIONS MUST BE INITIALIZED FIRST
+  void pInitializeSteps();
+
   // Declare all fields of the constructor at once
   Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data, ReferenceFrame<T> *frame);
 
@@ -487,13 +495,18 @@ template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()])
 {
-  size_t accumulator = 1;
-  for (size_t i = 0; i < N; ++i) {
-    steps_[N - i - 1] = accumulator;
-    accumulator *= shape_.dimensions_[N - i - 1];
-  }
-
+  pInitializeSteps();
   // create a new reference 
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value) 
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()])
+{
+  pInitializeSteps();
+  std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
+  pMap(allocate);
   frame_ = new ReferenceFrame<T>(data_);
 }
 
@@ -501,13 +514,18 @@ template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
   : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()])
 {
-  size_t accumulator = 1;
-  for (size_t i = 0; i < N; ++i) {
-    steps_[N - i - 1] = accumulator;
-    accumulator *= shape_.dimensions_[N - i - 1];
-  }
-
+  pInitializeSteps();
   // create a new reference
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()])
+{
+  pInitializeSteps();
+  std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
+  pMap(allocate);
   frame_ = new ReferenceFrame<T>(data_);
 }
 
@@ -871,6 +889,16 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
   }
 }
 
+template <typename T, uint32_t N>
+void Tensor<T, N>::pInitializeSteps()
+{
+  size_t accumulator = 1;
+  for (size_t i = 0; i < N; ++i) {
+    steps_[N - i - 1] = accumulator;
+    accumulator *= shape_.dimensions_[N - i - 1];
+  }
+}
+
 /* -------------------------- Expressions -------------------------- */
 
 template <typename X, typename Y, uint32_t M>
@@ -966,30 +994,6 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 
 /* ------------------------ Useful Functions ------------------- */
 
-template <typename U, uint32_t M>
-Tensor<U, M> Zeros(uint32_t const (&dimensions)[M]) 
-{
-  Tensor<U, M> zero_tensor(dimensions);
-  std::function<void(U *)> zero = [](U *x) -> void 
-  {
-    *x = 0;
-  };
-  zero_tensor.pMap(zero);
-  return zero_tensor;
-}
-
-template <typename U, uint32_t M>
-Tensor<U, M> Ones(uint32_t const (&dimensions)[M]) 
-{
-  Tensor<U, M> one_tensor(dimensions);
-  std::function<void(U *)> one = [](U *x) -> void 
-  {
-    *x = 1;
-  };
-  one_tensor.pMap(one);
-  return one_tensor;
-}
-
 /* ------------------------ Scalar Specialization ----------------------- */
 
 template <>
@@ -1051,6 +1055,7 @@ public:
 
   Tensor();
   explicit Tensor(value_type &&val);
+  explicit Tensor(Shape<0>);
   Tensor(Tensor<T, 0> const &tensor);
   Tensor(Tensor<T, 0> &&tensor);
   ~Tensor();
@@ -1144,7 +1149,13 @@ private:
 /* ------------------- Constructors ----------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1])
+Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1]())
+{
+  frame_ = new ReferenceFrame<T>(data_);
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Shape<0>) : shape_(Shape<0>()), data_(new T[1]())
 {
   frame_ = new ReferenceFrame<T>(data_);
 }

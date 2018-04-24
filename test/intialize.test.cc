@@ -66,7 +66,15 @@ TEST_CASE("Intializing Tensors", "[int]") {
         for (uint32_t k = 1; k <= tensor_1.dimension(3); ++k)
           for (uint32_t l = 1; l <= tensor_1.dimension(4); ++l)
             REQUIRE(move_tensor(i, j, k, l) == (int)(1000 * i + 100 * j + 10 * k + l));
-  }
+ }
+
+ SECTION("Value Constructor") {
+    auto ones = Tensor<int32_t, 3>({2, 3, 4}, 1);
+    for (uint32_t i = 1; i <= tensor_1.dimension(1); ++i)
+      for (uint32_t j = 1; j <= tensor_1.dimension(2); ++j)
+        for (uint32_t k = 1; k <= tensor_1.dimension(3); ++k)
+          REQUIRE(ones(i, j, k) == 1);
+ }
 
 }
 
