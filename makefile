@@ -1,6 +1,6 @@
 SUBDIRS := test
 CXX := g++
-CXXFLAGS := -O3 -I./ -I./include -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD
+CXXFLAGS := -O3 -I. -I./include -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD
 LINK := g++
 LINKFLAGS :=
 
