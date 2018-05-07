@@ -36,4 +36,13 @@ TEST_CASE("Logic Errors") {
       REQUIRE(0);
     } catch (const std::logic_error &e) { REQUIRE(1); }
   }
+
+  SECTION("Multiplication Shape Mismatch") {
+    Tensor<int32_t, 3> tensor_1({1, 2, 3});
+    Tensor<int32_t, 2> tensor_2({4, 2});
+    try {
+      Tensor<int32_t, 3> tensor_3 = tensor_1 * tensor_2;
+      REQUIRE(0);
+    } catch (const std::logic_error &e) { REQUIRE(1); }
+  }
 }

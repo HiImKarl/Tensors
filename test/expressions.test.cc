@@ -58,7 +58,7 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
 }
 
 
-TEST_CASE("Basic Tensor Arithmetic, Scalar") {
+TEST_CASE("Scalar Arithmatic") {
   auto tensor_1 = Tensor<int32_t>(10);
   auto tensor_2 = Tensor<int32_t>(-10); 
 
@@ -70,7 +70,12 @@ TEST_CASE("Basic Tensor Arithmetic, Scalar") {
     REQUIRE(tensor_1 + 10 == 20);
     REQUIRE(10 + tensor_1 == 20);
     REQUIRE(tensor_1 - 10 == 0);
-    REQUIRE(10 - tensor_1 == 0);
+
+    Tensor<int32_t> tensor_3 = tensor_1 + tensor_2;
+    REQUIRE(tensor_3 == 0);
+
+    Tensor<int32_t> tensor_4 = tensor_1 - tensor_2;
+    REQUIRE(tensor_4 == 20);
   }
 
   SECTION("Multi-Term Addition/Subtract") {
@@ -80,13 +85,22 @@ TEST_CASE("Basic Tensor Arithmetic, Scalar") {
     REQUIRE(tensor_1 + 10 - tensor_2 + 5 == 35);
   }
 
+  SECTION("Multiplication") { 
+    REQUIRE(tensor_1() * tensor_2() == -100);
+    REQUIRE((tensor_1 * tensor_2)() == -100);
+    REQUIRE(tensor_1 * 4 == 40);
+
+    Tensor<int32_t> tensor_3 = tensor_1 * tensor_2;
+    REQUIRE(tensor_3 == -100);
+  }
+
   SECTION("Negation") {
     REQUIRE(-tensor_1 == -10);
     REQUIRE(-tensor_1 - 10 + -tensor_2 - 5 == -15);
   }
 }
 
-TEST_CASE("Tensor Multplication, Scalar") {
+TEST_CASE("Tensor Multplication") {
   auto tensor_1 = Tensor<int32_t, 3>({2, 3, 4});
   auto tensor_2 = Tensor<int32_t, 3>({4, 3, 2});
   for (uint32_t i = 1; i <= tensor_1.dimension(1); ++i) 
@@ -126,5 +140,19 @@ TEST_CASE("Tensor Multplication, Scalar") {
     REQUIRE(tensor_5.dimension(2) == 3);
     REQUIRE(tensor_5.dimension(3) == 3);
     REQUIRE(tensor_5.dimension(4) == 2);
+  }
+
+  SECTION("Combined Multiplication and Addition/Subtraction") {
+    Tensor<int32_t, 4> tensor_3 = tensor_1 * tensor_2 + tensor_1 * tensor_2;
+    for (uint32_t i = 1; i <= tensor_3.dimension(1); ++i) 
+      for (uint32_t j = 1; j <= tensor_3.dimension(2); ++j) 
+        for (uint32_t k = 1; k <= tensor_3.dimension(3); ++k) 
+          for (uint32_t l = 1; l <= tensor_3.dimension(4); ++l) 
+            REQUIRE(tensor_3(i, j, k, l) == 8);
+
+    Tensor<int32_t, 2> tensor_4 = (tensor_1.slice<1, 2>(1) - tensor_1.slice<1, 2>(1)) * tensor_2(1);
+    for (uint32_t i = 1; i <= tensor_4.dimension(1); ++i)
+      for (uint32_t j = 1; j <= tensor_4.dimension(2); ++j)
+        REQUIRE(tensor_4(i, j) == 0);
   }
 }
