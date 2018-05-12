@@ -67,16 +67,16 @@ TEST_CASE("Multiple Tensors") {
 
   SECTION("Copy Destructor") {
     {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
     }
     REQUIRE(destructor_counter == 32);
   }
 
   SECTION("Move Construction") {
     {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = std::move(tensor_1);
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = std::move(tensor_1);
     }
     REQUIRE(destructor_counter == 32);
   }
@@ -92,6 +92,25 @@ TEST_CASE("Multiple Tensors") {
     { test_func(); }
     REQUIRE(destructor_counter == 32);
     { auto tensor = test_func(); }
+    REQUIRE(destructor_counter == 64);
+  }
+}
+
+TEST_CASE("Explicit Copy Method") {
+  constructor_counter = 0;
+  destructor_counter = 0;
+  
+  SECTION("Constructor") {
+    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.copy();
+    REQUIRE(constructor_counter == 32);
+  }
+
+  SECTION("Destructor") {
+    {
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.copy();
+    }
     REQUIRE(destructor_counter == 64);
   }
 }

@@ -409,8 +409,7 @@ public:
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
 
   /* -------------- Useful Functions ------------------- */
-  template <typename U, uint32_t M>
-  Tensor<U, M> CopyTensor(Tensor<U, M> const &tensor);
+  Tensor<T, N> copy() const;
 
 
 /* --------------------------- Debug Information --------------------------- */
@@ -965,13 +964,13 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 // Tensor<T, N1> Resize(Tensor<T, N2> const &tensor) {}
 
 template <typename T, uint32_t N>
-Tensor<T, N> CopyTensor(Tensor<T, N> const &tensor)
+Tensor<T, N> Tensor<T, N>::copy() const
 {
-  T *data = tensor.pDuplicateData();
+  T *data = pDuplicateData();
   ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
   // decrement reference because its incremented in the constructor
   --frame->count;
-  return Tensor<T, N>(tensor.shape_.dimensions_, tensor.strides_, data, frame);
+  return Tensor<T, N>(shape_.dimensions_, strides_, data, frame);
 }
 
 /* ------------------------ Scalar Specialization ----------------------- */
@@ -1114,8 +1113,7 @@ public:
   operator T const&() const { return *data_; }
 
   /* ------------- Useful Functions ------------ */
-  template <typename U>
-  Tensor<U, 0> CopyTensor(Tensor<U, 0> const &tensor);
+  Tensor<T, 0> copy() const;
 
 private:
   
@@ -1268,9 +1266,10 @@ std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
 /* ------------------- Useful Functions ---------------------- */
 
 template <typename T>
-Tensor<T, 0> CopyTensor(Tensor<T, 0> const &tensor)
+Tensor<T, 0> Tensor<T, 0>::copy() const
 { 
-  T *data = new T(*tensor.data_);
+  T *data = new T[1]();
+  *data = *data_;
   ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
   // decrement count because it gets incremented in the constructor
   --frame->count;
