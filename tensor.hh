@@ -186,7 +186,8 @@ public:
   /* -------------------- Getters --------------------- */
 
   constexpr static uint32_t rank() { return N; }
-  uint32_t dimension(uint32_t index) const ;
+  uint32_t &operator[](uint32_t index);
+  uint32_t operator[](uint32_t index) const;
 
   /* -------------------- Equality -------------------- */
 
@@ -252,7 +253,17 @@ Shape<N> &Shape<N>::operator=(Shape<N> const &shape)
 }
 
 template <uint32_t N>
-uint32_t Shape<N>::dimension(uint32_t index) const 
+uint32_t &Shape<N>::operator[](uint32_t index)
+{
+  if (N < index || index == 0)
+    throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(uint32_t)"));
+
+  // indexing begins at 1
+  return dimensions_[index - 1];
+}
+
+template <uint32_t N>
+uint32_t Shape<N>::operator[](uint32_t index) const
 {
   if (N < index || index == 0)
     throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(uint32_t)"));
@@ -361,7 +372,7 @@ public:
   /* ----------------- Getters ----------------- */
   
   constexpr static uint32_t rank() { return N; }
-  uint32_t dimension(uint32_t index) const { return shape_.dimension(index); }
+  uint32_t dimension(uint32_t index) const { return shape_[index]; }
   Shape<N> shape() const noexcept { return shape_; }
 
   /* ------------------ Access To Data ----------------- */

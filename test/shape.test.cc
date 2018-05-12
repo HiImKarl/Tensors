@@ -12,7 +12,7 @@ TEST_CASE("Shapes") {
   SECTION("Rank and Dimensions") {
     REQUIRE(shape.rank() == 8);
     for (uint32_t i = 1; i <= 8; ++i)
-      REQUIRE(shape.dimension(i) == i);
+      REQUIRE(shape[i] == i);
   }
 
   SECTION("Tensor Constructor") {
