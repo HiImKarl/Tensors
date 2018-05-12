@@ -24,6 +24,11 @@ static Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> test_fun
   return tensor;
 }
 
+/**
+ *  Notice that the copy constructor and move constructor should behave in the same way
+ *  the move constructor is not explicitly defined
+ */
+
 TEST_CASE("Single Tensor") {
   constructor_counter = 0;
   destructor_counter = 0;
@@ -51,7 +56,7 @@ TEST_CASE("Multiple Tensors") {
   SECTION("Copy Constructor") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
-    REQUIRE(constructor_counter == 32);
+    REQUIRE(constructor_counter == 16);
   }
 
   SECTION("Move Constructor") {
@@ -65,7 +70,7 @@ TEST_CASE("Multiple Tensors") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
     }
-    REQUIRE(destructor_counter == 64);
+    REQUIRE(destructor_counter == 32);
   }
 
   SECTION("Move Construction") {

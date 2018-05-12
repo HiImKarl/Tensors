@@ -149,14 +149,6 @@ struct ValueToTensor<BinaryMul<LHS, RHS>> {
   BinaryMul<LHS, RHS> const &value;
 };
 
-/* ---------------- Template Meta-Functions ---------------- */
-
-template <typename T, uint32_t N>
-Tensor<T, N> CopyTensor(Tensor<T, N> &&tensor)
-{
-  return Tensor<T, N>(tensor);
-}
-
 /* ---------------------------------------------------------- */
 
 
@@ -356,7 +348,6 @@ public:
   explicit Tensor(Shape<N> shape);
   Tensor(Shape<N> shape, T const &value);
   Tensor(Tensor<T, N> const &tensor);
-  Tensor(Tensor<T, N> &&tensor);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
   ~Tensor();
@@ -418,6 +409,8 @@ public:
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
 
   /* -------------- Useful Functions ------------------- */
+  template <typename U, uint32_t M>
+  Tensor<U, M> CopyTensor(Tensor<U, M> const &tensor);
 
 
 /* --------------------------- Debug Information --------------------------- */
@@ -428,17 +421,16 @@ public:
 
 private:
 
-
   /* ----------------- Data ---------------- */
 
   Shape<N> shape_;
-  uint32_t steps_[N];
+  uint32_t strides_[N];
   value_type *data_;
   ReferenceFrame<T> *frame_;
 
   /* --------------- Getters --------------- */
 
-  uint32_t const *steps() const noexcept { return steps_; }
+  uint32_t const *strides() const noexcept { return strides_; }
 
   /* ------------- Expansion for operator()() ------------- */
   
@@ -465,7 +457,7 @@ private:
   /* ----------------- Utility -------------------- */
 
   // Data mapping
-  void pUpdateTrackers(uint32_t (&dim_trackers)[N]);
+  void pUpdateTrackers(uint32_t (&dim_trackers)[N]) const;
   void pMap(std::function<void(T *lhs)> const &fn);
   template <typename X>
   void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn); 
@@ -476,11 +468,11 @@ private:
   // allocate new space and copy data
   value_type * pDuplicateData() const;
 
-  // Initialize steps :: DIMENSIONS MUST BE INITIALIZED FIRST
+  // Initialize strides :: DIMENSIONS MUST BE INITIALIZED FIRST
   void pInitializeSteps();
 
-  // Declare all fields of the constructor at once
-  Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data, ReferenceFrame<T> *frame);
+  // Declare all fields in jthe constructor 
+  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, ReferenceFrame<T> *frame);
 
 
 }; // Tensor
@@ -527,19 +519,9 @@ Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
-  : shape_(tensor.shape_), data_(tensor.pDuplicateData())
-{
-  std::copy_n(tensor.steps_, N, steps_);
-
-  // create a new reference 
-  frame_ = new ReferenceFrame<T>(data_);
-}
-
-template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(Tensor<T, N> &&tensor)
   : shape_(tensor.shape_), data_(tensor.data_), frame_(tensor.frame_)
 {
-  std::copy_n(tensor.steps_, N, steps_);
+  std::copy_n(tensor.strides_, N, strides_);
   ++frame_->count;
 }
 
@@ -548,19 +530,10 @@ template <typename NodeType>
 Tensor<T, N>::Tensor(Expression<NodeType> const& expression) 
 {
   auto result = expression.self()();
-  std::copy_n(result.steps_, N, steps_);
+  std::copy_n(result.strides_, N, strides_);
   shape_ = result.shape_;
   data_ = result.data_;
   frame_ = result.frame_;
-  ++frame_->count;
-}
-
-// private constructor
-template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *steps, T *data, ReferenceFrame<T> *frame)
-  : shape_(Shape<N>(dimensions, 0)), data_(data), frame_(frame)
-{
-  std::copy_n(steps, N, steps_);
   ++frame_->count;
 }
 
@@ -617,8 +590,8 @@ Tensor<T, N - M> Tensor<T, N>::operator[](Indices<M> const &indices)
 {
   uint32_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i) 
-    cumul_index += steps_[N - i - 1] * (indices[i] - 1);
-  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M,  data_ + cumul_index, frame_);
+    cumul_index += strides_[N - i - 1] * (indices[i] - 1);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M,  data_ + cumul_index, frame_);
 }
 
 template <typename T, uint32_t N>
@@ -698,7 +671,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
       --dim_index;
     }
     for (size_t j = 0; j < N; ++j)
-      index += tensor.steps_[j] * (tensor.shape_.dimensions_[j] - dim_trackers[j]);
+      index += tensor.strides_[j] * (tensor.shape_.dimensions_[j] - dim_trackers[j]);
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
@@ -713,7 +686,7 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t cumul_index)
 {
-  return Tensor<T, N - M>(shape_.dimensions_ + M, steps_ + M, data_ + cumul_index, frame_);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, frame_);
 }
 
 template <typename T, uint32_t N>
@@ -725,7 +698,7 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
 
   // adjust for 1 index array access
-  cumul_index += steps_[M - sizeof...(rest) - 1] * (next_index - 1);
+  cumul_index += strides_[M - sizeof...(rest) - 1] * (next_index - 1);
   return pAccessExpansion<M>(cumul_index, rest...);
 }
 
@@ -772,18 +745,18 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_
 {
   uint32_t offset = 0;
   uint32_t dimensions[N - M];
-  uint32_t steps[N - M];
+  uint32_t strides[N - M];
   uint32_t array_index = 0;
   for (uint32_t i = 0; i < N; ++i) {
     if (placed_indices[i]) {
-      offset += (placed_indices[i] - 1) * steps_[i]; // adjust for 1-based indexing
+      offset += (placed_indices[i] - 1) * strides_[i]; // adjust for 1-based indexing
     } else {
-      steps[array_index] = steps_[i];
+      strides[array_index] = strides_[i];
       dimensions[array_index] = shape_.dimensions_[i];
       ++array_index;
     }
   }
-  return Tensor<T, N - M>(dimensions, steps, data_ + offset, frame_);
+  return Tensor<T, N - M>(dimensions, strides, data_ + offset, frame_);
 }
 
 /* ------------ Utility Methods ------------ */
@@ -799,7 +772,7 @@ T * Tensor<T, N>::pDuplicateData() const
 
 // find the correct index to "step" to
 template <typename T, uint32_t N>
-void Tensor<T, N>::pUpdateTrackers(uint32_t (&dim_trackers)[N])
+void Tensor<T, N>::pUpdateTrackers(uint32_t (&dim_trackers)[N]) const
 {
   uint32_t dim_index = N;
   bool propogate = true;
@@ -824,7 +797,7 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
   for (size_t i = 0; i < cumul_index; ++i) {
     uint32_t index = 0;
     for (size_t j = 0; j < N; ++j) 
-      index += steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
     fn(&(data_[index]));
     pUpdateTrackers(dim_trackers);
   }
@@ -843,8 +816,8 @@ void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
   for (size_t i = 0; i < cumul_index; ++i) {
     uint32_t index = 0, t_index = 0;
     for (size_t j = 0; j < N; ++j) {
-      index += steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t_index += tensor.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      t_index += tensor.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
     }
     fn(&(data_[index]), &(tensor.data_[t_index]));
     pUpdateTrackers(dim_trackers);
@@ -862,9 +835,9 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
   for (size_t i = 0; i < cumul_index; ++i) {
     uint32_t index = 0, t1_index = 0, t2_index = 0;
     for (size_t j = 0; j < N; ++j) {
-      index += steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t1_index += tensor_1.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t2_index += tensor_2.steps_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      t1_index += tensor_1.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+      t2_index += tensor_2.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
     }
     fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]); 
     pUpdateTrackers(dim_trackers);
@@ -876,9 +849,18 @@ void Tensor<T, N>::pInitializeSteps()
 {
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
-    steps_[N - i - 1] = accumulator;
+    strides_[N - i - 1] = accumulator;
     accumulator *= shape_.dimensions_[N - i - 1];
   }
+}
+
+// private constructor
+template <typename T, uint32_t N>
+Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, ReferenceFrame<T> *frame)
+  : shape_(Shape<N>(dimensions, 0)), data_(data), frame_(frame)
+{
+  std::copy_n(strides, N, strides_);
+  ++frame_->count;
 }
 
 /* -------------------------- Expressions -------------------------- */
@@ -918,6 +900,8 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   if (tensor_1.shape_.dimensions_[0] != tensor_2.shape_.dimensions_[M2 - 1])
     throw std::logic_error(INNER_DIMENSION_MISMATCH("Multiply(Tensor const&, Tensor const&)"));
   auto shape = Shape<M1 + M2 - 2>();
+
+  // FIXME :: Very messy, is there any way to implement an internal iterator?
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2> prod_tensor(shape);
@@ -931,13 +915,13 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
       uint32_t t1_index = 0, t2_index = 0;
       for (size_t j = 0; j < M1 - 1; ++j) 
-        t1_index += tensor_1.steps_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
+        t1_index += tensor_1.strides_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
       for (size_t j = 0; j < M2 - 1; ++j) 
-        t2_index += tensor_2.steps_[j + 1] * (tensor_2.shape_.dimensions_[j + 1] - dim_trackers_2[j]);
+        t2_index += tensor_2.strides_[j + 1] * (tensor_2.shape_.dimensions_[j + 1] - dim_trackers_2[j]);
       X value {};
       for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x) 
-          value += *(tensor_1.data_ + t1_index + tensor_1.steps_[M1 - 1] * x) *
-            *(tensor_2.data_ + t2_index + tensor_2.steps_[0] * x);
+          value += *(tensor_1.data_ + t1_index + tensor_1.strides_[M1 - 1] * x) *
+            *(tensor_2.data_ + t2_index + tensor_2.strides_[0] * x);
       prod_tensor.data_[index] = value;
       uint32_t dim_index = M2 - 1;
       bool propogate = true;
@@ -974,7 +958,21 @@ Tensor<T, N> Tensor<T, N>::operator-() const
   return neg_tensor;
 }
 
-/* ------------------------ Useful Functions ------------------- */
+/* --------------------------- Useful Functions ------------------------- */
+  
+// creates a tensor with a different shape but the same number of elements
+// template <typename T, uint32_t N1, uint32_t N2>
+// Tensor<T, N1> Resize(Tensor<T, N2> const &tensor) {}
+
+template <typename T, uint32_t N>
+Tensor<T, N> CopyTensor(Tensor<T, N> const &tensor)
+{
+  T *data = tensor.pDuplicateData();
+  ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
+  // decrement reference because its incremented in the constructor
+  --frame->count;
+  return Tensor<T, N>(tensor.shape_.dimensions_, tensor.strides_, data, frame);
+}
 
 /* ------------------------ Scalar Specialization ----------------------- */
 
@@ -1039,7 +1037,6 @@ public:
   explicit Tensor(value_type &&val);
   explicit Tensor(Shape<0>);
   Tensor(Tensor<T, 0> const &tensor);
-  Tensor(Tensor<T, 0> &&tensor);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
   ~Tensor();
@@ -1116,6 +1113,10 @@ public:
   operator T &() { return *data_; }
   operator T const&() const { return *data_; }
 
+  /* ------------- Useful Functions ------------ */
+  template <typename U>
+  Tensor<U, 0> CopyTensor(Tensor<U, 0> const &tensor);
+
 private:
   
   /* ------------------- Data ------------------- */
@@ -1152,20 +1153,7 @@ Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T[1])
 }
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(new T(*tensor.data_))
-{
-  frame_ = new ReferenceFrame<T>(data_);
-}
-
-template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): shape_(Shape<0>()), data_(tensor.data_), frame_(tensor.frame_)
-{
-  ++frame_->count;
-}
-
-template <typename T>
-Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame)
-  : data_(data), frame_(frame) 
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(tensor.data_), frame_(tensor.frame_)
 {
   ++frame_->count;
 }
@@ -1259,6 +1247,15 @@ Tensor<T, 0> Tensor<T, 0>::operator-() const
   return Tensor<T, 0>(-(*data_));
 }
 
+/* ------------------------ Utility --------------------------- */
+
+template <typename T>
+Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame)
+  : data_(data), frame_(frame) 
+{
+  ++frame_->count;
+}
+
 /* ------------------------ Overloads ------------------------ */
 
 template <typename X>
@@ -1266,6 +1263,18 @@ std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
 {
   os << *(tensor.data_);
   return os;
+}
+
+/* ------------------- Useful Functions ---------------------- */
+
+template <typename T>
+Tensor<T, 0> CopyTensor(Tensor<T, 0> const &tensor)
+{ 
+  T *data = new T(*tensor.data_);
+  ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
+  // decrement count because it gets incremented in the constructor
+  --frame->count;
+  return Tensor<T, 0>(nullptr, nullptr, data, frame);
 }
 
 /* ---------------------- Expressions ------------------------ */
