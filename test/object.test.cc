@@ -104,6 +104,7 @@ TEST_CASE("Explicit Copy Method") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.copy();
     REQUIRE(constructor_counter == 32);
+    PRINT(10);
   }
 
   SECTION("Destructor") {

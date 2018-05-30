@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <numeric>
 #include <functional>
+#include <memory> 
 
 /* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
@@ -150,7 +151,6 @@ struct ValueToTensor<BinaryMul<LHS, RHS>> {
 };
 
 /* ---------------------------------------------------------- */
-
 
 template <typename NodeType>
 struct Expression { 
@@ -324,15 +324,6 @@ uint32_t Indices<N>::operator[](size_t index) const
   return indices_[index];
 }
 
-/* ------------ Reference Counting ------------ */
-
-template <typename T>
-struct ReferenceFrame {
-  ReferenceFrame(T *data_) : data(data_), count(1) {}
-  T *data;
-  size_t count;
-};
-
 template <typename T, uint32_t N>
 class Tensor: public Expression<Tensor<T, N>> {
 public:
@@ -361,7 +352,6 @@ public:
   Tensor(Tensor<T, N> const &tensor);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
-  ~Tensor();
 
   /* ----------------- Assignment ----------------- */
 
@@ -394,7 +384,6 @@ public:
   template <uint32_t... Slices, typename... Indices>
   Tensor<T, sizeof...(Slices)> const slice(Indices... indices) const;
 
-
   /* -------------------- Expressions ------------------- */
 
   template <typename X, typename Y, uint32_t M>
@@ -422,7 +411,6 @@ public:
   /* -------------- Useful Functions ------------------- */
   Tensor<T, N> copy() const;
 
-
 /* --------------------------- Debug Information --------------------------- */
 #ifndef _NDBEUG
   uint32_t const *dimensions() const noexcept { return shape_.dimensions_; }
@@ -436,7 +424,7 @@ private:
   Shape<N> shape_;
   uint32_t strides_[N];
   value_type *data_;
-  ReferenceFrame<T> *frame_;
+  std::shared_ptr<T> ref_;
 
   /* --------------- Getters --------------- */
 
@@ -482,8 +470,7 @@ private:
   void pInitializeSteps();
 
   // Declare all fields in jthe constructor 
-  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, ReferenceFrame<T> *frame);
-
+  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&ref_);
 
 }; // Tensor
 
@@ -491,48 +478,39 @@ private:
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()])
-{
-  pInitializeSteps();
-  // create a new reference 
-  frame_ = new ReferenceFrame<T>(data_);
-}
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), 
+  ref_(data_, [](T *ptr) { delete[] ptr; })
+{ pInitializeSteps(); }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value) 
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()])
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), 
+  ref_(data_, [](T *ptr) { delete[] ptr; })
 {
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
   pMap(allocate);
-  frame_ = new ReferenceFrame<T>(data_);
 }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()])
-{
-  pInitializeSteps();
-  // create a new reference
-  frame_ = new ReferenceFrame<T>(data_);
-}
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, [](T *ptr) { delete[] ptr; })
+{ pInitializeSteps(); }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()])
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, [](T *ptr) { delete[] ptr; })
 {
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
   pMap(allocate);
-  frame_ = new ReferenceFrame<T>(data_);
 }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
-  : shape_(tensor.shape_), data_(tensor.data_), frame_(tensor.frame_)
+  : shape_(tensor.shape_), data_(tensor.data_), ref_(tensor.ref_)
 {
   std::copy_n(tensor.strides_, N, strides_);
-  ++frame_->count;
 }
 
 template <typename T, uint32_t N>
@@ -543,17 +521,7 @@ Tensor<T, N>::Tensor(Expression<NodeType> const& expression)
   std::copy_n(result.strides_, N, strides_);
   shape_ = result.shape_;
   data_ = result.data_;
-  frame_ = result.frame_;
-  ++frame_->count;
-}
-
-template <typename T, uint32_t N> Tensor<T, N>::~Tensor()
-{
-  --frame_->count;
-  if (!frame_->count) {
-    delete[] frame_->data;
-    delete frame_;
-  }
+  ref_ = std::move(result.ref_);
 }
 
 template <typename T, uint32_t N>
@@ -601,7 +569,7 @@ Tensor<T, N - M> Tensor<T, N>::operator[](Indices<M> const &indices)
   uint32_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i) 
     cumul_index += strides_[N - i - 1] * (indices[i] - 1);
-  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M,  data_ + cumul_index, frame_);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M,  data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
 template <typename T, uint32_t N>
@@ -696,7 +664,7 @@ template <typename T, uint32_t N>
 template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t cumul_index)
 {
-  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, frame_);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
 template <typename T, uint32_t N>
@@ -766,7 +734,7 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_
       ++array_index;
     }
   }
-  return Tensor<T, N - M>(dimensions, strides, data_ + offset, frame_);
+  return Tensor<T, N - M>(dimensions, strides, data_ + offset, std::shared_ptr<T>(ref_));
 }
 
 /* ------------ Utility Methods ------------ */
@@ -866,11 +834,10 @@ void Tensor<T, N>::pInitializeSteps()
 
 // private constructor
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, ReferenceFrame<T> *frame)
-  : shape_(Shape<N>(dimensions, 0)), data_(data), frame_(frame)
+Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&ref)
+  : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
 {
   std::copy_n(strides, N, strides_);
-  ++frame_->count;
 }
 
 /* -------------------------- Expressions -------------------------- */
@@ -978,10 +945,8 @@ template <typename T, uint32_t N>
 Tensor<T, N> Tensor<T, N>::copy() const
 {
   T *data = pDuplicateData();
-  ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
-  // decrement reference because its incremented in the constructor
-  --frame->count;
-  return Tensor<T, N>(shape_.dimensions_, strides_, data, frame);
+  return Tensor<T, N>(shape_.dimensions_, strides_, data, 
+      std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
 }
 
 /* ------------------------ Scalar Specialization ----------------------- */
@@ -1049,7 +1014,6 @@ public:
   Tensor(Tensor<T, 0> const &tensor);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
-  ~Tensor();
 
   /* ------------- Assignment ------------- */
 
@@ -1070,7 +1034,6 @@ public:
             typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
   Tensor<T, 0> &operator=(X&& elem);
-
 
   /* --------------- Print --------------- */
 
@@ -1132,40 +1095,34 @@ private:
   
   Shape<0> shape_;
   value_type * data_;
-  ReferenceFrame<T> *frame_;
+  std::shared_ptr<T> ref_;
 
   /* ------------------ Utility ----------------- */
 
-  Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame);
+  Tensor(uint32_t const *, uint32_t const *, T *data, std::shared_ptr<T> &&ref_);
 
 };
 
 /* ------------------- Constructors ----------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1]())
-{
-  frame_ = new ReferenceFrame<T>(data_);
-}
+Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, [](T *ptr) { delete[] ptr; })
+{}
 
 template <typename T>
-Tensor<T, 0>::Tensor(Shape<0>) : shape_(Shape<0>()), data_(new T[1]())
-{
-  frame_ = new ReferenceFrame<T>(data_);
-}
+Tensor<T, 0>::Tensor(Shape<0>) : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, [](T *ptr) { delete[] ptr; })
+{}
 
 template <typename T>
 Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T[1])
 {
   *data_ = std::forward<T>(val);
-  frame_ = new ReferenceFrame<T>(data_);
+  ref_ = std::shared_ptr<T>(data_);
 }
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(tensor.data_), frame_(tensor.frame_)
-{
-  ++frame_->count;
-}
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(tensor.data_), ref_(tensor.ref_)
+{}
 
 template <typename T>
 template <typename NodeType>
@@ -1173,18 +1130,7 @@ Tensor<T, 0>::Tensor(Expression<NodeType> const& expression)
 {
   Tensor<T, 0> result = expression.self()();
   data_ = result.data_;
-  frame_ = result.frame_;
-  ++frame_->count;
-}
-
-template <typename T>
-Tensor<T, 0>::~Tensor()
-{
-  --frame_->count;
-  if (!frame_->count) {
-    delete[] frame_->data;
-    delete frame_;
-  }
+  ref_ = std::move(result.ref_);
 }
 
 /* ---------------------- Assignment ---------------------- */
@@ -1259,11 +1205,9 @@ Tensor<T, 0> Tensor<T, 0>::operator-() const
 /* ------------------------ Utility --------------------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, ReferenceFrame<T> *frame)
-  : data_(data), frame_(frame) 
-{
-  ++frame_->count;
-}
+Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, std::shared_ptr<T> &&ref)
+  : data_(data), ref_(std::move(ref)) 
+{}
 
 /* ------------------------ Overloads ------------------------ */
 
@@ -1281,10 +1225,9 @@ Tensor<T, 0> Tensor<T, 0>::copy() const
 { 
   T *data = new T[1]();
   *data = *data_;
-  ReferenceFrame<T> *frame = new ReferenceFrame<T>(data);
   // decrement count because it gets incremented in the constructor
-  --frame->count;
-  return Tensor<T, 0>(nullptr, nullptr, data, frame);
+  return Tensor<T, 0>(nullptr, nullptr, data, 
+      std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
 }
 
 /* ---------------------- Expressions ------------------------ */
@@ -1447,7 +1390,6 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 {
   return BinaryMul<LHSType, RHSType>(lhs.self(), rhs.self());
 }
-
 
 } // tensor
 
