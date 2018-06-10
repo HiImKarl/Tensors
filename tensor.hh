@@ -10,6 +10,7 @@
 #include <numeric>
 #include <functional>
 #include <memory>
+#include <string>
 
 /* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
@@ -41,6 +42,8 @@
   "Invalid Instantiation of N-Tensor -- Use a N-Constructor"
 #define NCONSTRUCTOR_0TENSOR \
   "Invalid Instantiation of 0-Tensor -- Use a 0-Constructor"
+#define NELEMENTS \
+  "Incorrect number of elements provided -- "\
 
 // Out of bounds
 #define DIMENSION_INVALID(METHOD) \
@@ -159,7 +162,7 @@ struct Expression {
 };
 
 // Tensor Shape
-template <uint32_t N>
+template <uint32_t N> /*@Shape<N>*/
 class Shape {
 public:
   /* -------------------- typedefs -------------------- */
@@ -324,8 +327,11 @@ uint32_t Indices<N>::operator[](size_t index) const
   return indices_[index];
 }
 
+/**
+ *  Tensor Object with compile time rank information
+ */
 template <typename T, uint32_t N>
-class Tensor: public Expression<Tensor<T, N>> {
+class Tensor: public Expression<Tensor<T, N>> { /*@Tensor<T, N>*/
 public:
   /* ------------------ Type Definitions --------------- */
 
@@ -343,7 +349,7 @@ public:
   template <typename LHSType, typename RHSType> friend class BinarySub;
   template <typename LHSType, typename RHSType> friend class BinaryMul;
 
-  /* ----------------- Constructors ----------------- */
+  /* ------------------ Constructors ------------------ */
 
   explicit Tensor(uint32_t const (&indices)[N]);
   Tensor(uint32_t const (&dimensions)[N], T const &value);
@@ -353,7 +359,7 @@ public:
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
 
-  /* ----------------- Assignment ----------------- */
+  /* ------------------- Assignment ------------------- */
 
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
   template <typename NodeType>
@@ -399,7 +405,7 @@ public:
   template <typename X, uint32_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
-  /* ----------------- Equivalennce ------------------ */
+  /* -------------------- Equivalence ------------------ */
 
   bool operator==(Tensor<T, N> const& tensor) const;
   bool operator!=(Tensor<T, N> const& tensor) const { return !(*this == tensor); }
@@ -408,14 +414,19 @@ public:
   template <typename X>
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
 
-  /* -------------- Useful Functions ------------------- */
-  Tensor<T, N> copy() const;
+  /* ----------------- Useful Functions ---------------- */
 
-/* --------------------------- Debug Information --------------------------- */
-#ifndef _NDBEUG
-  uint32_t const *dimensions() const noexcept { return shape_.dimensions_; }
-#endif
-/* ------------------------------------------------------------------------- */
+  Tensor<T, N> copy() const;
+  template <typename U, uint32_t M, typename Container>
+  friend void Fill(Tensor<U, M> &tensor, Container const &container);
+
+  /* -------------------- Iterator --------------------- */
+
+  class Iterator {
+  public:
+
+  private:
+  };
 
 private:
 
@@ -494,6 +505,21 @@ Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
   pMap(allocate);
+}
+
+template <typename T, uint32_t N, typename Container>
+void Fill(Tensor<T, N> &tensor, Container const &container)
+{
+  uint32_t cumul_sum = tensor.shape_.IndexProduct();
+  if (container.size() != cumul_sum)
+    throw std::logic_error(NELEMENTS);
+  auto it = container.begin();
+  std::function<void(T *)> allocate = [&it](T *x) -> void
+  {
+    *x = *it;
+    ++it;
+  };
+  tensor.pMap(allocate);
 }
 
 template <typename T, uint32_t N>
@@ -935,11 +961,12 @@ Tensor<T, N> Tensor<T, N>::copy() const
       std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
 }
 
-/* ------------------------ Scalar Specialization ----------------------- */
+/* ------------------------ Scalar Specializations ---------------------- */
 
 template <>
-class Shape<0> {
+class Shape<0> { /*@Shape<0>*/
 public:
+
   /* -------------------- typedefs -------------------- */
   typedef size_t                    size_type;
   typedef ptrdiff_t                 difference_type;
@@ -981,7 +1008,7 @@ private:
 
 // Scalar specialization
 template <typename T>
-class Tensor<T, 0>: public Expression<Tensor<T, 0>> {
+class Tensor<T, 0>: public Expression<Tensor<T, 0>> { /*@Tensor<T, 0>*/
 public:
   typedef T                 value_type;
   typedef T&                reference_type;
@@ -992,7 +1019,7 @@ public:
 
   template <typename X, uint32_t M> friend class Tensor;
 
-  /* ------------- Constructors ------------- */
+  /* -------------- Constructors -------------- */
 
   Tensor();
   explicit Tensor(value_type &&val);
@@ -1381,6 +1408,7 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 
 #undef NTENSOR_0CONSTRUCTOR
 #undef NCONSTRUCTOR_0TENSOR
+#undef NELEMENTS
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS
