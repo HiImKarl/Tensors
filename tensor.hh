@@ -422,11 +422,20 @@ public:
 
   /* -------------------- Iterator --------------------- */
 
+  /*@Iterator<T, N>*/
+  /* FIXME :: Implement
   class Iterator {
   public:
-
+    Tensor<T, N> operator*() ;
+    Tensor<T, N> const operator*() const;
   private:
+    Iterator(Tensor<T, N> const &tensor);
+    Shape<N> shape_;
+    uint32_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
   };
+  */
 
 private:
 
