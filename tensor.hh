@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <numeric>
 #include <functional>
-#include <memory> 
+#include <memory>
 
 /* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
@@ -153,7 +153,7 @@ struct ValueToTensor<BinaryMul<LHS, RHS>> {
 /* ---------------------------------------------------------- */
 
 template <typename NodeType>
-struct Expression { 
+struct Expression {
   inline NodeType &self() { return *static_cast<NodeType *>(this); }
   inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }
 };
@@ -180,7 +180,7 @@ public:
   Shape(Shape<N> const &shape);
 
   /* ------------------ Assignment -------------------- */
-  
+
   Shape<N> &operator=(Shape<N> const &shape);
 
   /* -------------------- Getters --------------------- */
@@ -223,7 +223,7 @@ private:
   /* --------------- Constructor --------------- */
 
   // FIXME :: dumb hack to avoid ambiguous overload
-  Shape(uint32_t const *dimensions, int); 
+  Shape(uint32_t const *dimensions, int);
   Shape() {}
 };
 
@@ -360,20 +360,20 @@ public:
   Tensor<T, N> &operator=(Expression<NodeType> const &rhs);
 
   /* ----------------- Getters ----------------- */
-  
+
   constexpr static uint32_t rank() { return N; }
   uint32_t dimension(uint32_t index) const { return shape_[index]; }
   Shape<N> shape() const noexcept { return shape_; }
 
   /* ------------------ Access To Data ----------------- */
 
-  template <typename... Indices> 
+  template <typename... Indices>
   Tensor<T, N - sizeof...(Indices)> operator()(Indices... args);
-  template <typename... Indices> 
+  template <typename... Indices>
   Tensor<T, N - sizeof...(Indices)> const operator()(Indices... args) const;
 
   // Access with containers
-  // The container must have compile time fixed size 
+  // The container must have compile time fixed size
   // accessible through a size() method
   template <uint32_t M>
   Tensor<T, N - M> operator[](Indices<M> const &indices);
@@ -431,7 +431,7 @@ private:
   uint32_t const *strides() const noexcept { return strides_; }
 
   /* ------------- Expansion for operator()() ------------- */
-  
+
   // Expansion
   template <uint32_t M>
   Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index);
@@ -444,7 +444,7 @@ private:
   template <uint32_t M, typename... Indices>
   Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices);
   template <uint32_t M>
-  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t); 
+  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t);
 
   // Index checking and placement
   template <uint32_t I1, uint32_t I2, uint32_t... Indices>
@@ -455,12 +455,16 @@ private:
   /* ----------------- Utility -------------------- */
 
   // Data mapping
-  void pUpdateTrackers(uint32_t (&dim_trackers)[N]) const;
+  template <uint32_t M>
+  void pUpdateQuotas(uint32_t (&dim_quotas)[M], uint32_t quota_offset = 0,
+      uint32_t offset = 0) const;
+  template <uint32_t M>
+  uint32_t pEvaluateIndex(uint32_t const (&dim_quotas)[M], uint32_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
   template <typename X>
-  void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn); 
+  void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn);
   template <typename X, typename Y>
-  void pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &tensor_2, 
+  void pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &tensor_2,
       std::function<void(T *lhs, X *rhs1, Y *rhs2)> const& fn);
 
   // allocate new space and copy data
@@ -469,7 +473,7 @@ private:
   // Initialize strides :: DIMENSIONS MUST BE INITIALIZED FIRST
   void pInitializeSteps();
 
-  // Declare all fields in jthe constructor 
+  // Declare all fields in jthe constructor
   Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&ref_);
 
 }; // Tensor
@@ -478,13 +482,13 @@ private:
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), 
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
   ref_(data_, [](T *ptr) { delete[] ptr; })
 { pInitializeSteps(); }
 
 template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value) 
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]), 
+Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
   ref_(data_, [](T *ptr) { delete[] ptr; })
 {
   pInitializeSteps();
@@ -515,7 +519,7 @@ Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
 
 template <typename T, uint32_t N>
 template <typename NodeType>
-Tensor<T, N>::Tensor(Expression<NodeType> const& expression) 
+Tensor<T, N>::Tensor(Expression<NodeType> const& expression)
 {
   auto result = expression.self()();
   std::copy_n(result.strides_, N, strides_);
@@ -541,7 +545,7 @@ Tensor<T, N> &Tensor<T, N>::operator=(Expression<NodeType> const &rhs)
   auto tensor = rhs.self()();
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator=(Tensor const&)"));
-  std::function<void(T *, typename NodeType::value_type*)> fn = 
+  std::function<void(T *, typename NodeType::value_type*)> fn =
     [](T *x, typename NodeType::value_type *y) -> void { *x = *y; };
   pUnaryMap(tensor, fn);
   return *this;
@@ -559,7 +563,7 @@ template <typename T, uint32_t N>
 template <typename... Indices>
 Tensor<T, N - sizeof...(Indices)> const Tensor<T, N>::operator()(Indices... args) const
 {
-  return (*const_cast<self_type*>(this))(args...); 
+  return (*const_cast<self_type*>(this))(args...);
 }
 
 template <typename T, uint32_t N>
@@ -567,7 +571,7 @@ template <uint32_t M>
 Tensor<T, N - M> Tensor<T, N>::operator[](Indices<M> const &indices)
 {
   uint32_t cumul_index = 0;
-  for (size_t i = 0; i < M; ++i) 
+  for (size_t i = 0; i < M; ++i)
     cumul_index += strides_[N - i - 1] * (indices[i] - 1);
   return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M,  data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
@@ -629,27 +633,25 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
     for (uint32_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
   uint32_t cumul_index = tensor.shape_.IndexProduct();
-  uint32_t dim_trackers[N];
-  std::copy_n(tensor.shape_.dimensions_, N, dim_trackers);
+  uint32_t dim_quotas[N];
+  std::copy_n(tensor.shape_.dimensions_, N, dim_quotas);
 
   add_brackets(N, true); // opening brackets
   os << tensor.data_[0]; // first element
   for (size_t i = 0; i < cumul_index - 1; ++i) {
-    uint32_t index = 0, dim_index = N;
+    uint32_t dim_index = N, bracket_count = 0;
     bool propogate = true;
-    uint32_t bracket_count = 0;
     // find the correct index to "step" to
     while (dim_index && propogate) {
-      --dim_trackers[dim_index - 1];
+      --dim_quotas[dim_index - 1];
       ++bracket_count;
-      if (!dim_trackers[dim_index - 1]) 
-        dim_trackers[dim_index - 1] = tensor.shape_.dimensions_[dim_index - 1];
-      else 
+      if (!dim_quotas[dim_index - 1])
+        dim_quotas[dim_index - 1] = tensor.shape_.dimensions_[dim_index - 1];
+      else
         propogate = false;
       --dim_index;
     }
-    for (size_t j = 0; j < N; ++j)
-      index += tensor.strides_[j] * (tensor.shape_.dimensions_[j] - dim_trackers[j]);
+    uint32_t index = tensor.pEvaluateIndex(dim_quotas);
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
@@ -684,7 +686,7 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
 
 template <typename T, uint32_t N>
 template <uint32_t I1, uint32_t I2, uint32_t... Indices>
-void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices) 
+void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
 {
   static_assert(N >= I1, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   static_assert(I1 != I2, SLICE_INDICES_REPEATED);
@@ -707,14 +709,14 @@ template <typename T, uint32_t N>
 template <uint32_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices)
 {
-  if (shape_.dimensions_[array_index] < next_index) 
+  if (shape_.dimensions_[array_index] < next_index)
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   if (!next_index)
     throw std::logic_error(ZERO_INDEX("Tensor::Slice(Indices...)"));
   placed_indices[array_index] = next_index;
   ++array_index;
   for (; array_index < N && !placed_indices[array_index]; ++array_index);
-  return pSliceExpansion<M>(placed_indices, array_index, indices...); 
+  return pSliceExpansion<M>(placed_indices, array_index, indices...);
 }
 
 template <typename T, uint32_t N>
@@ -748,20 +750,33 @@ T * Tensor<T, N>::pDuplicateData() const
   return data;
 }
 
-// find the correct index to "step" to
+// Update the quotas after one iterator increment
 template <typename T, uint32_t N>
-void Tensor<T, N>::pUpdateTrackers(uint32_t (&dim_trackers)[N]) const
+template <uint32_t M>
+void Tensor<T, N>::pUpdateQuotas(uint32_t (&dim_quotas)[M], uint32_t quota_offset,
+    uint32_t offset) const
 {
-  uint32_t dim_index = N;
+  uint32_t dim_index = M;
   bool propogate = true;
   while (dim_index && propogate) {
-    --dim_trackers[dim_index - 1];
+    --dim_quotas[dim_index - 1];
     --dim_index;
-    if (!dim_trackers[dim_index - 1]) 
-      dim_trackers[dim_index - 1] = shape_.dimensions_[dim_index - 1];
-    else 
+    if (!dim_quotas[dim_index - 1 + quota_offset])
+      dim_quotas[dim_index - 1 + quota_offset] = shape_.dimensions_[dim_index - 1 + quota_offset + offset];
+    else
       propogate = false;
   }
+}
+
+// Obtain absolute data offset from dim quotas
+template <typename T, uint32_t N>
+template <uint32_t M>
+uint32_t Tensor<T, N>::pEvaluateIndex(uint32_t const (&dim_quotas)[M], uint32_t offset) const
+{
+  uint32_t index = 0;
+  for (size_t i = 0; i < M; ++i)
+      index += strides_[i + offset] * (shape_.dimensions_[i + offset] - dim_quotas[i]);
+  return index;
 }
 
 template <typename T, uint32_t N>
@@ -769,36 +784,30 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
 {
   // this is the index upper bound for iteration
   uint32_t cumul_index = shape_.IndexProduct();
-
-  uint32_t dim_trackers[N];
-  std::copy_n(shape_.dimensions_, N, dim_trackers);
+  uint32_t dim_quotas[N];
+  std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = 0;
-    for (size_t j = 0; j < N; ++j) 
-      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
+    uint32_t index = pEvaluateIndex(dim_quotas);
     fn(&(data_[index]));
-    pUpdateTrackers(dim_trackers);
+    pUpdateQuotas(dim_quotas);
   }
 }
 
 template <typename T, uint32_t N>
 template <typename X>
-void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor, 
+void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
     std::function<void(T *lhs, X *rhs)> const &fn)
 {
   // this is the index upper bound for iteration
   uint32_t cumul_index = shape_.IndexProduct();
 
-  uint32_t dim_trackers[N];
-  std::copy_n(shape_.dimensions_, N, dim_trackers);
+  uint32_t dim_quotas[N];
+  std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = 0, t_index = 0;
-    for (size_t j = 0; j < N; ++j) {
-      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t_index += tensor.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-    }
+    uint32_t index = pEvaluateIndex(dim_quotas);
+    uint32_t t_index = tensor.pEvaluateIndex(dim_quotas);
     fn(&(data_[index]), &(tensor.data_[t_index]));
-    pUpdateTrackers(dim_trackers);
+    pUpdateQuotas(dim_quotas);
   }
 }
 
@@ -807,18 +816,14 @@ template <typename X, typename Y>
 void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &tensor_2, std::function<void(T *lhs, X *rhs1, Y *rhs2)> const &fn)
 {
   uint32_t cumul_index = shape_.IndexProduct();
-
-  uint32_t dim_trackers[N];
-  std::copy_n(shape_.dimensions_, N, dim_trackers);
+  uint32_t dim_quotas[N];
+  std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = 0, t1_index = 0, t2_index = 0;
-    for (size_t j = 0; j < N; ++j) {
-      index += strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t1_index += tensor_1.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-      t2_index += tensor_2.strides_[j] * (shape_.dimensions_[j] - dim_trackers[j]);
-    }
-    fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]); 
-    pUpdateTrackers(dim_trackers);
+    uint32_t index = pEvaluateIndex(dim_quotas);
+    uint32_t t1_index = tensor_1.pEvaluateIndex(dim_quotas);
+    uint32_t t2_index = tensor_2.pEvaluateIndex(dim_quotas);
+    fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]);
+    pUpdateQuotas(dim_quotas);
   }
 }
 
@@ -843,11 +848,11 @@ Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *dat
 /* -------------------------- Expressions -------------------------- */
 
 template <typename X, typename Y, uint32_t M>
-Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2) 
+Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
   if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Add(Tensor const&, Tensor const&)"));
   Tensor<X, M> sum_tensor(tensor_1.shape_);
-  std::function<void(X *, X*, Y*)> add = [](X *x, X *y, Y *z) -> void 
+  std::function<void(X *, X*, Y*)> add = [](X *x, X *y, Y *z) -> void
   {
     *x = *y + *z;
   };
@@ -856,11 +861,11 @@ Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 }
 
 template <typename X, typename Y, uint32_t M>
-Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2) 
+Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
   if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Subtract(Tensor const&, Tensor const&)"));
   Tensor<X, M> diff_tensor(tensor_1.shape_);
-  std::function<void(X *, X*, Y*)> sub = [](X *x, X *y, Y *z) -> void 
+  std::function<void(X *, X*, Y*)> sub = [](X *x, X *y, Y *z) -> void
   {
     *x = *y - *z;
   };
@@ -878,47 +883,28 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
     throw std::logic_error(INNER_DIMENSION_MISMATCH("Multiply(Tensor const&, Tensor const&)"));
   auto shape = Shape<M1 + M2 - 2>();
 
-  // FIXME :: Very messy, is there any way to implement an internal iterator?
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2> prod_tensor(shape);
   uint32_t cumul_index_1 = tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1];
   uint32_t cumul_index_2 = tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[0];
-  uint32_t dim_trackers_1[M1 - 1], dim_trackers_2[M2 - 1];
-  std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_trackers_1);
-  std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_trackers_2);
+  uint32_t dim_quotas_1[M1 - 1], dim_quotas_2[M2 - 1];
+  std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_quotas_1);
+  std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_quotas_2);
   uint32_t index = 0;
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
-      uint32_t t1_index = 0, t2_index = 0;
-      for (size_t j = 0; j < M1 - 1; ++j) 
-        t1_index += tensor_1.strides_[j] * (tensor_1.shape_.dimensions_[j] - dim_trackers_1[j]);
-      for (size_t j = 0; j < M2 - 1; ++j) 
-        t2_index += tensor_2.strides_[j + 1] * (tensor_2.shape_.dimensions_[j + 1] - dim_trackers_2[j]);
+      uint32_t t1_index = tensor_1.pEvaluateIndex(dim_quotas_1);
+      uint32_t t2_index = tensor_2.pEvaluateIndex(dim_quotas_2, 1);
       X value {};
-      for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x) 
+      for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x)
           value += *(tensor_1.data_ + t1_index + tensor_1.strides_[M1 - 1] * x) *
             *(tensor_2.data_ + t2_index + tensor_2.strides_[0] * x);
       prod_tensor.data_[index] = value;
-      uint32_t dim_index = M2 - 1;
-      bool propogate = true;
-      while (dim_index && propogate) {
-        --dim_trackers_2[dim_index - 1];
-        if (!dim_trackers_2[dim_index - 1]) dim_trackers_2[dim_index - 1] = tensor_2.shape_.dimensions_[dim_index];
-        else propogate = false;
-        --dim_index;
-      }
+      tensor_2.pUpdateQuotas(dim_quotas_2, 1, 1);
       ++index;
     }
-    uint32_t dim_index = M1 - 1;
-    bool propogate = true;
-    // find the correct index to "step" to
-    while (dim_index && propogate) {
-      --dim_trackers_1[dim_index - 1];
-      if (!dim_trackers_1[dim_index - 1]) dim_trackers_1[dim_index - 1] = tensor_1.shape_.dimensions_[dim_index - 1];
-      else propogate = false;
-      --dim_index;
-    }
+    tensor_1.pUpdateQuotas(dim_quotas_1, 1);
   }
   return prod_tensor;
 }
@@ -927,7 +913,7 @@ template <typename T, uint32_t N>
 Tensor<T, N> Tensor<T, N>::operator-() const
 {
   Tensor<T, N> neg_tensor(shape_);
-  std::function<void(T *, T *)> neg = [](T *x, T *y) -> void 
+  std::function<void(T *, T *)> neg = [](T *x, T *y) -> void
   {
     *x = -(*y);
   };
@@ -936,7 +922,7 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 }
 
 /* --------------------------- Useful Functions ------------------------- */
-  
+
 // creates a tensor with a different shape but the same number of elements
 // template <typename T, uint32_t N1, uint32_t N2>
 // Tensor<T, N1> Resize(Tensor<T, N2> const &tensor) {}
@@ -945,7 +931,7 @@ template <typename T, uint32_t N>
 Tensor<T, N> Tensor<T, N>::copy() const
 {
   T *data = pDuplicateData();
-  return Tensor<T, N>(shape_.dimensions_, strides_, data, 
+  return Tensor<T, N>(shape_.dimensions_, strides_, data,
       std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
 }
 
@@ -1068,11 +1054,11 @@ public:
 
   // Addition
   template <typename X, typename Y>
-  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
+  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
   // Subtraction
   template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2); 
+  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
   // Multiplication
   template <typename X, typename Y>
@@ -1090,9 +1076,9 @@ public:
   Tensor<T, 0> copy() const;
 
 private:
-  
+
   /* ------------------- Data ------------------- */
-  
+
   Shape<0> shape_;
   value_type * data_;
   std::shared_ptr<T> ref_;
@@ -1126,7 +1112,7 @@ Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(tens
 
 template <typename T>
 template <typename NodeType>
-Tensor<T, 0>::Tensor(Expression<NodeType> const& expression) 
+Tensor<T, 0>::Tensor(Expression<NodeType> const& expression)
 {
   Tensor<T, 0> result = expression.self()();
   data_ = result.data_;
@@ -1142,7 +1128,7 @@ Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<T, 0> const &tensor)
   return *this;
 }
 
-template <typename T> 
+template <typename T>
 template <typename X>
 Tensor<T, 0> &Tensor<T, 0>::operator=(Tensor<X, 0> const &tensor)
 {
@@ -1206,7 +1192,7 @@ Tensor<T, 0> Tensor<T, 0>::operator-() const
 
 template <typename T>
 Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, std::shared_ptr<T> &&ref)
-  : data_(data), ref_(std::move(ref)) 
+  : data_(data), ref_(std::move(ref))
 {}
 
 /* ------------------------ Overloads ------------------------ */
@@ -1222,11 +1208,11 @@ std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor)
 
 template <typename T>
 Tensor<T, 0> Tensor<T, 0>::copy() const
-{ 
+{
   T *data = new T[1]();
   *data = *data_;
   // decrement count because it gets incremented in the constructor
-  return Tensor<T, 0>(nullptr, nullptr, data, 
+  return Tensor<T, 0>(nullptr, nullptr, data,
       std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
 }
 
@@ -1239,7 +1225,7 @@ public:
   /* ---------------- typedefs --------------- */
 
   typedef typename LHSType::value_type value_type;
-  typedef BinaryAdd                    self_type;         
+  typedef BinaryAdd                    self_type;
 
   /* -------------- Constructors -------------- */
 
@@ -1266,7 +1252,7 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
-  return Add(ValueToTensor<LHSType>(lhs_).value(indices...), 
+  return Add(ValueToTensor<LHSType>(lhs_).value(indices...),
              ValueToTensor<RHSType>(rhs_).value(indices...));
 }
 
@@ -1293,7 +1279,7 @@ public:
   /* ---------------- typedefs --------------- */
 
   typedef typename LHSType::value_type value_type;
-  typedef BinarySub                    self_type;         
+  typedef BinarySub                    self_type;
 
   /* -------------- Constructors -------------- */
 
@@ -1323,7 +1309,7 @@ Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> Binar
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
   return Subtract(
-      ValueToTensor<LHSType>(lhs_).value(indices...), 
+      ValueToTensor<LHSType>(lhs_).value(indices...),
       ValueToTensor<RHSType>(rhs_).value(indices...));
 }
 
@@ -1344,7 +1330,7 @@ std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &bi
 
 /**
  * Multiplies the inner dimensions
- * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor 
+ * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor
  */
 
 template <typename LHSType, typename RHSType>
@@ -1354,7 +1340,7 @@ public:
   /* ---------------- typedefs --------------- */
 
   typedef typename LHSType::value_type value_type;
-  typedef BinaryMul                    self_type;         
+  typedef BinaryMul                    self_type;
 
   /* -------------- Constructors -------------- */
 
@@ -1363,7 +1349,7 @@ public:
   /* ---------------- Getters ----------------- */
 
   constexpr static uint32_t rank() { return LHSType::rank() + RHSType::rank() - 2; }
-  uint32_t dimension(uint32_t index) const; 
+  uint32_t dimension(uint32_t index) const;
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> operator()(Indices... indices) const;
 
@@ -1378,7 +1364,7 @@ BinaryMul<LHSType, RHSType>::BinaryMul(LHSType const &lhs, RHSType const &rhs)
 
 template <typename LHSType, typename RHSType>
 template <typename... Indices>
-Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const 
+Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Multiplication"));
   return Multiply(ValueToTensor<LHSType>(lhs_).value(),
@@ -1405,5 +1391,12 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 #undef SLICE_INDICES_DESCENDING
 #undef RANK_MISMATCH
 #undef DIMENSION_MISMATCH
+#undef INNER_DIMENSION_MISMATCH
+#undef SCALAR_TENSOR_MULT
+#undef DEBUG
+#undef OVERLOAD_RESOLUTION
+
+/* ----------------------------------------------- */
+
 
 #endif // TENSORS_H_

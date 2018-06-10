@@ -24,4 +24,4 @@ run_tests : $(OBJ)
 .PHONY : clean
 
 clean :
-	rm -f $(TEMPORARIES) 
+	rm -f $(TEMPORARIES)

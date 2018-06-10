@@ -32,7 +32,7 @@ static Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> test_fun
 TEST_CASE("Single Tensor") {
   constructor_counter = 0;
   destructor_counter = 0;
-  
+
   SECTION("Single Tensor Constructor") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor({2, 2, 2, 2});
     REQUIRE(constructor_counter == 16);
@@ -52,7 +52,7 @@ TEST_CASE("Single Tensor") {
 TEST_CASE("Multiple Tensors") {
   constructor_counter = 0;
   destructor_counter = 0;
-  
+
   SECTION("Copy Constructor") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
@@ -99,12 +99,11 @@ TEST_CASE("Multiple Tensors") {
 TEST_CASE("Explicit Copy Method") {
   constructor_counter = 0;
   destructor_counter = 0;
-  
+
   SECTION("Constructor") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.copy();
     REQUIRE(constructor_counter == 32);
-    PRINT(10);
   }
 
   SECTION("Destructor") {
