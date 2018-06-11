@@ -10,6 +10,7 @@
 #include <numeric>
 #include <functional>
 #include <memory>
+#include <cassert>
 #include <string>
 
 /* FIXME -- Remove debug macros */
@@ -75,14 +76,17 @@
 #define SCALAR_TENSOR_MULT(METHOD) \
   METHOD " Failed -- Cannot multiple tensors with scalars"
 
-/* ----------------------------------------------- */
-
 /* ---------------- Debug Messages --------------- */
 
 #define DEBUG \
   "This static assertion should never fire"
 #define OVERLOAD_RESOLUTION(METHOD) \
   METHOD " :: Overload resolution :: " DEBUG
+
+/* ------------------ Lambdas -------------------- */
+
+#define _ARRAY_DELETER(type) \
+  ([](type *ptr) { delete[] ptr; })
 
 /* ----------------------------------------------- */
 
@@ -227,7 +231,7 @@ private:
 
   // FIXME :: dumb hack to avoid ambiguous overload
   Shape(uint32_t const *dimensions, int);
-  Shape() {}
+  Shape() = default;
 };
 
 template <uint32_t N>
@@ -333,14 +337,14 @@ uint32_t Indices<N>::operator[](size_t index) const
 template <typename T, uint32_t N>
 class Tensor: public Expression<Tensor<T, N>> { /*@Tensor<T, N>*/
 public:
-  /* ------------------ Type Definitions --------------- */
 
-  typedef T                 value_type;
-  typedef T&                reference;
-  typedef T const&          const_reference;
-  typedef size_t            size_type;
-  typedef ptrdiff_t         difference_type;
-  typedef Tensor<T, N>      self_type;
+  /* ------------------ Type Definitions --------------- */
+  typedef T                                     value_type;
+  typedef T&                                    reference;
+  typedef T const&                              const_reference;
+  typedef size_t                                size_type;
+  typedef ptrdiff_t                             difference_type;
+  typedef Tensor<T, N>                          self_type;
 
   /* ----------------- Friend Classes ----------------- */
 
@@ -420,22 +424,37 @@ public:
   template <typename U, uint32_t M, typename Container>
   friend void Fill(Tensor<U, M> &tensor, Container const &container);
 
-  /* -------------------- Iterator --------------------- */
+  /* -------------------- Iterators --------------------- */
 
-  /*@Iterator<T, N>*/
-  /* FIXME :: Implement
-  class Iterator {
+  class Iterator { /*@Iterator<T, N>*/
   public:
-    Tensor<T, N> operator*() ;
+    Tensor<T, N> operator*();
     Tensor<T, N> const operator*() const;
+    Iterator operator++(int);
+    Iterator &operator++();
+    Iterator operator--(int);
+    Iterator &operator--();
+    bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(Iterator const &it) const { return !(it == *this); }
   private:
-    Iterator(Tensor<T, N> const &tensor);
+    Iterator(Tensor<T, N + 1> const &tensor, uint32_t index);
+
+    /**
+     * Data describing the underlying tensor
+     */
     Shape<N> shape_;
     uint32_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
+
+    /**
+     * Step size of the underlying data pointer per increment
+     */
+    uint32_t stride_;
   };
-  */
+
+  typename Tensor<T, N - 1>::Iterator begin(uint32_t index);
+  typename Tensor<T, N - 1>::Iterator end(uint32_t index);
 
 private:
 
@@ -494,7 +513,7 @@ private:
   void pInitializeSteps();
 
   // Declare all fields in jthe constructor
-  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&ref_);
+  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&_ref);
 
 }; // Tensor
 
@@ -503,13 +522,13 @@ private:
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
-  ref_(data_, [](T *ptr) { delete[] ptr; })
+  ref_(data_, _ARRAY_DELETER(T))
 { pInitializeSteps(); }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
-  ref_(data_, [](T *ptr) { delete[] ptr; })
+  ref_(data_, _ARRAY_DELETER(T))
 {
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
@@ -533,12 +552,12 @@ void Fill(Tensor<T, N> &tensor, Container const &container)
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, [](T *ptr) { delete[] ptr; })
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
 { pInitializeSteps(); }
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, [](T *ptr) { delete[] ptr; })
+  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
 {
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
@@ -967,7 +986,85 @@ Tensor<T, N> Tensor<T, N>::copy() const
 {
   T *data = pDuplicateData();
   return Tensor<T, N>(shape_.dimensions_, strides_, data,
-      std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
+      std::shared_ptr<T>(data, _ARRAY_DELETER(T)));
+}
+
+/* ------------------------------- Iterator ----------------------------- */
+
+template <typename T, uint32_t N>
+Tensor<T, N>::Iterator::Iterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+  : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
+{
+  assert(index < N && "This should throw earlier");
+  std::copy_n(tensor.dimensions_, index, shape_.dimensions_);
+  std::copy_n(tensor.dimensions_ + index + 1, 
+      N - index - 1, shape_.dimensions_ + index);
+  std::copy_n(tensor.strides_, index, strides_);
+  std::copy_n(tensor.strides_+ index + 1, N - index - 1, strides_ + index);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> Tensor<T, N>::Iterator::operator*()
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> const Tensor<T, N>::Iterator::operator*() const
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator++(int)
+{
+  Tensor<T, N>::Iterator it {*this};
+  ++(*this);
+  return it;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator++()
+{
+  data_ += stride_;
+  return *this;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator--(int)
+{
+  Tensor<T, N>::Iterator it {*this};
+  --(*this);
+  return it;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator--()
+{
+  data_ -= stride_;
+  return *this;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin(uint32_t index)
+{
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::Iterator::Iterator()"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::Iterator::Iterator()"));
+  --index;
+  return Tensor<T, N - 1>::Iterator(*this, index);
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end(uint32_t index)
+{
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::Iterator::Iterator()"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::Iterator::Iterator()"));
+  --index;
+  typename Tensor<T, N - 1>::Iterator it{*this, index};
+  it.data_ += strides_[index] * shape_.dimensions_[index];
+  return it;
 }
 
 /* ------------------------ Scalar Specializations ---------------------- */
@@ -1109,7 +1206,30 @@ public:
   operator T const&() const { return *data_; }
 
   /* ------------- Useful Functions ------------ */
+
   Tensor<T, 0> copy() const;
+
+  /* ---------------- Iterator -------------- */
+
+  class Iterator { /*@Iterator<T, 0>*/
+  public:
+    Tensor<T, 0> operator*();
+    Tensor<T, 0> const operator*() const;
+    Iterator operator++(int);
+    Iterator &operator++();
+    Iterator operator--(int);
+    Iterator &operator--();
+  private:
+    Iterator(Tensor<T, 1> const &tensor, uint32_t);
+
+    /**
+     * Data describing the underlying tensor
+     */
+    Shape<0> shape_;
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+
+  };
 
 private:
 
@@ -1128,11 +1248,11 @@ private:
 /* ------------------- Constructors ----------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, [](T *ptr) { delete[] ptr; })
+Tensor<T, 0>::Tensor() : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, _ARRAY_DELETER(T))
 {}
 
 template <typename T>
-Tensor<T, 0>::Tensor(Shape<0>) : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, [](T *ptr) { delete[] ptr; })
+Tensor<T, 0>::Tensor(Shape<0>) : shape_(Shape<0>()), data_(new T[1]()), ref_(data_, _ARRAY_DELETER(T))
 {}
 
 template <typename T>
@@ -1249,7 +1369,21 @@ Tensor<T, 0> Tensor<T, 0>::copy() const
   *data = *data_;
   // decrement count because it gets incremented in the constructor
   return Tensor<T, 0>(nullptr, nullptr, data,
-      std::shared_ptr<T>(data, [](T *ptr) { delete[] ptr; }));
+      std::shared_ptr<T>(data, _ARRAY_DELETER(T)));
+}
+
+/* ---------------------- Iterators ------------------------- */
+
+template <typename T>
+Tensor<T, 0> Tensor<T, 0>::Iterator::operator*()
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
+}
+
+template <typename T>
+Tensor<T, 0> const Tensor<T, 0>::Iterator::operator*() const
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
 }
 
 /* ---------------------- Expressions ------------------------ */
@@ -1432,6 +1566,7 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 #undef SCALAR_TENSOR_MULT
 #undef DEBUG
 #undef OVERLOAD_RESOLUTION
+#undef _ARRAY_DELETER
 
 /* ----------------------------------------------- */
 
