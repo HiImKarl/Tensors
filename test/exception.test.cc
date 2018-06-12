@@ -34,4 +34,10 @@ TEST_CASE("Logic Errors") {
     REQUIRE_NOTHROW(Fill(tensor_1, vec_correct));
     REQUIRE_THROWS_AS(Fill(tensor_1, vec_incorrect), std::logic_error);
   }
+
+  SECTION("Iterator") {
+    REQUIRE_THROWS_AS(tensor.begin(0), std::logic_error);
+    REQUIRE_THROWS_AS(tensor.begin(6), std::logic_error);
+    REQUIRE_NOTHROW(tensor.begin(5));
+  }
 }
