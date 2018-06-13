@@ -471,10 +471,52 @@ public:
     uint32_t stride_;
   };
 
+  class ReverseIterator { /*@ReverseIterator<T, N>*/
+  public:
+
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, uint32_t M> friend class Tensor;
+
+    /* --------------- Constructors --------------- */
+    ReverseIterator(ReverseIterator const &it);
+    ReverseIterator(ReverseIterator &&it);
+    Tensor<T, N> operator*();
+    Tensor<T, N> const operator*() const;
+    Tensor<T, N> operator->();
+    Tensor<T, N> const operator->() const;
+    ReverseIterator operator++(int);
+    ReverseIterator &operator++();
+    ReverseIterator operator--(int);
+    ReverseIterator &operator--();
+    bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
+  private:
+    ReverseIterator (Tensor<T, N + 1> const &tensor, uint32_t index);
+
+    /**
+     * Data describing the underlying tensor
+     */
+    Shape<N> shape_;
+    uint32_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+
+    /**
+     * Step size of the underlying data pointer per increment
+     */
+    uint32_t stride_;
+  };
+
   typename Tensor<T, N - 1>::Iterator begin(uint32_t index);
   typename Tensor<T, N - 1>::Iterator end(uint32_t index);
   typename Tensor<T, N - 1>::Iterator begin();
   typename Tensor<T, N - 1>::Iterator end();
+
+  typename Tensor<T, N - 1>::ReverseIterator rbegin(uint32_t index);
+  typename Tensor<T, N - 1>::ReverseIterator rend(uint32_t index);
+  typename Tensor<T, N - 1>::ReverseIterator rbegin();
+  typename Tensor<T, N - 1>::ReverseIterator rend();
 
 private:
 
@@ -1094,11 +1136,97 @@ typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator--()
   return *this;
 }
 
+/* ---------------------------- ReverseIterator -------------------------- */
+
+template <typename T, uint32_t N>
+Tensor<T, N>::ReverseIterator::ReverseIterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+  : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
+{
+  assert(index < N + 1 && "This should throw earlier");
+  std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
+  std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
+  std::copy_n(tensor.strides_, index, strides_);
+  std::copy_n(tensor.strides_+ index + 1, N - index, strides_ + index);
+  data_ += stride_ * (tensor.shape_.dimensions_[index] - 1);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::ReverseIterator::ReverseIterator(ReverseIterator const &it)
+  : shape_(it.shape_), data_(it.data_), ref_(it.ref_), stride_(it.stride_)
+{
+  std::copy_n(it.strides_, N, strides_);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
+  : shape_(it.shape_), data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_)
+{
+  std::copy_n(it.strides_, N, strides_);
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> Tensor<T, N>::ReverseIterator::operator*()
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> const Tensor<T, N>::ReverseIterator::operator*() const
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> Tensor<T, N>::ReverseIterator::operator->()
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+Tensor<T, N> const Tensor<T, N>::ReverseIterator::operator->() const
+{
+  return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
+      std::shared_ptr<T>(ref_));
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator++(int)
+{
+  Tensor<T, N>::ReverseIterator it {*this};
+  ++(*this);
+  return it;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::ReverseIterator &Tensor<T, N>::ReverseIterator::operator++()
+{
+  data_ -= stride_;
+  return *this;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator--(int)
+{
+  Tensor<T, N>::ReverseIterator it {*this};
+  --(*this);
+  return it;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N>::ReverseIterator &Tensor<T, N>::ReverseIterator::operator--()
+{
+  data_ += stride_;
+  return *this;
+}
+
 template <typename T, uint32_t N>
 typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin(uint32_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::Iterator::Iterator()"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::Iterator::Iterator()"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::begin(uint32_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::begin(uint32_t)"));
   --index;
   return typename Tensor<T, N - 1>::Iterator(*this, index);
 }
@@ -1106,8 +1234,8 @@ typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin(uint32_t index)
 template <typename T, uint32_t N>
 typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end(uint32_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::Iterator::Iterator()"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::Iterator::Iterator()"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::end(uint32_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::end(uint32_t)"));
   --index;
   typename Tensor<T, N - 1>::Iterator it{*this, index};
   it.data_ += strides_[index] * shape_.dimensions_[index];
@@ -1127,6 +1255,41 @@ typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end()
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
   return this->end(1); 
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin(uint32_t index)
+{
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rbegin(uint32_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rbegin(uint32_t)"));
+  --index;
+  return typename Tensor<T, N - 1>::ReverseIterator(*this, index);
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rend(uint32_t index)
+{
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rend(uint32_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rend(uint32_t)"));
+  --index;
+  typename Tensor<T, N - 1>::ReverseIterator it{*this, index};
+  it.data_ -= strides_[index] * shape_.dimensions_[index];
+  return it;
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin() 
+{
+  // Probably a mistake if using this on a non-vector 
+  static_assert(N == 1, BEGIN_ON_NON_VECTOR);
+  return this->rbegin(1); 
+}
+
+template <typename T, uint32_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rend() 
+{ 
+  static_assert(N == 1, BEGIN_ON_NON_VECTOR);
+  return this->rend(1); 
 }
 
 /* ------------------------ Scalar Specializations ---------------------- */
@@ -1297,6 +1460,36 @@ public:
     bool operator!=(Iterator const &it) const { return !(it == *this); }
   private:
     Iterator(Tensor<T, 1> const &tensor, uint32_t);
+
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+    uint32_t stride_;
+  };
+
+  /* ------------- ReverseIterator ----------- */
+
+  class ReverseIterator { /*@ReverseIterator<T, 0>*/
+  public:
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, uint32_t M> friend class Tensor;
+
+    /* --------------- Constructors --------------- */
+
+    ReverseIterator(ReverseIterator const &it);
+    ReverseIterator(ReverseIterator &&it);
+    Tensor<T, 0> operator*();
+    Tensor<T, 0> const operator*() const;
+    Tensor<T, 0> operator->();
+    Tensor<T, 0> const operator->() const;
+    ReverseIterator operator++(int);
+    ReverseIterator &operator++();
+    ReverseIterator operator--(int);
+    ReverseIterator &operator--();
+    bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
+  private:
+    ReverseIterator(Tensor<T, 1> const &tensor, uint32_t);
 
     value_type *data_;
     std::shared_ptr<T> ref_;
@@ -1510,6 +1703,77 @@ template <typename T>
 typename Tensor<T, 0>::Iterator &Tensor<T, 0>::Iterator::operator--()
 {
   data_ -= stride_;
+  return *this;
+}
+
+/* -------------------- ReverseIterator ---------------------- */
+
+template <typename T>
+Tensor<T, 0>::ReverseIterator::ReverseIterator(Tensor<T, 1> const &tensor, uint32_t)
+  : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
+{
+  data_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
+}
+
+template <typename T>
+Tensor<T, 0>::ReverseIterator::ReverseIterator(ReverseIterator const &it)
+  : data_(it.data_), ref_(it.ref_), stride_(it.stride_) {}
+
+template <typename T>
+Tensor<T, 0>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
+  : data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
+
+template <typename T>
+Tensor<T, 0> Tensor<T, 0>::ReverseIterator::operator*()
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
+}
+
+template <typename T>
+Tensor<T, 0> const Tensor<T, 0>::ReverseIterator::operator*() const
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
+}
+
+template <typename T>
+Tensor<T, 0> Tensor<T, 0>::ReverseIterator::operator->()
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
+}
+
+template <typename T>
+Tensor<T, 0> const Tensor<T, 0>::ReverseIterator::operator->() const
+{
+  return Tensor<T, 0>(nullptr, nullptr, data_, std::shared_ptr<T>(ref_));
+}
+
+template <typename T>
+typename Tensor<T, 0>::ReverseIterator Tensor<T, 0>::ReverseIterator::operator++(int)
+{
+  Tensor<T, 0>::ReverseIterator it {*this};
+  ++(*this);
+  return it;
+}
+
+template <typename T>
+typename Tensor<T, 0>::ReverseIterator &Tensor<T, 0>::ReverseIterator::operator++()
+{
+  data_ -= stride_;
+  return *this;
+}
+
+template <typename T>
+typename Tensor<T, 0>::ReverseIterator Tensor<T, 0>::ReverseIterator::operator--(int)
+{
+  Tensor<T, 0>::ReverseIterator it {*this};
+  --(*this);
+  return it;
+}
+
+template <typename T>
+typename Tensor<T, 0>::ReverseIterator &Tensor<T, 0>::ReverseIterator::operator--()
+{
+  data_ += stride_;
   return *this;
 }
 
