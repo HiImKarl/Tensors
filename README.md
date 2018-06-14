@@ -1,5 +1,5 @@
 
-Tensor Template header-only library, where the rank of the tensor must be a compile time constant. As so far, operations on the tensors have not been implemented except for addition, subtraction, and ostream.
+Tensor Template header-only library, where the rank of the tensor must be a compile time constant.
 
 ## Definition
 
@@ -10,11 +10,12 @@ template <typename T, uint32_t N = 0>
 class Tensor;
 ```
 
-The rank and dimension of tensor values can be retrieved with the following methods
+## Rank and Dimensions
+The rank and dimensions of tensors can be retrieved with the following methods
 
 ```c++
 constexpr uint32_t rank() const noexcept;
-uint32_t dimension() const;
+uint32_t dimension(uint32_t) const;
 ```
 
 ## Instaniation and Access
@@ -68,11 +69,11 @@ tensor_2(1, 3) = tensor_2(7, 12);
 ## Addition and Subtraction
 ```c++
 
-// A naive implementation for addition and subtraction have beed defined as an example
 Tensor<int, 4> tensor_1 {1, 2, 3, 4};
 Tensor<long, 2> tensor_2 {3, 4};
 //... instantiate values
 tensor_1(1, 1) += tensor_2;
+tensor_1(1, 1) -= tensor_2;
 ```
 
 ## Printing the Tensor
