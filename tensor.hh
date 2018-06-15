@@ -44,7 +44,9 @@
 #define NCONSTRUCTOR_0TENSOR \
   "Invalid Instantiation of 0-Tensor -- Use a 0-Constructor"
 #define NELEMENTS \
-  "Incorrect number of elements provided -- "\
+  "Incorrect number of elements provided -- "
+#define ZERO_ELEMENT(CLASS) \
+  CLASS " Cannot be constructed with a zero dimension"
 
 // Out of bounds
 #define DIMENSION_INVALID(METHOD) \
@@ -242,6 +244,8 @@ private:
 template <uint32_t N>
 Shape<N>::Shape(uint32_t const (&dimensions)[N])
 {
+  for (uint32_t i = 0; i < N; ++i) 
+    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Shape"));
   std::copy_n(dimensions, N, dimensions_);
 }
 
@@ -661,13 +665,19 @@ template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
   ref_(data_, _ARRAY_DELETER(T))
-{ pInitializeSteps(); }
+{ 
+  for (uint32_t i = 0; i < N; ++i) 
+    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
+  pInitializeSteps(); 
+}
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
   ref_(data_, _ARRAY_DELETER(T))
 {
+  for (uint32_t i = 0; i < N; ++i) 
+    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
   pMap(allocate);
@@ -691,12 +701,18 @@ void Fill(Tensor<T, N> &tensor, Container const &container)
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
   : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
-{ pInitializeSteps(); }
+{ 
+  for (uint32_t i = 0; i < N; ++i) 
+    if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
+  pInitializeSteps(); 
+}
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
   : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
 {
+  for (uint32_t i = 0; i < N; ++i) 
+    if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
   std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
   pMap(allocate);
@@ -2352,6 +2368,7 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 #undef NTENSOR_0CONSTRUCTOR
 #undef NCONSTRUCTOR_0TENSOR
 #undef NELEMENTS
+#undef ZERO_ELEMENT
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS

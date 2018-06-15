@@ -4,7 +4,19 @@
 using namespace tensor;
 
 TEST_CASE("Logic Errors") {
-  Tensor<int, 5> tensor({1, 2, 3, 4, 5});
+  Tensor<int32_t, 5> tensor({1, 2, 3, 4, 5});
+
+  SECTION("Invalid Initialization") {
+    REQUIRE_THROWS_AS(Shape<3>({0, 4, 6}), std::logic_error);
+    REQUIRE_THROWS_AS((Tensor<bool, 3>({3, 0, 2})), std::logic_error);
+    REQUIRE_THROWS_AS((Tensor<bool, 3>({3, 0, 2}), true), std::logic_error);
+
+    auto shape = Shape<3>({1, 2, 3});
+    shape[2] = 0;
+    REQUIRE_THROWS_AS((Tensor<bool, 3>(shape)), std::logic_error);
+    REQUIRE_THROWS_AS((Tensor<bool, 3>(shape), true), std::logic_error);
+  }
+
   SECTION("Requesting Out of Bounds Dimension") {
     REQUIRE_THROWS_AS(tensor.dimension(0), std::logic_error);
     REQUIRE_THROWS_AS(tensor.dimension(6), std::logic_error);
