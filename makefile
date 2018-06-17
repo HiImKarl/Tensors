@@ -1,25 +1,40 @@
-SUBDIRS := test
+TEST_DIR := test
+BENCHMARK_DIR := benchmark
+
 CXX := g++
-CXXFLAGS := -O3 -I./include -I./external -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD
+CXXFLAGS := -O3 -I./include -I./external -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD -g
 LINK := g++
-LINKFLAGS :=
+LINKFLAGS := -g
 
 TEMPORARY_PATTERNS := *.o *~ *.d
-TEMPORARIES := $(foreach DIR,$(SUBDIRS),$(addprefix $(DIR)/,$(TEMPORARY_PATTERNS)))
+TEMPORARIES := $(foreach DIR, $(TEST_DIR) $(BENCHMARK_DIR),$(addprefix $(DIR)/,$(TEMPORARY_PATTERNS)))
 
-SRC := $(wildcard $(SUBDIRS)/*.cc)
-OBJ := $(SRC:.cc=.o)
+TEST_SRC := $(wildcard $(TEST_DIR)/*test.cc) 
+TEST_OBJ := $(TEST_SRC:.cc=.o)
 
-.PHONY : all
+BENCHMARK_SRC := $(wildcard $(BENCHMARK_DIR)/*benchmark.cc) 
+BENCHMARK_OBJ := $(BENCHMARK_SRC:.cc=.o)
 
-all : run_tests
-	./run_tests
-	rm run_tests
+.PHONY : test 
+test : run_test
+	valgrind --leak-check=full --show-leak-kinds=all ./run_test
+	rm run_test
 
-run_tests : $(OBJ)
-	$(LINK) $(LINKFLAGS) $^ -o $@
+run_test : $(TEST_OBJ)
+	$(LINK) $^ -o $@ $(LINKFLAGS) 
 
--include $(OBJ:.o=.d)
+-include $(TEST_OBJ:.o=.d)
+
+.PHONY : benchmark
+benchmark : LINKFLAGS += -lbenchmark -lpthread
+benchmark : run_benchmark
+	./run_benchmark
+	rm run_benchmark
+
+run_benchmark : $(BENCHMARK_OBJ)
+	$(LINK) $^ -o $@ $(LINKFLAGS)
+
+-include $(BENCHMARK_OBJ.o=.d)
 
 .PHONY : clean
 

@@ -673,14 +673,15 @@ Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
-  ref_(data_, _ARRAY_DELETER(T))
+  : shape_(Shape<N>(dimensions))
 {
   for (uint32_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
-  std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
-  pMap(allocate);
+  uint32_t cumul = shape_.IndexProduct();
+  data_ = new T[cumul];
+  std::fill(data_, data_ + cumul, value);
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
 template <typename T, uint32_t N, typename Container>
@@ -709,13 +710,15 @@ Tensor<T, N>::Tensor(Shape<N> shape)
 
 template <typename T, uint32_t N>
 Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
+  : shape_(Shape<N>(shape))
 {
   for (uint32_t i = 0; i < N; ++i) 
     if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
-  std::function<void(T *)> allocate = [&value](T *x) -> void { *x = value; };
-  pMap(allocate);
+  uint32_t cumul = shape_.IndexProduct();
+  data_ = new T[cumul];
+  std::fill(data_, data_ + cumul, value);
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
 template <typename T, uint32_t N>
@@ -1857,7 +1860,7 @@ template <typename T>
 Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T[1])
 {
   *data_ = std::forward<T>(val);
-  ref_ = std::shared_ptr<T>(data_);
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
 template <typename T>
