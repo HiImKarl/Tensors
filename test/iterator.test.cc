@@ -75,6 +75,15 @@ TEST_CASE("Iterator") {
           REQUIRE(tensor(i, j, k) == 0);
 
   }
+
+  SECTION("Range based") {
+    int32_t i = 0;
+    for (auto&& _tensor : tensor(1, 1)) {
+      ++i;
+      REQUIRE(_tensor == 110 + i);
+    }
+    REQUIRE(i == 4);
+  }
 }
 
 TEST_CASE("Constant Iterator") {
