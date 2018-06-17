@@ -1,4 +1,4 @@
-#include "tensor.hh"
+#include <tensor.hh>
 #include "catch.hh"
 
 using namespace tensor;
