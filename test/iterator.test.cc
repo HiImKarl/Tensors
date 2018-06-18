@@ -5,9 +5,9 @@ using namespace tensor;
 
 TEST_CASE("Iterator") {
   Tensor<int32_t, 3> tensor({2, 3, 4});
-  for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-    for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-      for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+  for (size_t i = 1; i <= tensor.dimension(1); ++i)
+    for (size_t j = 1; j <= tensor.dimension(2); ++j)
+      for (size_t k = 1; k <= tensor.dimension(3); ++k)
         tensor(i, j, k) = 100 * i + 10 * j + k;
 
   SECTION("Tensor") {
@@ -69,9 +69,9 @@ TEST_CASE("Iterator") {
         for (auto it3 = it2->begin(1); it3 != it2->end(1); ++it3)
           (*it3) = 0;
 
-    for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-      for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-        for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+    for (size_t i = 1; i <= tensor.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor.dimension(3); ++k)
           REQUIRE(tensor(i, j, k) == 0);
 
   }
@@ -88,9 +88,9 @@ TEST_CASE("Iterator") {
 
 TEST_CASE("Constant Iterator") {
   Tensor<int32_t, 3> tensor({2, 3, 4});
-  for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-    for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-      for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+  for (size_t i = 1; i <= tensor.dimension(1); ++i)
+    for (size_t j = 1; j <= tensor.dimension(2); ++j)
+      for (size_t k = 1; k <= tensor.dimension(3); ++k)
         tensor(i, j, k) = 100 * i + 10 * j + k;
 
   SECTION("Constness") {
@@ -156,9 +156,9 @@ TEST_CASE("Constant Iterator") {
 
 TEST_CASE("Reverse Iterator") {
   Tensor<int32_t, 3> tensor({2, 3, 4});
-  for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-    for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-      for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+  for (size_t i = 1; i <= tensor.dimension(1); ++i)
+    for (size_t j = 1; j <= tensor.dimension(2); ++j)
+      for (size_t k = 1; k <= tensor.dimension(3); ++k)
         tensor(i, j, k) = 100 * i + 10 * j + k;
 
   SECTION("Tensor") {
@@ -223,18 +223,18 @@ TEST_CASE("Reverse Iterator") {
         for (auto it3 = it2->rbegin(1); it3 != it2->rend(1); ++it3)
           (*it3) = 0;
 
-    for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-      for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-        for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+    for (size_t i = 1; i <= tensor.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor.dimension(3); ++k)
           REQUIRE(tensor(i, j, k) == 0);
   }
 }
 
 TEST_CASE("Reverse Const Iterator") {
   Tensor<int32_t, 3> tensor({2, 3, 4});
-  for (uint32_t i = 1; i <= tensor.dimension(1); ++i)
-    for (uint32_t j = 1; j <= tensor.dimension(2); ++j)
-      for (uint32_t k = 1; k <= tensor.dimension(3); ++k)
+  for (size_t i = 1; i <= tensor.dimension(1); ++i)
+    for (size_t j = 1; j <= tensor.dimension(2); ++j)
+      for (size_t k = 1; k <= tensor.dimension(3); ++k)
         tensor(i, j, k) = 100 * i + 10 * j + k;
 
   SECTION("Constness") {

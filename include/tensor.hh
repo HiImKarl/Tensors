@@ -71,7 +71,7 @@
 // Iteration
 #define BEGIN_ON_NON_VECTOR \
   "Tensor::begin() should only be called on rank 1 tensors, " \
-  "use Tensor::begin(uint32_t) instead"
+  "use Tensor::begin(size_t) instead"
 
 // Arithmetic Operations
 #define RANK_MISMATCH(METHOD) \
@@ -100,8 +100,8 @@
 namespace tensor {
 
 /* --------------- Forward Declerations --------------- */
-template <uint32_t N> class Shape;
-template <typename T, uint32_t N = 0> class Tensor;
+template <size_t N> class Shape;
+template <typename T, size_t N = 0> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
 template <typename LHS, typename RHS> class BinarySub;
 template <typename LHS, typename RHS> class BinaryMul;
@@ -116,7 +116,7 @@ template <typename T>
 struct IsTensor { static bool const value = false; };
 
 template <>
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 struct IsTensor<Tensor<T, N>> { static bool const value = true; };
 
 template <typename T>
@@ -127,7 +127,7 @@ template <typename T>
 struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
 
 template <>
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 struct IsScalar<Tensor<T, N>> { static bool const value = false; };
 
 template <typename T>
@@ -137,7 +137,7 @@ struct ValueToTensor {
 };
 
 template <>
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 struct ValueToTensor<Tensor<T, N>> {
   ValueToTensor(Tensor<T, N> const &val): value(val) {}
   Tensor<T, N> const &value;
@@ -173,7 +173,7 @@ struct Expression {
 };
 
 // Tensor Shape
-template <uint32_t N> /*@Shape<N>*/
+template <size_t N> /*@Shape<N>*/
 class Shape {
 public:
   /* -------------------- typedefs -------------------- */
@@ -183,14 +183,14 @@ public:
 
   /* ----------------- friend classes ----------------- */
 
-  template <typename X, uint32_t M> friend class Tensor;
+  template <typename X, size_t M> friend class Tensor;
   template <typename LHSType, typename RHSType> friend class BinaryAdd;
   template <typename LHSType, typename RHSType> friend class BinarySub;
   template <typename LHSType, typename RHSType> friend class BinaryMul;
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Shape(uint32_t const (&dimensions)[N]);
+  explicit Shape(size_t const (&dimensions)[N]);
   Shape(Shape<N> const &shape);
 
   /* ------------------ Assignment -------------------- */
@@ -199,116 +199,116 @@ public:
 
   /* -------------------- Getters --------------------- */
 
-  constexpr static uint32_t rank() { return N; }
-  uint32_t &operator[](uint32_t index);
-  uint32_t operator[](uint32_t index) const;
+  constexpr static size_t rank() { return N; }
+  size_t &operator[](size_t index);
+  size_t operator[](size_t index) const;
 
   /* -------------------- Equality -------------------- */
 
   // Equality only compares against dimensions, not step size
   bool operator==(Shape<N> const& shape) const noexcept;
   bool operator!=(Shape<N> const& shape) const noexcept { return !(*this == shape); }
-  template <uint32_t M>
+  template <size_t M>
   bool operator==(Shape<M> const& shape) const noexcept;
-  template <uint32_t M>
+  template <size_t M>
   bool operator!=(Shape<M> const& shape) const noexcept { return !(*this == shape); }
 
   /* ----------------- Expressions ------------------ */
 
-  template <typename X, typename Y, uint32_t M1, uint32_t M2>
+  template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
 
   /* ------------------- Utility -------------------- */
 
-  uint32_t IndexProduct() const noexcept;
+  size_t IndexProduct() const noexcept;
 
   /* -------------------- Print --------------------- */
 
-  template <typename X, uint32_t M>
+  template <typename X, size_t M>
   friend std::ostream &operator<<(std::ostream &os, Tensor<X, M> const&tensor);
-  template <uint32_t M>
+  template <size_t M>
   friend std::ostream &operator<<(std::ostream &os, Shape<M> const &shape);
 
 private:
   /* ------------------ Data ------------------ */
 
-  uint32_t dimensions_[N];
+  size_t dimensions_[N];
 
   /* --------------- Constructor --------------- */
 
   // FIXME :: dumb hack to avoid ambiguous overload
-  Shape(uint32_t const *dimensions, int);
+  Shape(size_t const *dimensions, int);
   Shape() = default;
 };
 
-template <uint32_t N>
-Shape<N>::Shape(uint32_t const (&dimensions)[N])
+template <size_t N>
+Shape<N>::Shape(size_t const (&dimensions)[N])
 {
-  for (uint32_t i = 0; i < N; ++i) 
+  for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Shape"));
   std::copy_n(dimensions, N, dimensions_);
 }
 
-template <uint32_t N>
+template <size_t N>
 Shape<N>::Shape(Shape const &shape)
 {
   std::copy_n(shape.dimensions_, N, dimensions_);
 }
 
-template <uint32_t N>
-Shape<N>::Shape(uint32_t const *dimensions, int)
+template <size_t N>
+Shape<N>::Shape(size_t const *dimensions, int)
 {
   std::copy_n(dimensions, N, dimensions_);
 }
 
-template <uint32_t N>
+template <size_t N>
 Shape<N> &Shape<N>::operator=(Shape<N> const &shape)
 {
   std::copy_n(shape.dimensions_, N, dimensions_);
   return *this;
 }
 
-template <uint32_t N>
-uint32_t &Shape<N>::operator[](uint32_t index)
+template <size_t N>
+size_t &Shape<N>::operator[](size_t index)
 {
   if (N < index || index == 0)
-    throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(uint32_t)"));
+    throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(size_t)"));
 
   // indexing begins at 1
   return dimensions_[index - 1];
 }
 
-template <uint32_t N>
-uint32_t Shape<N>::operator[](uint32_t index) const
+template <size_t N>
+size_t Shape<N>::operator[](size_t index) const
 {
   if (N < index || index == 0)
-    throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(uint32_t)"));
+    throw std::logic_error(DIMENSION_INVALID("Tensor::dimension(size_t)"));
 
   // indexing begins at 1
   return dimensions_[index - 1];
 }
 
-template <uint32_t N>
+template <size_t N>
 bool Shape<N>::operator==(Shape<N> const& shape) const noexcept
 {
   return std::equal(dimensions_, dimensions_ + N, shape.dimensions_);
 }
 
-template <uint32_t N>
-template <uint32_t M>
+template <size_t N>
+template <size_t M>
 bool Shape<N>::operator==(Shape<M> const& shape) const noexcept
 {
   if (N != M) return false;
   return std::equal(dimensions_, dimensions_ + N, shape.dimensions_);
 }
 
-template <uint32_t N>
-uint32_t Shape<N>::IndexProduct() const noexcept
+template <size_t N>
+size_t Shape<N>::IndexProduct() const noexcept
 {
   return std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
 }
 
-template <uint32_t N>
+template <size_t N>
 std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
 {
   os << "S{";
@@ -318,23 +318,23 @@ std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
 }
 
 // Is this really necessary?
-template <uint32_t N>
+template <size_t N>
 class Indices {
 public:
-  explicit Indices(uint32_t const (&indices)[N]);
-  uint32_t operator[](size_t index) const;
+  explicit Indices(size_t const (&indices)[N]);
+  size_t operator[](size_t index) const;
 private:
-  uint32_t indices_[N];
+  size_t indices_[N];
 };
 
-template <uint32_t N>
-Indices<N>::Indices(uint32_t const (&indices)[N])
+template <size_t N>
+Indices<N>::Indices(size_t const (&indices)[N])
 {
   std::copy_n(indices, N, indices_);
 }
 
-template <uint32_t N>
-uint32_t Indices<N>::operator[](size_t index) const
+template <size_t N>
+size_t Indices<N>::operator[](size_t index) const
 {
   if (index > N) throw std::logic_error(DIMENSION_INVALID("Indices::operator[]"));
   return indices_[index];
@@ -343,7 +343,7 @@ uint32_t Indices<N>::operator[](size_t index) const
 /**
  *  Tensor Object with compile time rank information
  */
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 class Tensor: public Expression<Tensor<T, N>> { /*@Tensor<T, N>*/
 public:
 
@@ -357,15 +357,15 @@ public:
 
   /* ----------------- Friend Classes ----------------- */
 
-  template <typename X, uint32_t M> friend class Tensor;
+  template <typename X, size_t M> friend class Tensor;
   template <typename LHSType, typename RHSType> friend class BinaryAdd;
   template <typename LHSType, typename RHSType> friend class BinarySub;
   template <typename LHSType, typename RHSType> friend class BinaryMul;
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Tensor(uint32_t const (&indices)[N]);
-  Tensor(uint32_t const (&dimensions)[N], T const &value);
+  explicit Tensor(size_t const (&indices)[N]);
+  Tensor(size_t const (&dimensions)[N], T const &value);
   explicit Tensor(Shape<N> shape);
   Tensor(Shape<N> shape, T const &value);
   Tensor(Tensor<T, N> const &tensor);
@@ -380,8 +380,8 @@ public:
 
   /* ----------------- Getters ----------------- */
 
-  constexpr static uint32_t rank() { return N; }
-  uint32_t dimension(uint32_t index) const { return shape_[index]; }
+  constexpr static size_t rank() { return N; }
+  size_t dimension(size_t index) const { return shape_[index]; }
   Shape<N> shape() const noexcept { return shape_; }
   // FIXME :: Any way to hide these and keep it-> functional?
   Tensor *operator->() { return this; }
@@ -397,28 +397,28 @@ public:
   // Access with containers
   // The container must have compile time fixed size
   // accessible through a size() method
-  template <uint32_t M>
+  template <size_t M>
   Tensor<T, N - M> operator[](Indices<M> const &indices);
 
   // slicing
-  template <uint32_t... Slices, typename... Indices>
+  template <size_t... Slices, typename... Indices>
   Tensor<T, sizeof...(Slices)> slice(Indices... indices);
-  template <uint32_t... Slices, typename... Indices>
+  template <size_t... Slices, typename... Indices>
   Tensor<T, sizeof...(Slices)> const slice(Indices... indices) const;
 
   /* -------------------- Expressions ------------------- */
 
-  template <typename X, typename Y, uint32_t M>
+  template <typename X, typename Y, size_t M>
   friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
-  template <typename X, typename Y, uint32_t M>
+  template <typename X, typename Y, size_t M>
   friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
-  template <typename X, typename Y, uint32_t M1, uint32_t M2>
+  template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
   Tensor<T, N> operator-() const;
 
   /* ------------------ Print to ostream --------------- */
 
-  template <typename X, uint32_t M>
+  template <typename X, size_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
   /* -------------------- Equivalence ------------------ */
@@ -433,7 +433,7 @@ public:
   /* ----------------- Useful Functions ---------------- */
 
   Tensor<T, N> copy() const;
-  template <typename U, uint32_t M, typename Container>
+  template <typename U, size_t M, typename Container>
   friend void Fill(Tensor<U, M> &tensor, Container const &container);
 
   /* -------------------- Iterators --------------------- */
@@ -443,7 +443,7 @@ public:
 
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
     Iterator(Iterator const &it);
@@ -457,20 +457,20 @@ public:
     bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(Iterator const &it) const { return !(it == *this); }
   private:
-    Iterator(Tensor<T, N + 1> const &tensor, uint32_t index);
+    Iterator(Tensor<T, N + 1> const &tensor, size_t index);
 
     /**
      * Data describing the underlying tensor
      */
     Shape<N> shape_;
-    uint32_t strides_[N];
+    size_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
 
     /**
      * Step size of the underlying data pointer per increment
      */
-    uint32_t stride_;
+    size_t stride_;
   };
 
   class ConstIterator { /*@ConstIterator<T, N>*/
@@ -478,7 +478,7 @@ public:
 
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
     ConstIterator(ConstIterator const &it);
@@ -492,20 +492,20 @@ public:
     bool operator==(ConstIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstIterator const &it) const { return !(it == *this); }
   private:
-    ConstIterator(Tensor<T, N + 1> const &tensor, uint32_t index);
+    ConstIterator(Tensor<T, N + 1> const &tensor, size_t index);
 
     /**
      * Data describing the underlying tensor
      */
     Shape<N> shape_;
-    uint32_t strides_[N];
+    size_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
 
     /**
      * Step size of the underlying data pointer per increment
      */
-    uint32_t stride_;
+    size_t stride_;
   };
 
   class ReverseIterator { /*@ReverseIterator<T, N>*/
@@ -513,7 +513,7 @@ public:
 
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
     ReverseIterator(ReverseIterator const &it);
@@ -527,20 +527,20 @@ public:
     bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
   private:
-    ReverseIterator (Tensor<T, N + 1> const &tensor, uint32_t index);
+    ReverseIterator (Tensor<T, N + 1> const &tensor, size_t index);
 
     /**
      * Data describing the underlying tensor
      */
     Shape<N> shape_;
-    uint32_t strides_[N];
+    size_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
 
     /**
      * Step size of the underlying data pointer per increment
      */
-    uint32_t stride_;
+    size_t stride_;
   };
 
   class ConstReverseIterator { /*@ConstReverseIterator<T, N>*/
@@ -548,7 +548,7 @@ public:
 
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
     ConstReverseIterator(ConstReverseIterator const &it);
@@ -562,39 +562,39 @@ public:
     bool operator==(ConstReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
   private:
-    ConstReverseIterator (Tensor<T, N + 1> const &tensor, uint32_t index);
+    ConstReverseIterator (Tensor<T, N + 1> const &tensor, size_t index);
 
     /**
      * Data describing the underlying tensor
      */
     Shape<N> shape_;
-    uint32_t strides_[N];
+    size_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
 
     /**
      * Step size of the underlying data pointer per increment
      */
-    uint32_t stride_;
+    size_t stride_;
   };
 
-  typename Tensor<T, N - 1>::Iterator begin(uint32_t index);
-  typename Tensor<T, N - 1>::Iterator end(uint32_t index);
+  typename Tensor<T, N - 1>::Iterator begin(size_t index);
+  typename Tensor<T, N - 1>::Iterator end(size_t index);
   typename Tensor<T, N - 1>::Iterator begin();
   typename Tensor<T, N - 1>::Iterator end();
 
-  typename Tensor<T, N - 1>::ConstIterator cbegin(uint32_t index) const;
-  typename Tensor<T, N - 1>::ConstIterator cend(uint32_t index) const;
+  typename Tensor<T, N - 1>::ConstIterator cbegin(size_t index) const;
+  typename Tensor<T, N - 1>::ConstIterator cend(size_t index) const;
   typename Tensor<T, N - 1>::ConstIterator cbegin() const;
   typename Tensor<T, N - 1>::ConstIterator cend() const;
 
-  typename Tensor<T, N - 1>::ReverseIterator rbegin(uint32_t index);
-  typename Tensor<T, N - 1>::ReverseIterator rend(uint32_t index);
+  typename Tensor<T, N - 1>::ReverseIterator rbegin(size_t index);
+  typename Tensor<T, N - 1>::ReverseIterator rend(size_t index);
   typename Tensor<T, N - 1>::ReverseIterator rbegin();
   typename Tensor<T, N - 1>::ReverseIterator rend();
 
-  typename Tensor<T, N - 1>::ConstReverseIterator crbegin(uint32_t index) const;
-  typename Tensor<T, N - 1>::ConstReverseIterator crend(uint32_t index) const;
+  typename Tensor<T, N - 1>::ConstReverseIterator crbegin(size_t index) const;
+  typename Tensor<T, N - 1>::ConstReverseIterator crend(size_t index) const;
   typename Tensor<T, N - 1>::ConstReverseIterator crbegin() const;
   typename Tensor<T, N - 1>::ConstReverseIterator crend() const;
 
@@ -603,44 +603,44 @@ private:
   /* ----------------- Data ---------------- */
 
   Shape<N> shape_;
-  uint32_t strides_[N];
+  size_t strides_[N];
   value_type *data_;
   std::shared_ptr<T> ref_;
 
   /* --------------- Getters --------------- */
 
-  uint32_t const *strides() const noexcept { return strides_; }
+  size_t const *strides() const noexcept { return strides_; }
 
   /* ------------- Expansion for operator()() ------------- */
 
   // Expansion
-  template <uint32_t M>
-  Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index);
-  template <uint32_t M, typename... Indices>
-  Tensor<T, N - M> pAccessExpansion(uint32_t cumul_index, uint32_t next_index, Indices...);
+  template <size_t M>
+  Tensor<T, N - M> pAccessExpansion(size_t cumul_index);
+  template <size_t M, typename... Indices>
+  Tensor<T, N - M> pAccessExpansion(size_t cumul_index, size_t next_index, Indices...);
 
   /* ------------- Expansion for slice() ------------- */
 
   // Expansion
-  template <uint32_t M, typename... Indices>
-  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices);
-  template <uint32_t M>
-  Tensor<T, N - M> pSliceExpansion(uint32_t * placed_indices, uint32_t);
+  template <size_t M, typename... Indices>
+  Tensor<T, N - M> pSliceExpansion(size_t * placed_indices, size_t array_index, size_t next_index, Indices... indices);
+  template <size_t M>
+  Tensor<T, N - M> pSliceExpansion(size_t * placed_indices, size_t);
 
   // Index checking and placement
-  template <uint32_t I1, uint32_t I2, uint32_t... Indices>
-  static void pSliceIndex(uint32_t *placed_indices);
-  template <uint32_t I1>
-  static void pSliceIndex(uint32_t *placed_indices);
+  template <size_t I1, size_t I2, size_t... Indices>
+  static void pSliceIndex(size_t *placed_indices);
+  template <size_t I1>
+  static void pSliceIndex(size_t *placed_indices);
 
   /* ----------------- Utility -------------------- */
 
   // Data mapping
-  template <uint32_t M>
-  void pUpdateQuotas(uint32_t (&dim_quotas)[M], uint32_t quota_offset = 0,
-      uint32_t offset = 0) const;
-  template <uint32_t M>
-  uint32_t pEvaluateIndex(uint32_t const (&dim_quotas)[M], uint32_t offset = 0) const;
+  template <size_t M>
+  void pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset = 0,
+      size_t offset = 0) const;
+  template <size_t M>
+  size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
   template <typename X>
   void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn);
@@ -655,39 +655,39 @@ private:
   void pInitializeSteps();
 
   // Declare all fields in jthe constructor
-  Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&_ref);
+  Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&_ref);
 
 }; // Tensor
 
 /* ----------------------------- Constructors ------------------------- */
 
-template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N])
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(size_t const (&dimensions)[N])
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
   ref_(data_, _ARRAY_DELETER(T))
 { 
-  for (uint32_t i = 0; i < N; ++i) 
+  for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps(); 
 }
 
-template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const (&dimensions)[N], T const& value)
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(size_t const (&dimensions)[N], T const& value)
   : shape_(Shape<N>(dimensions))
 {
-  for (uint32_t i = 0; i < N; ++i) 
+  for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
-  uint32_t cumul = shape_.IndexProduct();
+  size_t cumul = shape_.IndexProduct();
   data_ = new T[cumul];
   std::fill(data_, data_ + cumul, value);
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
-template <typename T, uint32_t N, typename Container>
+template <typename T, size_t N, typename Container>
 void Fill(Tensor<T, N> &tensor, Container const &container)
 {
-  uint32_t cumul_sum = tensor.shape_.IndexProduct();
+  size_t cumul_sum = tensor.shape_.IndexProduct();
   if (container.size() != cumul_sum)
     throw std::logic_error(NELEMENTS);
   auto it = container.begin();
@@ -699,36 +699,36 @@ void Fill(Tensor<T, N> &tensor, Container const &container)
   tensor.pMap(allocate);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::Tensor(Shape<N> shape)
   : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
 { 
-  for (uint32_t i = 0; i < N; ++i) 
+  for (size_t i = 0; i < N; ++i) 
     if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps(); 
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
   : shape_(Shape<N>(shape))
 {
-  for (uint32_t i = 0; i < N; ++i) 
+  for (size_t i = 0; i < N; ++i) 
     if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeSteps();
-  uint32_t cumul = shape_.IndexProduct();
+  size_t cumul = shape_.IndexProduct();
   data_ = new T[cumul];
   std::fill(data_, data_ + cumul, value);
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
   : shape_(tensor.shape_), data_(tensor.data_), ref_(tensor.ref_)
 {
   std::copy_n(tensor.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename NodeType>
 Tensor<T, N>::Tensor(Expression<NodeType> const& expression)
 {
@@ -739,7 +739,7 @@ Tensor<T, N>::Tensor(Expression<NodeType> const& expression)
   ref_ = std::move(result.ref_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
 {
   if (shape_ != tensor.shape_)
@@ -749,7 +749,7 @@ Tensor<T, N> &Tensor<T, N>::operator=(const Tensor<T, N> &tensor)
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename NodeType>
 Tensor<T, N> &Tensor<T, N>::operator=(Expression<NodeType> const &rhs)
 {
@@ -762,7 +762,7 @@ Tensor<T, N> &Tensor<T, N>::operator=(Expression<NodeType> const &rhs)
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename... Indices>
 Tensor<T, N - sizeof...(Indices)> Tensor<T, N>::operator()(Indices... args)
 {
@@ -770,87 +770,87 @@ Tensor<T, N - sizeof...(Indices)> Tensor<T, N>::operator()(Indices... args)
   return pAccessExpansion<sizeof...(args)>(0, args...);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename... Indices>
 Tensor<T, N - sizeof...(Indices)> const Tensor<T, N>::operator()(Indices... args) const
 {
   return (*const_cast<self_type*>(this))(args...);
 }
 
-template <typename T, uint32_t N>
-template <uint32_t M>
+template <typename T, size_t N>
+template <size_t M>
 Tensor<T, N - M> Tensor<T, N>::operator[](Indices<M> const &indices)
 {
-  uint32_t cumul_index = 0;
+  size_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i)
     cumul_index += strides_[N - i - 1] * (indices[i] - 1);
   return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M,  data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
-template <uint32_t... Slices, typename... Indices>
+template <typename T, size_t N>
+template <size_t... Slices, typename... Indices>
 Tensor<T, sizeof...(Slices)> Tensor<T, N>::slice(Indices... indices)
 {
   static_assert(sizeof...(Slices));
   static_assert(N == sizeof...(Slices) + sizeof...(indices), SLICES_OUT_OF_BOUNDS);
-  uint32_t placed_indices[N];
+  size_t placed_indices[N];
   // Initially fill the array with 1s
   // place 0s where the indices are sliced
   std::fill_n(placed_indices, N, 1);
   this->pSliceIndex<Slices...>(placed_indices);
-  uint32_t index = 0;
+  size_t index = 0;
   for (; index < N && !placed_indices[index]; ++index);
   return pSliceExpansion<sizeof...(indices)>(placed_indices, index, indices...);
 }
 
-template <typename T, uint32_t N>
-template <uint32_t... Slices, typename... Indices>
+template <typename T, size_t N>
+template <size_t... Slices, typename... Indices>
 Tensor<T, sizeof...(Slices)> const Tensor<T, N>::slice(Indices... indices) const
 {
   return const_cast<self_type*>(this)->slice<Slices...>(indices...);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
 {
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator==(Tensor const&)"));
 
-  uint32_t indices_product = shape_.IndexProduct();
-  for (uint32_t i = 0; i < indices_product; ++i)
+  size_t indices_product = shape_.IndexProduct();
+  for (size_t i = 0; i < indices_product; ++i)
     if (data_[i] != tensor.data_[i]) return false;
   return true;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename X>
 bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
 {
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator==(Tensor const&)"));
 
-  uint32_t indices_product = shape_.IndexProduct();
-  for (uint32_t i = 0; i < indices_product; ++i)
+  size_t indices_product = shape_.IndexProduct();
+  for (size_t i = 0; i < indices_product; ++i)
     if (data_[i] != tensor.data_[i]) return false;
   return true;
 }
 
 // possible iostream overload implemention
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 {
-  auto add_brackets = [&os](uint32_t n, bool left)
+  auto add_brackets = [&os](size_t n, bool left)
   {
-    for (uint32_t i = 0; i < n; ++i) os << (left ?'[' : ']');
+    for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
-  uint32_t cumul_index = tensor.shape_.IndexProduct();
-  uint32_t dim_quotas[N];
+  size_t cumul_index = tensor.shape_.IndexProduct();
+  size_t dim_quotas[N];
   std::copy_n(tensor.shape_.dimensions_, N, dim_quotas);
 
   add_brackets(N, true); // opening brackets
   os << tensor.data_[0]; // first element
   for (size_t i = 0; i < cumul_index - 1; ++i) {
-    uint32_t dim_index = N, bracket_count = 0;
+    size_t dim_index = N, bracket_count = 0;
     bool propogate = true;
     // find the correct index to "step" to
     while (dim_index && propogate) {
@@ -862,7 +862,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
         propogate = false;
       --dim_index;
     }
-    uint32_t index = tensor.pEvaluateIndex(dim_quotas);
+    size_t index = tensor.pEvaluateIndex(dim_quotas);
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
@@ -873,17 +873,17 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 }
 
 // private methods
-template <typename T, uint32_t N>
-template <uint32_t M>
-Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(uint32_t cumul_index)
+template <typename T, size_t N>
+template <size_t M>
+Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(size_t cumul_index)
 {
   return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
-template <uint32_t M, typename... Indices>
+template <typename T, size_t N>
+template <size_t M, typename... Indices>
 Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
- uint32_t cumul_index, uint32_t next_index, Indices... rest)
+ size_t cumul_index, size_t next_index, Indices... rest)
 {
   if (next_index > shape_.dimensions_[M - sizeof...(rest) - 1] || next_index == 0)
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
@@ -895,9 +895,9 @@ Tensor<T, N - M> Tensor<T, N>::pAccessExpansion(
 
 /* ------------- Slice Expansion ------------- */
 
-template <typename T, uint32_t N>
-template <uint32_t I1, uint32_t I2, uint32_t... Indices>
-void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
+template <typename T, size_t N>
+template <size_t I1, size_t I2, size_t... Indices>
+void Tensor<T, N>::pSliceIndex(size_t *placed_indices)
 {
   static_assert(N >= I1, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   static_assert(I1 != I2, SLICE_INDICES_REPEATED);
@@ -907,18 +907,18 @@ void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
   pSliceIndex<I2, Indices...>(placed_indices);
 }
 
-template <typename T, uint32_t N>
-template <uint32_t Index>
-void Tensor<T, N>::pSliceIndex(uint32_t *placed_indices)
+template <typename T, size_t N>
+template <size_t Index>
+void Tensor<T, N>::pSliceIndex(size_t *placed_indices)
 {
   static_assert(N >= Index, INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
   static_assert(Index, ZERO_INDEX("Tensor::Slice(Indices...)"));
   placed_indices[Index - 1] = 0;
 }
 
-template <typename T, uint32_t N>
-template <uint32_t M, typename... Indices>
-Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32_t array_index, uint32_t next_index, Indices... indices)
+template <typename T, size_t N>
+template <size_t M, typename... Indices>
+Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(size_t * placed_indices, size_t array_index, size_t next_index, Indices... indices)
 {
   if (shape_.dimensions_[array_index] < next_index)
     throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::Slice(Indices...)"));
@@ -930,15 +930,15 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t * placed_indices, uint32
   return pSliceExpansion<M>(placed_indices, array_index, indices...);
 }
 
-template <typename T, uint32_t N>
-template <uint32_t M>
-Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_t)
+template <typename T, size_t N>
+template <size_t M>
+Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(size_t *placed_indices, size_t)
 {
-  uint32_t offset = 0;
-  uint32_t dimensions[N - M];
-  uint32_t strides[N - M];
-  uint32_t array_index = 0;
-  for (uint32_t i = 0; i < N; ++i) {
+  size_t offset = 0;
+  size_t dimensions[N - M];
+  size_t strides[N - M];
+  size_t array_index = 0;
+  for (size_t i = 0; i < N; ++i) {
     if (placed_indices[i]) {
       offset += (placed_indices[i] - 1) * strides_[i]; // adjust for 1-based indexing
     } else {
@@ -952,22 +952,22 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(uint32_t *placed_indices, uint32_
 
 /* ------------ Utility Methods ------------ */
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 T * Tensor<T, N>::pDuplicateData() const
 {
-  uint32_t count = shape_.IndexProduct();
+  size_t count = shape_.IndexProduct();
   T * data = new T[count];
   std::copy_n(this->data_, count, data);
   return data;
 }
 
 // Update the quotas after one iterator increment
-template <typename T, uint32_t N>
-template <uint32_t M>
-void Tensor<T, N>::pUpdateQuotas(uint32_t (&dim_quotas)[M], uint32_t quota_offset,
-    uint32_t offset) const
+template <typename T, size_t N>
+template <size_t M>
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset,
+    size_t offset) const
 {
-  uint32_t dim_index = M;
+  size_t dim_index = M;
   bool propogate = true;
   while (dim_index && propogate) {
     --dim_quotas[dim_index - 1];
@@ -980,65 +980,65 @@ void Tensor<T, N>::pUpdateQuotas(uint32_t (&dim_quotas)[M], uint32_t quota_offse
 }
 
 // Obtain absolute data offset from dim quotas
-template <typename T, uint32_t N>
-template <uint32_t M>
-uint32_t Tensor<T, N>::pEvaluateIndex(uint32_t const (&dim_quotas)[M], uint32_t offset) const
+template <typename T, size_t N>
+template <size_t M>
+size_t Tensor<T, N>::pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset) const
 {
-  uint32_t index = 0;
+  size_t index = 0;
   for (size_t i = 0; i < M; ++i)
       index += strides_[i + offset] * (shape_.dimensions_[i + offset] - dim_quotas[i]);
   return index;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
 {
   // this is the index upper bound for iteration
-  uint32_t cumul_index = shape_.IndexProduct();
-  uint32_t dim_quotas[N];
+  size_t cumul_index = shape_.IndexProduct();
+  size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = pEvaluateIndex(dim_quotas);
+    size_t index = pEvaluateIndex(dim_quotas);
     fn(&(data_[index]));
     pUpdateQuotas(dim_quotas);
   }
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename X>
 void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
     std::function<void(T *lhs, X *rhs)> const &fn)
 {
   // this is the index upper bound for iteration
-  uint32_t cumul_index = shape_.IndexProduct();
+  size_t cumul_index = shape_.IndexProduct();
 
-  uint32_t dim_quotas[N];
+  size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = pEvaluateIndex(dim_quotas);
-    uint32_t t_index = tensor.pEvaluateIndex(dim_quotas);
+    size_t index = pEvaluateIndex(dim_quotas);
+    size_t t_index = tensor.pEvaluateIndex(dim_quotas);
     fn(&(data_[index]), &(tensor.data_[t_index]));
     pUpdateQuotas(dim_quotas);
   }
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 template <typename X, typename Y>
 void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &tensor_2, std::function<void(T *lhs, X *rhs1, Y *rhs2)> const &fn)
 {
-  uint32_t cumul_index = shape_.IndexProduct();
-  uint32_t dim_quotas[N];
+  size_t cumul_index = shape_.IndexProduct();
+  size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
-    uint32_t index = pEvaluateIndex(dim_quotas);
-    uint32_t t1_index = tensor_1.pEvaluateIndex(dim_quotas);
-    uint32_t t2_index = tensor_2.pEvaluateIndex(dim_quotas);
+    size_t index = pEvaluateIndex(dim_quotas);
+    size_t t1_index = tensor_1.pEvaluateIndex(dim_quotas);
+    size_t t2_index = tensor_2.pEvaluateIndex(dim_quotas);
     fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]);
     pUpdateQuotas(dim_quotas);
   }
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 void Tensor<T, N>::pInitializeSteps()
 {
   size_t accumulator = 1;
@@ -1049,8 +1049,8 @@ void Tensor<T, N>::pInitializeSteps()
 }
 
 // private constructor
-template <typename T, uint32_t N>
-Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *data, std::shared_ptr<T> &&ref)
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&ref)
   : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
 {
   std::copy_n(strides, N, strides_);
@@ -1058,7 +1058,7 @@ Tensor<T, N>::Tensor(uint32_t const *dimensions, uint32_t const *strides, T *dat
 
 /* -------------------------- Expressions -------------------------- */
 
-template <typename X, typename Y, uint32_t M>
+template <typename X, typename Y, size_t M>
 Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
   if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Add(Tensor const&, Tensor const&)"));
@@ -1071,7 +1071,7 @@ Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
   return sum_tensor;
 }
 
-template <typename X, typename Y, uint32_t M>
+template <typename X, typename Y, size_t M>
 Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
   if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Subtract(Tensor const&, Tensor const&)"));
@@ -1084,7 +1084,7 @@ Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
   return diff_tensor;
 }
 
-template <typename X, typename Y, uint32_t M1, uint32_t M2>
+template <typename X, typename Y, size_t M1, size_t M2>
 Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2)
 {
   static_assert(M1 || M2, OVERLOAD_RESOLUTION("Multiply(Tensor const&, Tensor const&)"));
@@ -1097,16 +1097,16 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2> prod_tensor(shape);
-  uint32_t cumul_index_1 = tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1];
-  uint32_t cumul_index_2 = tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[0];
-  uint32_t dim_quotas_1[M1 - 1], dim_quotas_2[M2 - 1];
+  size_t cumul_index_1 = tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1];
+  size_t cumul_index_2 = tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[0];
+  size_t dim_quotas_1[M1 - 1], dim_quotas_2[M2 - 1];
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_quotas_1);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_quotas_2);
-  uint32_t index = 0;
+  size_t index = 0;
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
-      uint32_t t1_index = tensor_1.pEvaluateIndex(dim_quotas_1);
-      uint32_t t2_index = tensor_2.pEvaluateIndex(dim_quotas_2, 1);
+      size_t t1_index = tensor_1.pEvaluateIndex(dim_quotas_1);
+      size_t t2_index = tensor_2.pEvaluateIndex(dim_quotas_2, 1);
       X value {};
       for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x)
           value += *(tensor_1.data_ + t1_index + tensor_1.strides_[M1 - 1] * x) *
@@ -1120,7 +1120,7 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   return prod_tensor;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::operator-() const
 {
   Tensor<T, N> neg_tensor(shape_);
@@ -1135,10 +1135,10 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 /* --------------------------- Useful Functions ------------------------- */
 
 // creates a tensor with a different shape but the same number of elements
-// template <typename T, uint32_t N1, uint32_t N2>
+// template <typename T, size_t N1, size_t N2>
 // Tensor<T, N1> Resize(Tensor<T, N2> const &tensor) {}
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::copy() const
 {
   T *data = pDuplicateData();
@@ -1148,8 +1148,8 @@ Tensor<T, N> Tensor<T, N>::copy() const
 
 /* ------------------------------- Iterator ----------------------------- */
 
-template <typename T, uint32_t N>
-Tensor<T, N>::Iterator::Iterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+template <typename T, size_t N>
+Tensor<T, N>::Iterator::Iterator(Tensor<T, N + 1> const &tensor, size_t index)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
@@ -1159,35 +1159,35 @@ Tensor<T, N>::Iterator::Iterator(Tensor<T, N + 1> const &tensor, uint32_t index)
   std::copy_n(tensor.strides_+ index + 1, N - index, strides_ + index);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::Iterator::Iterator(Iterator const &it)
   : shape_(it.shape_), data_(it.data_), ref_(it.ref_), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::Iterator::Iterator(Iterator &&it)
   : shape_(it.shape_), data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::Iterator::operator*()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::Iterator::operator->()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator++(int)
 {
   Tensor<T, N>::Iterator it {*this};
@@ -1195,14 +1195,14 @@ typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator++(int)
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator++()
 {
   data_ += stride_;
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator--(int)
 {
   Tensor<T, N>::Iterator it {*this};
@@ -1210,7 +1210,7 @@ typename Tensor<T, N>::Iterator Tensor<T, N>::Iterator::operator--(int)
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator--()
 {
   data_ -= stride_;
@@ -1219,8 +1219,8 @@ typename Tensor<T, N>::Iterator &Tensor<T, N>::Iterator::operator--()
 
 /* ----------------------------- ConstIterator --------------------------- */
 
-template <typename T, uint32_t N>
-Tensor<T, N>::ConstIterator::ConstIterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+template <typename T, size_t N>
+Tensor<T, N>::ConstIterator::ConstIterator(Tensor<T, N + 1> const &tensor, size_t index)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
@@ -1230,35 +1230,35 @@ Tensor<T, N>::ConstIterator::ConstIterator(Tensor<T, N + 1> const &tensor, uint3
   std::copy_n(tensor.strides_+ index + 1, N - index, strides_ + index);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ConstIterator::ConstIterator(ConstIterator const &it)
   : shape_(it.shape_), data_(it.data_), ref_(it.ref_), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ConstIterator::ConstIterator(ConstIterator &&it)
   : shape_(it.shape_), data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> const Tensor<T, N>::ConstIterator::operator*()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> const Tensor<T, N>::ConstIterator::operator->()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstIterator Tensor<T, N>::ConstIterator::operator++(int)
 {
   Tensor<T, N>::ConstIterator it {*this};
@@ -1266,14 +1266,14 @@ typename Tensor<T, N>::ConstIterator Tensor<T, N>::ConstIterator::operator++(int
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstIterator &Tensor<T, N>::ConstIterator::operator++()
 {
   data_ += stride_;
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstIterator Tensor<T, N>::ConstIterator::operator--(int)
 {
   Tensor<T, N>::ConstIterator it {*this};
@@ -1281,7 +1281,7 @@ typename Tensor<T, N>::ConstIterator Tensor<T, N>::ConstIterator::operator--(int
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstIterator &Tensor<T, N>::ConstIterator::operator--()
 {
   data_ -= stride_;
@@ -1290,8 +1290,8 @@ typename Tensor<T, N>::ConstIterator &Tensor<T, N>::ConstIterator::operator--()
 
 /* ---------------------------- ReverseIterator -------------------------- */
 
-template <typename T, uint32_t N>
-Tensor<T, N>::ReverseIterator::ReverseIterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+template <typename T, size_t N>
+Tensor<T, N>::ReverseIterator::ReverseIterator(Tensor<T, N + 1> const &tensor, size_t index)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
@@ -1302,35 +1302,35 @@ Tensor<T, N>::ReverseIterator::ReverseIterator(Tensor<T, N + 1> const &tensor, u
   data_ += stride_ * (tensor.shape_.dimensions_[index] - 1);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ReverseIterator::ReverseIterator(ReverseIterator const &it)
   : shape_(it.shape_), data_(it.data_), ref_(it.ref_), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
   : shape_(it.shape_), data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::ReverseIterator::operator*()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::ReverseIterator::operator->()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator++(int)
 {
   Tensor<T, N>::ReverseIterator it {*this};
@@ -1338,14 +1338,14 @@ typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator++
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ReverseIterator &Tensor<T, N>::ReverseIterator::operator++()
 {
   data_ -= stride_;
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator--(int)
 {
   Tensor<T, N>::ReverseIterator it {*this};
@@ -1353,7 +1353,7 @@ typename Tensor<T, N>::ReverseIterator Tensor<T, N>::ReverseIterator::operator--
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ReverseIterator &Tensor<T, N>::ReverseIterator::operator--()
 {
   data_ += stride_;
@@ -1362,8 +1362,8 @@ typename Tensor<T, N>::ReverseIterator &Tensor<T, N>::ReverseIterator::operator-
 
 /* ------------------------- ConstReverseIterator ----------------------- */
 
-template <typename T, uint32_t N>
-Tensor<T, N>::ConstReverseIterator::ConstReverseIterator(Tensor<T, N + 1> const &tensor, uint32_t index)
+template <typename T, size_t N>
+Tensor<T, N>::ConstReverseIterator::ConstReverseIterator(Tensor<T, N + 1> const &tensor, size_t index)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
@@ -1374,35 +1374,35 @@ Tensor<T, N>::ConstReverseIterator::ConstReverseIterator(Tensor<T, N + 1> const 
   data_ += stride_ * (tensor.shape_.dimensions_[index] - 1);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator const &it)
   : shape_(it.shape_), data_(it.data_), ref_(it.ref_), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator &&it)
   : shape_(it.shape_), data_(it.data_), ref_(std::move(it.ref_)), stride_(it.stride_)
 {
   std::copy_n(it.strides_, N, strides_);
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> const Tensor<T, N>::ConstReverseIterator::operator*()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 Tensor<T, N> const Tensor<T, N>::ConstReverseIterator::operator->()
 {
   return Tensor<T, N>(shape_.dimensions_, strides_, data_, 
       std::shared_ptr<T>(ref_));
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstReverseIterator Tensor<T, N>::ConstReverseIterator::operator++(int)
 {
   Tensor<T, N>::ConstReverseIterator it {*this};
@@ -1410,14 +1410,14 @@ typename Tensor<T, N>::ConstReverseIterator Tensor<T, N>::ConstReverseIterator::
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstReverseIterator &Tensor<T, N>::ConstReverseIterator::operator++()
 {
   data_ -= stride_;
   return *this;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstReverseIterator Tensor<T, N>::ConstReverseIterator::operator--(int)
 {
   Tensor<T, N>::ConstReverseIterator it {*this};
@@ -1425,7 +1425,7 @@ typename Tensor<T, N>::ConstReverseIterator Tensor<T, N>::ConstReverseIterator::
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N>::ConstReverseIterator &Tensor<T, N>::ConstReverseIterator::operator--()
 {
   data_ += stride_;
@@ -1434,27 +1434,27 @@ typename Tensor<T, N>::ConstReverseIterator &Tensor<T, N>::ConstReverseIterator:
 
 /* ----------------------- Iterator Construction ----------------------- */
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin(uint32_t index)
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin(size_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::begin(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::begin(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::begin(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::begin(size_t)"));
   --index;
   return typename Tensor<T, N - 1>::Iterator(*this, index);
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end(uint32_t index)
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end(size_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::end(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::end(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::end(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::end(size_t)"));
   --index;
   typename Tensor<T, N - 1>::Iterator it{*this, index};
   it.data_ += strides_[index] * shape_.dimensions_[index];
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin() 
 {
   // Probably a mistake if using this on a non-vector 
@@ -1462,34 +1462,34 @@ typename Tensor<T, N - 1>::Iterator Tensor<T, N>::begin()
   return this->begin(1); 
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::Iterator Tensor<T, N>::end() 
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
   return this->end(1); 
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cbegin(uint32_t index) const
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cbegin(size_t index) const
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::begin(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::begin(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::begin(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::begin(size_t)"));
   --index;
   return typename Tensor<T, N - 1>::ConstIterator(*this, index);
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cend(uint32_t index) const
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cend(size_t index) const
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::end(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::end(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::end(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::end(size_t)"));
   --index;
   typename Tensor<T, N - 1>::ConstIterator it{*this, index};
   it.data_ += strides_[index] * shape_.dimensions_[index];
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cbegin() const
 {
   // Probably a mistake if using this on a non-vector 
@@ -1497,34 +1497,34 @@ typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cbegin() const
   return this->cbegin(1); 
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ConstIterator Tensor<T, N>::cend() const
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
   return this->cend(1); 
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin(uint32_t index)
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin(size_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rbegin(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rbegin(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rbegin(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rbegin(size_t)"));
   --index;
   return typename Tensor<T, N - 1>::ReverseIterator(*this, index);
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rend(uint32_t index)
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rend(size_t index)
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rend(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rend(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rend(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rend(size_t)"));
   --index;
   typename Tensor<T, N - 1>::ReverseIterator it{*this, index};
   it.data_ -= strides_[index] * shape_.dimensions_[index];
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin() 
 {
   // Probably a mistake if using this on a non-vector 
@@ -1532,34 +1532,34 @@ typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rbegin()
   return this->rbegin(1); 
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ReverseIterator Tensor<T, N>::rend() 
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
   return this->rend(1); 
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crbegin(uint32_t index) const
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crbegin(size_t index) const
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rbegin(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rbegin(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rbegin(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rbegin(size_t)"));
   --index;
   return typename Tensor<T, N - 1>::ConstReverseIterator(*this, index);
 }
 
-template <typename T, uint32_t N>
-typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crend(uint32_t index) const
+template <typename T, size_t N>
+typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crend(size_t index) const
 {
-  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rend(uint32_t)"));
-  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rend(uint32_t)"));
+  if (!index) throw std::logic_error(ZERO_INDEX("Tensor<T, N>::rend(size_t)"));
+  if (index > N) throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor<T, N>::rend(size_t)"));
   --index;
   typename Tensor<T, N - 1>::ConstReverseIterator it{*this, index};
   it.data_ -= strides_[index] * shape_.dimensions_[index];
   return it;
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crbegin() const
 {
   // Probably a mistake if using this on a non-vector 
@@ -1567,7 +1567,7 @@ typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crbegin() const
   return this->crbegin(1); 
 }
 
-template <typename T, uint32_t N>
+template <typename T, size_t N>
 typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crend() const
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
@@ -1587,7 +1587,7 @@ public:
 
   /* ----------------- friend classes ----------------- */
 
-  template <typename X, uint32_t M> friend class Tensor;
+  template <typename X, size_t M> friend class Tensor;
   template <typename LHSType, typename RHSType> friend class BinaryAdd;
   template <typename LHSType, typename RHSType> friend class BinarySub;
   template <typename LHSType, typename RHSType> friend class BinaryMul;
@@ -1599,21 +1599,21 @@ public:
 
   /* -------------------- Getters --------------------- */
 
-  constexpr static uint32_t rank() { return 0; }
+  constexpr static size_t rank() { return 0; }
 
   /* -------------------- Equality -------------------- */
 
   // Equality only compares against dimensions, not step size
   bool operator==(Shape<0> const&) const noexcept { return true; }
   bool operator!=(Shape<0> const&) const noexcept { return false; }
-  template <uint32_t M>
+  template <size_t M>
   bool operator==(Shape<M> const&) const noexcept { return false; }
-  template <uint32_t M>
+  template <size_t M>
   bool operator!=(Shape<M> const&) const noexcept { return true; }
 
   /* ---------------- Print ----------------- */
 
-  template <typename X, uint32_t M>
+  template <typename X, size_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
 
 private:
@@ -1630,7 +1630,7 @@ public:
 
   /* ------------- Friend Classes ------------- */
 
-  template <typename X, uint32_t M> friend class Tensor;
+  template <typename X, size_t M> friend class Tensor;
 
   /* -------------- Constructors -------------- */
 
@@ -1648,7 +1648,7 @@ public:
 
   /* -------------- Getters -------------- */
 
-  constexpr static uint32_t rank() { return 0; }
+  constexpr static size_t rank() { return 0; }
   Shape<0> shape() const noexcept { return shape_; }
   value_type &operator()() { return *data_; }
   value_type const &operator()() const { return *data_; }
@@ -1665,7 +1665,7 @@ public:
 
   /* --------------- Print --------------- */
 
-  template <typename X, uint32_t M>
+  template <typename X, size_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
   template <typename X>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor);
@@ -1724,7 +1724,7 @@ public:
   public:
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
 
@@ -1741,11 +1741,11 @@ public:
     bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(Iterator const &it) const { return !(it == *this); }
   private:
-    Iterator(Tensor<T, 1> const &tensor, uint32_t);
+    Iterator(Tensor<T, 1> const &tensor, size_t);
 
     value_type *data_;
     std::shared_ptr<T> ref_;
-    uint32_t stride_;
+    size_t stride_;
   };
 
   /* -------------- ConstIterator ------------ */
@@ -1754,7 +1754,7 @@ public:
   public:
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
 
@@ -1769,11 +1769,11 @@ public:
     bool operator==(ConstIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstIterator const &it) const { return !(it == *this); }
   private:
-    ConstIterator(Tensor<T, 1> const &tensor, uint32_t);
+    ConstIterator(Tensor<T, 1> const &tensor, size_t);
 
     value_type *data_;
     std::shared_ptr<T> ref_;
-    uint32_t stride_;
+    size_t stride_;
   };
 
   /* ------------- ReverseIterator ----------- */
@@ -1782,7 +1782,7 @@ public:
   public:
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
 
@@ -1797,11 +1797,11 @@ public:
     bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
   private:
-    ReverseIterator(Tensor<T, 1> const &tensor, uint32_t);
+    ReverseIterator(Tensor<T, 1> const &tensor, size_t);
 
     value_type *data_;
     std::shared_ptr<T> ref_;
-    uint32_t stride_;
+    size_t stride_;
   };
 
   /* ----------- ConstReverseIterator --------- */
@@ -1810,7 +1810,7 @@ public:
   public:
     /* -------------- Friend Classes -------------- */
 
-    template <typename U, uint32_t M> friend class Tensor;
+    template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
 
@@ -1825,11 +1825,11 @@ public:
     bool operator==(ConstReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
   private:
-    ConstReverseIterator(Tensor<T, 1> const &tensor, uint32_t);
+    ConstReverseIterator(Tensor<T, 1> const &tensor, size_t);
 
     value_type *data_;
     std::shared_ptr<T> ref_;
-    uint32_t stride_;
+    size_t stride_;
   };
 
 private:
@@ -1842,7 +1842,7 @@ private:
 
   /* ------------------ Utility ----------------- */
 
-  Tensor(uint32_t const *, uint32_t const *, T *data, std::shared_ptr<T> &&ref_);
+  Tensor(size_t const *, size_t const *, T *data, std::shared_ptr<T> &&ref_);
 
 };
 
@@ -1948,7 +1948,7 @@ Tensor<T, 0> Tensor<T, 0>::operator-() const
 /* ------------------------ Utility --------------------------- */
 
 template <typename T>
-Tensor<T, 0>::Tensor(uint32_t const *, uint32_t const *, T *data, std::shared_ptr<T> &&ref)
+Tensor<T, 0>::Tensor(size_t const *, size_t const *, T *data, std::shared_ptr<T> &&ref)
   : data_(data), ref_(std::move(ref))
 {}
 
@@ -1976,7 +1976,7 @@ Tensor<T, 0> Tensor<T, 0>::copy() const
 /* ---------------------- Iterators ------------------------- */
 
 template <typename T>
-Tensor<T, 0>::Iterator::Iterator(Tensor<T, 1> const &tensor, uint32_t)
+Tensor<T, 0>::Iterator::Iterator(Tensor<T, 1> const &tensor, size_t)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {}
 
@@ -2033,7 +2033,7 @@ typename Tensor<T, 0>::Iterator &Tensor<T, 0>::Iterator::operator--()
 /* ------------------- ConstIterators ---------------------- */
 
 template <typename T>
-Tensor<T, 0>::ConstIterator::ConstIterator(Tensor<T, 1> const &tensor, uint32_t)
+Tensor<T, 0>::ConstIterator::ConstIterator(Tensor<T, 1> const &tensor, size_t)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {}
 
@@ -2090,7 +2090,7 @@ typename Tensor<T, 0>::ConstIterator &Tensor<T, 0>::ConstIterator::operator--()
 /* -------------------- ReverseIterator ---------------------- */
 
 template <typename T>
-Tensor<T, 0>::ReverseIterator::ReverseIterator(Tensor<T, 1> const &tensor, uint32_t)
+Tensor<T, 0>::ReverseIterator::ReverseIterator(Tensor<T, 1> const &tensor, size_t)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {
   data_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
@@ -2149,7 +2149,7 @@ typename Tensor<T, 0>::ReverseIterator &Tensor<T, 0>::ReverseIterator::operator-
 /* ----------------- ConstReverseIterator ------------------- */
 
 template <typename T>
-Tensor<T, 0>::ConstReverseIterator::ConstReverseIterator(Tensor<T, 1> const &tensor, uint32_t)
+Tensor<T, 0>::ConstReverseIterator::ConstReverseIterator(Tensor<T, 1> const &tensor, size_t)
   : data_(tensor.data_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {
   data_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
@@ -2222,8 +2222,8 @@ public:
 
   /* ---------------- Getters ----------------- */
 
-  constexpr static uint32_t rank() { return LHSType::rank(); }
-  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
+  constexpr static size_t rank() { return LHSType::rank(); }
+  size_t dimension(size_t index) const { return lhs_.dimension(index); }
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
 
@@ -2276,8 +2276,8 @@ public:
 
   /* ---------------- Getters ----------------- */
 
-  constexpr static uint32_t rank() { return LHSType::rank(); }
-  uint32_t dimension(uint32_t index) const { return lhs_.dimension(index); }
+  constexpr static size_t rank() { return LHSType::rank(); }
+  size_t dimension(size_t index) const { return lhs_.dimension(index); }
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() - sizeof...(Indices)> operator()(Indices... indices) const;
 
@@ -2337,8 +2337,8 @@ public:
 
   /* ---------------- Getters ----------------- */
 
-  constexpr static uint32_t rank() { return LHSType::rank() + RHSType::rank() - 2; }
-  uint32_t dimension(uint32_t index) const;
+  constexpr static size_t rank() { return LHSType::rank() + RHSType::rank() - 2; }
+  size_t dimension(size_t index) const;
   template <typename... Indices>
   Tensor<value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> operator()(Indices... indices) const;
 

@@ -11,14 +11,14 @@ TEST_CASE("Shapes") {
   
   SECTION("Rank and Dimensions") {
     REQUIRE(shape.rank() == 8);
-    for (uint32_t i = 1; i <= 8; ++i)
+    for (size_t i = 1; i <= 8; ++i)
       REQUIRE(shape[i] == i);
   }
 
   SECTION("Tensor Constructor") {
     Tensor<int, 8> tensor(shape);
     REQUIRE(tensor.rank() == 8);
-    for (uint32_t i = 1; i <= 8; ++i)
+    for (size_t i = 1; i <= 8; ++i)
       REQUIRE(tensor.dimension(i) == i);
   }
 
