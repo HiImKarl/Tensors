@@ -28,8 +28,6 @@ static void BM_VectorTensor_Assignment(benchmark::State &state)
 {
   size_t dim = state.range(0);
   std::vector<int32_t> vec ((size_t)pow(dim, 5), -1);
-  std::cout << vec.size() << std::endl;
-  std::cout << dim << std::endl;
   Tensor<int32_t, 5> t1({dim, dim, dim, dim, dim});
   for (auto _ : state) Fill(t1, vec);
 }
