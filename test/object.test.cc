@@ -56,7 +56,7 @@ TEST_CASE("Multiple Tensors") {
   SECTION("Copy Constructor") {
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
     Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
-    REQUIRE(constructor_counter == 16);
+    REQUIRE(constructor_counter == 32);
   }
 
   SECTION("Move Constructor") {
@@ -70,13 +70,27 @@ TEST_CASE("Multiple Tensors") {
       Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
       Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
     }
-    REQUIRE(destructor_counter == 32);
+    REQUIRE(destructor_counter == 64);
   }
 
-  SECTION("Move Construction") {
+  SECTION("Move Destruction") {
     {
       Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
       Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = std::move(tensor_1);
+    }
+    REQUIRE(destructor_counter == 32);
+  }
+
+  SECTION("Ref Constructor") {
+    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.ref();
+    REQUIRE(constructor_counter == 16);
+  }
+
+  SECTION("Move Destruction") {
+    {
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
+      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.ref();
     }
     REQUIRE(destructor_counter == 32);
   }

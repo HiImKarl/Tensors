@@ -362,6 +362,23 @@ public:
   template <typename LHSType, typename RHSType> friend class BinarySub;
   template <typename LHSType, typename RHSType> friend class BinaryMul;
 
+  /* ------------------ Proxy Objects ----------------- */
+
+  /**
+   * Proxy Tensor Object used for building tensors from reference
+   * This is used only to differentiate proxy tensor Construction
+   */
+
+  class Proxy { /*@Proxy<T,N>*/
+  public:
+    template <typename U, size_t M> friend class Tensor;
+    Proxy() = delete;
+  private:
+    Proxy(Tensor<T, N> const &tensor): tensor_(tensor) {}
+    Proxy(Proxy const &proxy): tensor_(proxy.tensor_) {}
+    Tensor<T, N> const &tensor_;
+  }; 
+
   /* ------------------ Constructors ------------------ */
 
   explicit Tensor(size_t const (&indices)[N]);
@@ -369,6 +386,8 @@ public:
   explicit Tensor(Shape<N> shape);
   Tensor(Shape<N> shape, T const &value);
   Tensor(Tensor<T, N> const &tensor);
+  Tensor(Tensor<T, N> &&tensor);
+  Tensor(Tensor<T, N>::Proxy const &proxy);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
 
@@ -429,12 +448,6 @@ public:
   bool operator==(Tensor<X, N> const& tensor) const;
   template <typename X>
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
-
-  /* ----------------- Useful Functions ---------------- */
-
-  Tensor<T, N> copy() const;
-  template <typename U, size_t M, typename Container>
-  friend void Fill(Tensor<U, M> &tensor, Container const &container);
 
   /* -------------------- Iterators --------------------- */
 
@@ -516,6 +529,7 @@ public:
     template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
+
     ReverseIterator(ReverseIterator const &it);
     ReverseIterator(ReverseIterator &&it);
     Tensor<T, N> operator*();
@@ -598,6 +612,14 @@ public:
   typename Tensor<T, N - 1>::ConstReverseIterator crbegin() const;
   typename Tensor<T, N - 1>::ConstReverseIterator crend() const;
 
+  /* ----------------- Utility Functions ---------------- */
+
+  Tensor<T, N> copy() const;
+  Tensor<T, N>::Proxy ref();
+  template <typename U, size_t M, typename Container>
+  friend void Fill(Tensor<U, M> &tensor, Container const &container);
+  
+
 private:
 
   /* ----------------- Data ---------------- */
@@ -652,7 +674,7 @@ private:
   value_type * pDuplicateData() const;
 
   // Initialize strides :: DIMENSIONS MUST BE INITIALIZED FIRST
-  void pInitializeSteps();
+  void pInitializeStrides();
 
   // Declare all fields in jthe constructor
   Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&_ref);
@@ -668,7 +690,7 @@ Tensor<T, N>::Tensor(size_t const (&dimensions)[N])
 { 
   for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeSteps(); 
+  pInitializeStrides(); 
 }
 
 template <typename T, size_t N>
@@ -677,7 +699,7 @@ Tensor<T, N>::Tensor(size_t const (&dimensions)[N], T const& value)
 {
   for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeSteps();
+  pInitializeStrides();
   size_t cumul = shape_.IndexProduct();
   data_ = new T[cumul];
   std::fill(data_, data_ + cumul, value);
@@ -705,7 +727,7 @@ Tensor<T, N>::Tensor(Shape<N> shape)
 { 
   for (size_t i = 0; i < N; ++i) 
     if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeSteps(); 
+  pInitializeStrides(); 
 }
 
 template <typename T, size_t N>
@@ -714,7 +736,7 @@ Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
 {
   for (size_t i = 0; i < N; ++i) 
     if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeSteps();
+  pInitializeStrides();
   size_t cumul = shape_.IndexProduct();
   data_ = new T[cumul];
   std::fill(data_, data_ + cumul, value);
@@ -723,9 +745,34 @@ Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
 
 template <typename T, size_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
-  : shape_(tensor.shape_), data_(tensor.data_), ref_(tensor.ref_)
+  : shape_(tensor.shape_)
+{
+  pInitializeStrides();
+  size_t cumul = shape_.IndexProduct();
+  this->data_ = new T[cumul];
+  size_t dim_quotas[N];
+  std::copy_n(shape_.dimensions_, N, dim_quotas);
+  for (size_t i = 0; i < cumul; ++i) {
+    size_t index = tensor.pEvaluateIndex(dim_quotas);
+    this->data_[i] = tensor.data_[index];
+    pUpdateQuotas(dim_quotas);
+  }
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
+}
+
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(Tensor<T, N> &&tensor)
+  : shape_(tensor.shape_), data_(tensor.data_), ref_(std::move(tensor.ref_))
 {
   std::copy_n(tensor.strides_, N, strides_);
+  tensor.data_ = nullptr;
+}
+
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(Tensor<T, N>::Proxy const &proxy)
+  : shape_(proxy.tensor_.shape_), data_(proxy.tensor_.data_), ref_(proxy.tensor_.ref_)
+{
+  std::copy_n(proxy.tensor_.strides_, N, strides_);
 }
 
 template <typename T, size_t N>
@@ -1039,7 +1086,7 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
 }
 
 template <typename T, size_t N>
-void Tensor<T, N>::pInitializeSteps()
+void Tensor<T, N>::pInitializeStrides()
 {
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
@@ -1141,9 +1188,13 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::copy() const
 {
-  T *data = pDuplicateData();
-  return Tensor<T, N>(shape_.dimensions_, strides_, data,
-      std::shared_ptr<T>(data, _ARRAY_DELETER(T)));
+  return Tensor<T, N>(*this);
+}
+
+template <typename T, size_t N>
+typename Tensor<T, N>::Proxy Tensor<T, N>::ref() 
+{
+  return Proxy(*this);
 }
 
 /* ------------------------------- Iterator ----------------------------- */
@@ -1632,12 +1683,31 @@ public:
 
   template <typename X, size_t M> friend class Tensor;
 
+  /* ----------- Proxy Objects ------------ */
+
+  /**
+   * Proxy Tensor Object used for building tensors from reference
+   * This is used only to differentiate proxy tensor Construction
+   */
+
+  class Proxy { /*@Proxy<T,0>*/
+  public:
+    template <typename U, size_t N> friend class Tensor;
+    Proxy() = delete;
+  private:
+    Proxy(Tensor<T, 0> const &tensor): tensor_(tensor) {}
+    Proxy(Proxy const &proxy): tensor_(proxy.tensor_) {} 
+    Tensor<T, 0> const &tensor_;
+  }; 
+
   /* -------------- Constructors -------------- */
 
   Tensor();
   explicit Tensor(value_type &&val);
   explicit Tensor(Shape<0>);
   Tensor(Tensor<T, 0> const &tensor);
+  Tensor(Tensor<T, 0> &&tensor);
+  Tensor(Tensor<T, 0>::Proxy const &proxy);
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
 
@@ -1713,10 +1783,6 @@ public:
 
   operator T &() { return *data_; }
   operator T const&() const { return *data_; }
-
-  /* ------------- Useful Functions ------------ */
-
-  Tensor<T, 0> copy() const;
 
   /* ---------------- Iterator -------------- */
 
@@ -1832,6 +1898,11 @@ public:
     size_t stride_;
   };
 
+  /* ------------- Utility Functions ------------ */
+
+  Tensor<T, 0> copy() const;
+  Tensor<T, 0>::Proxy ref();
+
 private:
 
   /* ------------------- Data ------------------- */
@@ -1864,7 +1935,22 @@ Tensor<T, 0>::Tensor(T &&val) : shape_(Shape<0>()), data_(new T[1])
 }
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(tensor.data_), ref_(tensor.ref_)
+Tensor<T, 0>::Tensor(Tensor<T, 0> const &tensor): shape_(Shape<0>()), data_(new T[1]()), 
+  ref_(data_, _ARRAY_DELETER(T))
+{
+  *data_ = *tensor.data_;
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): shape_(Shape<0>()), data_(tensor.data_),
+  ref_(std::move(tensor.ref_))
+{
+  tensor.data_ = nullptr;
+}
+
+template <typename T>
+Tensor<T, 0>::Tensor(Tensor<T, 0>::Proxy const &proxy)
+  : shape_(Shape<0>()), data_(proxy.tensor_.data_), ref_(proxy.tensor_.ref_)
 {}
 
 template <typename T>
@@ -1971,6 +2057,12 @@ Tensor<T, 0> Tensor<T, 0>::copy() const
   // decrement count because it gets incremented in the constructor
   return Tensor<T, 0>(nullptr, nullptr, data,
       std::shared_ptr<T>(data, _ARRAY_DELETER(T)));
+}
+
+template <typename T>
+typename Tensor<T, 0>::Proxy Tensor<T, 0>::ref() 
+{
+  return Proxy(*this);
 }
 
 /* ---------------------- Iterators ------------------------- */

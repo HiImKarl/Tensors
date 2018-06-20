@@ -19,7 +19,6 @@ TEST_CASE("Tensor Assignment", "[int]") {
 
   SECTION("Assigning Tensors to Tensors") {
 
-    /* same type */
     Tensor<int32_t, 2> t2({3, 4});
     for (size_t i = 1; i <= t2.dimension(1); ++i)
       for (size_t j = 1; j <= t2.dimension(2); ++j) 
@@ -39,7 +38,6 @@ TEST_CASE("Tensor Assignment", "[int]") {
       for (size_t j = 1; j <= tensor_1.dimension(4); ++j)
         REQUIRE(tensor_1(1, 2, i, j) == (int)(1000 + 200 + 10 * i + j));
 
-    /* different type */
     Tensor<double, 4> t3({1, 2, 3, 4});
     for (size_t i = 1; i <= t3.dimension(1); ++i)
       for (size_t j = 1; j <= t3.dimension(2); ++j)
@@ -85,6 +83,40 @@ TEST_CASE("Tensor Assignment", "[int]") {
             t3(i, j, k, l) = -1 * (int)(i + 10 * j + 100 * k + 1000 * l);
 
     tensor_1 = t3;
+    for (size_t i = 1; i <= t3.dimension(1); ++i)
+      for (size_t j = 1; j <= t3.dimension(2); ++j)
+        for (size_t k = 1; k <= t3.dimension(3); ++k)
+          for (size_t l = 1; l <= t3.dimension(4); ++l)
+            REQUIRE(tensor_1(i, j, k, l) == -1 * (int)(i + 10 * j + 100 * k + 1000 * l));
+  }
+
+  SECTION("Assigning Tensors to Reference Tensors") {
+
+    Tensor<int32_t, 4> tensor_1_ref = tensor_1.ref();
+    Tensor<int32_t, 2> t2({3, 4});
+    for (size_t i = 1; i <= t2.dimension(1); ++i)
+      for (size_t j = 1; j <= t2.dimension(2); ++j) 
+        t2(i, j) = tensor_1(1, 1, i, j) - 1000;
+
+    tensor_1_ref(1, 1) = t2;
+
+    for (size_t i = 1; i <= tensor_1.dimension(3); ++i)
+      for (size_t j = 1; j <= tensor_1.dimension(4); ++j)
+        REQUIRE(tensor_1(1, 1, i, j) == (int)(100 + 10 * i + j));
+
+    for (size_t i = 1; i <= tensor_1.dimension(3); ++i)
+      for (size_t j = 1; j <= tensor_1.dimension(4); ++j)
+        REQUIRE(tensor_1(1, 2, i, j) == (int)(1000 + 200 + 10 * i + j));
+
+    Tensor<double, 4> t3({1, 2, 3, 4});
+    for (size_t i = 1; i <= t3.dimension(1); ++i)
+      for (size_t j = 1; j <= t3.dimension(2); ++j)
+        for (size_t k = 1; k <= t3.dimension(3); ++k)
+          for (size_t l = 1; l <= t3.dimension(4); ++l)
+            t3(i, j, k, l) = -1 * (int)(i + 10 * j + 100 * k + 1000 * l);
+
+    tensor_1_ref  = t3;
+
     for (size_t i = 1; i <= t3.dimension(1); ++i)
       for (size_t j = 1; j <= t3.dimension(2); ++j)
         for (size_t k = 1; k <= t3.dimension(3); ++k)
