@@ -92,6 +92,21 @@ TEST_CASE("Intializing Tensors", "[int]") {
         for (size_t k = 1; k <= naturals.dimension(3); ++k)
           REQUIRE((size_t)naturals(i, j, k) == (i - 1) * 12 + (j - 1) * 4 + k - 1);
  }
+
+ SECTION("Factory Method") {
+    int count = 0;
+    std::function<int(int)> factory = [&count](int x) -> int {
+      count += x;
+      return count - x;
+    };
+
+    auto naturals = Tensor<int32_t, 3>(Shape<3>({2, 3, 4}), factory, 1);
+    for (size_t i = 1; i <= naturals.dimension(1); ++i)
+      for (size_t j = 1; j <= naturals.dimension(2); ++j)
+        for (size_t k = 1; k <= naturals.dimension(3); ++k)
+          REQUIRE((size_t)naturals(i, j, k) == (i - 1) * 12 + (j - 1) * 4 + k - 1);
+ }
+
 }
 
 TEST_CASE("Initializing Scalars") {

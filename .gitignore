@@ -3,3 +3,6 @@
 *.o
 *.d
 .clang-format
+*.log
+documentation/
+bin/

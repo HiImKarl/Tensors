@@ -1,0 +1,61 @@
+\hypertarget{classtensor_1_1Shape_3_010_01_4}{}\section{tensor\+:\+:Shape$<$ 0 $>$ Class Template Reference}
+\label{classtensor_1_1Shape_3_010_01_4}\index{tensor\+::\+Shape$<$ 0 $>$@{tensor\+::\+Shape$<$ 0 $>$}}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef size\+\_\+t {\bfseries size\+\_\+type}\hypertarget{classtensor_1_1Shape_3_010_01_4_aa6971b8d13fb21ce5a31751b9c8c37fb}{}\label{classtensor_1_1Shape_3_010_01_4_aa6971b8d13fb21ce5a31751b9c8c37fb}
+
+\item 
+typedef ptrdiff\+\_\+t {\bfseries difference\+\_\+type}\hypertarget{classtensor_1_1Shape_3_010_01_4_a96dd3e0fcba05deee2afbf2b7b93c874}{}\label{classtensor_1_1Shape_3_010_01_4_a96dd3e0fcba05deee2afbf2b7b93c874}
+
+\item 
+typedef \hyperlink{classtensor_1_1Shape}{Shape}$<$ 0 $>$ {\bfseries self\+\_\+type}\hypertarget{classtensor_1_1Shape_3_010_01_4_a51707d9bc620f1b2f42e45a5367d4b04}{}\label{classtensor_1_1Shape_3_010_01_4_a51707d9bc620f1b2f42e45a5367d4b04}
+
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+{\bfseries Shape} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ 0 $>$ const \&)\hypertarget{classtensor_1_1Shape_3_010_01_4_ac343bf46319a4a89ca80b5ccc3608bf7}{}\label{classtensor_1_1Shape_3_010_01_4_ac343bf46319a4a89ca80b5ccc3608bf7}
+
+\item 
+bool {\bfseries operator==} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ 0 $>$ const \&) const noexcept\hypertarget{classtensor_1_1Shape_3_010_01_4_a51391d1d3addb07ee2611cdb1581a9e8}{}\label{classtensor_1_1Shape_3_010_01_4_a51391d1d3addb07ee2611cdb1581a9e8}
+
+\item 
+bool {\bfseries operator!=} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ 0 $>$ const \&) const noexcept\hypertarget{classtensor_1_1Shape_3_010_01_4_ae1ff8093c962f0cde6f7aff0e4843a92}{}\label{classtensor_1_1Shape_3_010_01_4_ae1ff8093c962f0cde6f7aff0e4843a92}
+
+\item 
+{\footnotesize template$<$size\+\_\+t M$>$ }\\bool {\bfseries operator==} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ M $>$ const \&) const noexcept\hypertarget{classtensor_1_1Shape_3_010_01_4_af9ae3623ccbc92d51e56a703e9e53fe3}{}\label{classtensor_1_1Shape_3_010_01_4_af9ae3623ccbc92d51e56a703e9e53fe3}
+
+\item 
+{\footnotesize template$<$size\+\_\+t M$>$ }\\bool {\bfseries operator!=} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ M $>$ const \&) const noexcept\hypertarget{classtensor_1_1Shape_3_010_01_4_aa6a66b20a263d0bbf4cdca2fe1d0d092}{}\label{classtensor_1_1Shape_3_010_01_4_aa6a66b20a263d0bbf4cdca2fe1d0d092}
+
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static constexpr size\+\_\+t {\bfseries rank} ()\hypertarget{classtensor_1_1Shape_3_010_01_4_af77da58c4771213109f60928683b1280}{}\label{classtensor_1_1Shape_3_010_01_4_af77da58c4771213109f60928683b1280}
+
+\end{DoxyCompactItemize}
+\subsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+{\footnotesize template$<$typename X , size\+\_\+t M$>$ }\\class {\bfseries Tensor}\hypertarget{classtensor_1_1Shape_3_010_01_4_af4a07134de1525172d3c60c57e8f1496}{}\label{classtensor_1_1Shape_3_010_01_4_af4a07134de1525172d3c60c57e8f1496}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Add}\hypertarget{classtensor_1_1Shape_3_010_01_4_a4d665549d16efb911a856dc6fd122618}{}\label{classtensor_1_1Shape_3_010_01_4_a4d665549d16efb911a856dc6fd122618}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Sub}\hypertarget{classtensor_1_1Shape_3_010_01_4_afc63fe61d41c24c197bbf470274e78c5}{}\label{classtensor_1_1Shape_3_010_01_4_afc63fe61d41c24c197bbf470274e78c5}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Mul}\hypertarget{classtensor_1_1Shape_3_010_01_4_a4e70ecf474c03f7e2051b75bb9af6110}{}\label{classtensor_1_1Shape_3_010_01_4_a4e70ecf474c03f7e2051b75bb9af6110}
+
+\item 
+{\footnotesize template$<$typename X , size\+\_\+t M$>$ }\\std\+::ostream \& {\bfseries operator$<$$<$} (std\+::ostream \&os, const \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ \&tensor)\hypertarget{classtensor_1_1Shape_3_010_01_4_a604769864add641c2cb711a392fb919b}{}\label{classtensor_1_1Shape_3_010_01_4_a604769864add641c2cb711a392fb919b}
+
+\end{DoxyCompactItemize}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/tensor.\+hh\end{DoxyCompactItemize}

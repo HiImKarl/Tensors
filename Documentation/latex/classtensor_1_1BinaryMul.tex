@@ -1,0 +1,55 @@
+\hypertarget{classtensor_1_1BinaryMul}{}\section{tensor\+:\+:Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$ Class Template Reference}
+\label{classtensor_1_1BinaryMul}\index{tensor\+::\+Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$@{tensor\+::\+Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$}}
+
+
+{\ttfamily \#include $<$tensor.\+hh$>$}
+
+
+
+Inheritance diagram for tensor\+:\+:Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$\+:
+% FIG 0
+
+
+Collaboration diagram for tensor\+:\+:Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$\+:
+% FIG 1
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef L\+H\+S\+Type\+::value\+\_\+type {\bfseries value\+\_\+type}\hypertarget{classtensor_1_1BinaryMul_a3531048c90774770c8257fff70aff711}{}\label{classtensor_1_1BinaryMul_a3531048c90774770c8257fff70aff711}
+
+\item 
+typedef \hyperlink{classtensor_1_1BinaryMul}{Binary\+Mul} {\bfseries self\+\_\+type}\hypertarget{classtensor_1_1BinaryMul_a7c4b82a586dbaa3d92283231fd80560b}{}\label{classtensor_1_1BinaryMul_a7c4b82a586dbaa3d92283231fd80560b}
+
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+{\bfseries Binary\+Mul} (L\+H\+S\+Type const \&lhs, R\+H\+S\+Type const \&rhs)\hypertarget{classtensor_1_1BinaryMul_a40dc94c6aff6dbd130fa4e404479751d}{}\label{classtensor_1_1BinaryMul_a40dc94c6aff6dbd130fa4e404479751d}
+
+\item 
+size\+\_\+t {\bfseries dimension} (size\+\_\+t index) const \hypertarget{classtensor_1_1BinaryMul_a56ce8ccfa6f8bfdd22dac020e7ce395d}{}\label{classtensor_1_1BinaryMul_a56ce8ccfa6f8bfdd22dac020e7ce395d}
+
+\item 
+{\footnotesize template$<$typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ value\+\_\+type, L\+H\+S\+Type\+::rank()+R\+H\+S\+Type\+::rank()-\/sizeof...(\hyperlink{classtensor_1_1Indices}{Indices})-\/2 $>$ {\bfseries operator()} (Indices...\+indices) const \hypertarget{classtensor_1_1BinaryMul_acf3d57f34d826810dd346647107f2097}{}\label{classtensor_1_1BinaryMul_acf3d57f34d826810dd346647107f2097}
+
+\item 
+{\footnotesize template$<$typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ typename L\+H\+S\+Type\+::value\+\_\+type, L\+H\+S\+Type\+::rank()+R\+H\+S\+Type\+::rank()-\/sizeof...(\hyperlink{classtensor_1_1Indices}{Indices})-\/2 $>$ {\bfseries operator()} (Indices...\+indices) const \hypertarget{classtensor_1_1BinaryMul_abb82ed8b97fc551cd9c40dc0069cb359}{}\label{classtensor_1_1BinaryMul_abb82ed8b97fc551cd9c40dc0069cb359}
+
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static constexpr size\+\_\+t {\bfseries rank} ()\hypertarget{classtensor_1_1BinaryMul_aab0b3fde23cd87bdadbc74ba8615c8dd}{}\label{classtensor_1_1BinaryMul_aab0b3fde23cd87bdadbc74ba8615c8dd}
+
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+\subsubsection*{template$<$typename L\+H\+S\+Type, typename R\+H\+S\+Type$>$\\*
+class tensor\+::\+Binary\+Mul$<$ L\+H\+S\+Type, R\+H\+S\+Type $>$}
+
+Multiplies the inner dimensions i.\+e. 3x4x5 $\ast$ 5x4x3 produces a 3x4x4x3 tensor 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/tensor.\+hh\end{DoxyCompactItemize}

@@ -1,0 +1,372 @@
+\hypertarget{classtensor_1_1Tensor}{}\section{tensor\+:\+:Tensor$<$ T, N $>$ Class Template Reference}
+\label{classtensor_1_1Tensor}\index{tensor\+::\+Tensor$<$ T, N $>$@{tensor\+::\+Tensor$<$ T, N $>$}}
+
+
+Inheritance diagram for tensor\+:\+:Tensor$<$ T, N $>$\+:
+% FIG 0
+
+
+Collaboration diagram for tensor\+:\+:Tensor$<$ T, N $>$\+:
+% FIG 1
+\subsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+class \hyperlink{classtensor_1_1Tensor_1_1ConstIterator}{Const\+Iterator}
+\item 
+class \hyperlink{classtensor_1_1Tensor_1_1ConstReverseIterator}{Const\+Reverse\+Iterator}
+\item 
+class \hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator}
+\item 
+class \hyperlink{classtensor_1_1Tensor_1_1Proxy}{Proxy}
+\item 
+class \hyperlink{classtensor_1_1Tensor_1_1ReverseIterator}{Reverse\+Iterator}
+\end{DoxyCompactItemize}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef T \hyperlink{classtensor_1_1Tensor_ad2bb23b5363bc4cdb97c43b48abb80f9}{value\+\_\+type}
+\item 
+typedef T \& {\bfseries reference}\hypertarget{classtensor_1_1Tensor_a0aadbaaa534281aa5394635be9323b8a}{}\label{classtensor_1_1Tensor_a0aadbaaa534281aa5394635be9323b8a}
+
+\item 
+typedef T const \& {\bfseries const\+\_\+reference}\hypertarget{classtensor_1_1Tensor_aea16565f8174f0b8a60c2a5fe1eda1e7}{}\label{classtensor_1_1Tensor_aea16565f8174f0b8a60c2a5fe1eda1e7}
+
+\item 
+typedef size\+\_\+t {\bfseries size\+\_\+type}\hypertarget{classtensor_1_1Tensor_ae1d6af038e05ae9cfa3d91162c2504de}{}\label{classtensor_1_1Tensor_ae1d6af038e05ae9cfa3d91162c2504de}
+
+\item 
+typedef ptrdiff\+\_\+t {\bfseries difference\+\_\+type}\hypertarget{classtensor_1_1Tensor_a491c6429ee1dafbd0d33e709868c6776}{}\label{classtensor_1_1Tensor_a491c6429ee1dafbd0d33e709868c6776}
+
+\item 
+typedef \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ {\bfseries self\+\_\+type}\hypertarget{classtensor_1_1Tensor_af377b68e264909b8c10d88674936f711}{}\label{classtensor_1_1Tensor_af377b68e264909b8c10d88674936f711}
+
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classtensor_1_1Tensor_ac8fe69c54ef48595983b4fc06624fcb6}{Tensor} (size\+\_\+t const (\&indices)\mbox{[}N\mbox{]})
+\item 
+\hyperlink{classtensor_1_1Tensor_a484451b19915ad181d2a077416879448}{Tensor} (size\+\_\+t const (\&dimensions)\mbox{[}N\mbox{]}, T const \&value)
+\item 
+\hyperlink{classtensor_1_1Tensor_aa8d5f8097ed9c58f02eefca13cd6e4d5}{Tensor} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ N $>$ \hyperlink{classtensor_1_1Tensor_a27f61bd247cbcc9c3a62ca54fec494dd}{shape})
+\item 
+\hyperlink{classtensor_1_1Tensor_a2682312974ba42709168df871ec7ebd9}{Tensor} (\hyperlink{classtensor_1_1Shape}{Shape}$<$ N $>$ \hyperlink{classtensor_1_1Tensor_a27f61bd247cbcc9c3a62ca54fec494dd}{shape}, T const \&value)
+\item 
+\hyperlink{classtensor_1_1Tensor_afd24db7e7bbd4d1864063096b45966ec}{Tensor} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ const \&tensor)
+\item 
+\hyperlink{classtensor_1_1Tensor_a9b8003676fbd417e782269f31448e82e}{Tensor} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \&\&tensor)
+\item 
+\hyperlink{classtensor_1_1Tensor_af8a1444d9f38bbe897740f0030199f46}{Tensor} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Proxy}{Proxy} const \&proxy)
+\item 
+{\footnotesize template$<$typename Node\+Type $>$ }\\\hyperlink{classtensor_1_1Tensor_ac325584759f20036bb5952a0701ee06d}{Tensor} (\hyperlink{structtensor_1_1Expression}{Expression}$<$ Node\+Type $>$ const \&expression)
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \& \hyperlink{classtensor_1_1Tensor_a9d457724cf49cf72336afc8f87da5436}{operator=} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ const \&tensor)
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \& \hyperlink{classtensor_1_1Tensor_ae4850d0bd0e1de0e1e2ed3dcc29e8cf4}{operator=} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \&\&tensor)
+\item 
+{\footnotesize template$<$typename Node\+Type $>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \& \hyperlink{classtensor_1_1Tensor_aa3cf0d0d3d23717cd09f5f5b3d96ab20}{operator=} (\hyperlink{structtensor_1_1Expression}{Expression}$<$ Node\+Type $>$ const \&rhs)
+\item 
+size\+\_\+t \hyperlink{classtensor_1_1Tensor_aa53f648dad035c24615bcda3247552e3}{dimension} (size\+\_\+t index) const 
+\item 
+\hyperlink{classtensor_1_1Shape}{Shape}$<$ N $>$ \hyperlink{classtensor_1_1Tensor_a27f61bd247cbcc9c3a62ca54fec494dd}{shape} () const noexcept
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor} $\ast$ {\bfseries operator-\/$>$} ()\hypertarget{classtensor_1_1Tensor_a05b7c17ecf2eb27e8c7cab2233135a87}{}\label{classtensor_1_1Tensor_a05b7c17ecf2eb27e8c7cab2233135a87}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor} const $\ast$ \hyperlink{classtensor_1_1Tensor_af950c636c45895afa12718ce19ab50d8}{operator-\/$>$} () const 
+\item 
+{\footnotesize template$<$typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/sizeof...(\hyperlink{classtensor_1_1Indices}{Indices})$>$ \hyperlink{classtensor_1_1Tensor_a5f17aba14f92ac8bb7302f85bb90d830}{operator()} (Indices...\+args)
+\item 
+{\footnotesize template$<$typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/sizeof...(\hyperlink{classtensor_1_1Indices}{Indices})$>$ const \hyperlink{classtensor_1_1Tensor_a18bad684c8592a78571528d46c1a2f50}{operator()} (Indices...\+args) const 
+\item 
+{\footnotesize template$<$size\+\_\+t M$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/M $>$ \hyperlink{classtensor_1_1Tensor_ad29b57f798891b3feca9455e05d016af}{operator\mbox{[}$\,$\mbox{]}} (\hyperlink{classtensor_1_1Indices}{Indices}$<$ M $>$ const \&indices)
+\item 
+{\footnotesize template$<$size\+\_\+t... Slices, typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, sizeof...(Slices)$>$ \hyperlink{classtensor_1_1Tensor_a89e5758ea04096cc524b58184203f1a9}{slice} (Indices...\+indices)
+\item 
+{\footnotesize template$<$size\+\_\+t... Slices, typename... Indices$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, sizeof...(Slices)$>$ const {\bfseries slice} (Indices...\+indices) const \hypertarget{classtensor_1_1Tensor_a158c4b623ec2d154a873ca3353f1b7cb}{}\label{classtensor_1_1Tensor_a158c4b623ec2d154a873ca3353f1b7cb}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ {\bfseries operator-\/} () const \hypertarget{classtensor_1_1Tensor_a6ce8a5f0bd2e4039af8de2c6388b86ce}{}\label{classtensor_1_1Tensor_a6ce8a5f0bd2e4039af8de2c6388b86ce}
+
+\item 
+bool \hyperlink{classtensor_1_1Tensor_a9488658b562b622bda64a26b8d6dfa3b}{operator==} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ const \&tensor) const 
+\item 
+bool \hyperlink{classtensor_1_1Tensor_a534cf82af969e8289df6346d4af4da93}{operator!=} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ const \&tensor) const 
+\item 
+{\footnotesize template$<$typename X $>$ }\\bool \hyperlink{classtensor_1_1Tensor_a494681b92fd48be1cb1c14d97df8f861}{operator==} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, N $>$ const \&tensor) const 
+\item 
+{\footnotesize template$<$typename X $>$ }\\bool \hyperlink{classtensor_1_1Tensor_a236c88d3d0f0dd93c4a6ba6186cfeab5}{operator!=} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, N $>$ const \&tensor) const 
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} {\bfseries begin} (size\+\_\+t index)\hypertarget{classtensor_1_1Tensor_ade2f10b699d8a3a3844add428899501b}{}\label{classtensor_1_1Tensor_ade2f10b699d8a3a3844add428899501b}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} {\bfseries end} (size\+\_\+t index)\hypertarget{classtensor_1_1Tensor_a837fe2d92f35c1cf284dd9e17cd3cc9e}{}\label{classtensor_1_1Tensor_a837fe2d92f35c1cf284dd9e17cd3cc9e}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} {\bfseries begin} ()\hypertarget{classtensor_1_1Tensor_acd3e58eb40c53cf89fa5ce1e75f28aa5}{}\label{classtensor_1_1Tensor_acd3e58eb40c53cf89fa5ce1e75f28aa5}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} {\bfseries end} ()\hypertarget{classtensor_1_1Tensor_ae36fdec96cac221feca56ec41265e0dd}{}\label{classtensor_1_1Tensor_ae36fdec96cac221feca56ec41265e0dd}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstIterator}{Const\+Iterator} {\bfseries cbegin} (size\+\_\+t index) const \hypertarget{classtensor_1_1Tensor_a2b7b0ca742db8b7e38191a3fe958c7e8}{}\label{classtensor_1_1Tensor_a2b7b0ca742db8b7e38191a3fe958c7e8}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstIterator}{Const\+Iterator} {\bfseries cend} (size\+\_\+t index) const \hypertarget{classtensor_1_1Tensor_a8480feac8bd12ba4a224dc3736d68b78}{}\label{classtensor_1_1Tensor_a8480feac8bd12ba4a224dc3736d68b78}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstIterator}{Const\+Iterator} {\bfseries cbegin} () const \hypertarget{classtensor_1_1Tensor_ad9d9813a405feca4cea3eb38acdf6d2d}{}\label{classtensor_1_1Tensor_ad9d9813a405feca4cea3eb38acdf6d2d}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstIterator}{Const\+Iterator} {\bfseries cend} () const \hypertarget{classtensor_1_1Tensor_ae46d4a7a73e83fcfbbf7a4917719dfea}{}\label{classtensor_1_1Tensor_ae46d4a7a73e83fcfbbf7a4917719dfea}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ReverseIterator}{Reverse\+Iterator} {\bfseries rbegin} (size\+\_\+t index)\hypertarget{classtensor_1_1Tensor_a8f97268bb08562bb5fca4b1d16a7cd2e}{}\label{classtensor_1_1Tensor_a8f97268bb08562bb5fca4b1d16a7cd2e}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ReverseIterator}{Reverse\+Iterator} {\bfseries rend} (size\+\_\+t index)\hypertarget{classtensor_1_1Tensor_a9a40ea42424ba3d4846eadaef3ad77a4}{}\label{classtensor_1_1Tensor_a9a40ea42424ba3d4846eadaef3ad77a4}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ReverseIterator}{Reverse\+Iterator} {\bfseries rbegin} ()\hypertarget{classtensor_1_1Tensor_a814124d00ea81bdcbfdbc82cbbf983c6}{}\label{classtensor_1_1Tensor_a814124d00ea81bdcbfdbc82cbbf983c6}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ReverseIterator}{Reverse\+Iterator} {\bfseries rend} ()\hypertarget{classtensor_1_1Tensor_ace8b93e9269b5748ecb8543bd2343eda}{}\label{classtensor_1_1Tensor_ace8b93e9269b5748ecb8543bd2343eda}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstReverseIterator}{Const\+Reverse\+Iterator} {\bfseries crbegin} (size\+\_\+t index) const \hypertarget{classtensor_1_1Tensor_ab4bde01ee6586116ba859a7532dbb284}{}\label{classtensor_1_1Tensor_ab4bde01ee6586116ba859a7532dbb284}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstReverseIterator}{Const\+Reverse\+Iterator} {\bfseries crend} (size\+\_\+t index) const \hypertarget{classtensor_1_1Tensor_a4abc5e8335802d42ddb1988cd0cc7c7e}{}\label{classtensor_1_1Tensor_a4abc5e8335802d42ddb1988cd0cc7c7e}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstReverseIterator}{Const\+Reverse\+Iterator} {\bfseries crbegin} () const \hypertarget{classtensor_1_1Tensor_ae617ee395934f8bf2ba785875fa7d70b}{}\label{classtensor_1_1Tensor_ae617ee395934f8bf2ba785875fa7d70b}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N-\/1 $>$\+::\hyperlink{classtensor_1_1Tensor_1_1ConstReverseIterator}{Const\+Reverse\+Iterator} {\bfseries crend} () const \hypertarget{classtensor_1_1Tensor_af5395bfa0f7d78ab04475b0e04326295}{}\label{classtensor_1_1Tensor_af5395bfa0f7d78ab04475b0e04326295}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ {\bfseries copy} () const \hypertarget{classtensor_1_1Tensor_a9c9c8e37fa8b71d1e76f735404ddf3ed}{}\label{classtensor_1_1Tensor_a9c9c8e37fa8b71d1e76f735404ddf3ed}
+
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$\+::\hyperlink{classtensor_1_1Tensor_1_1Proxy}{Proxy} {\bfseries ref} ()\hypertarget{classtensor_1_1Tensor_a231c1f016e88fdd78b6ed08dc6b837d9}{}\label{classtensor_1_1Tensor_a231c1f016e88fdd78b6ed08dc6b837d9}
+
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static constexpr size\+\_\+t \hyperlink{classtensor_1_1Tensor_af8cf6037659bed7a53c92888b51a34fb}{rank} ()
+\end{DoxyCompactItemize}
+\subsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+{\footnotesize template$<$typename X , size\+\_\+t M$>$ }\\class {\bfseries Tensor}\hypertarget{classtensor_1_1Tensor_af4a07134de1525172d3c60c57e8f1496}{}\label{classtensor_1_1Tensor_af4a07134de1525172d3c60c57e8f1496}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Add}\hypertarget{classtensor_1_1Tensor_a4d665549d16efb911a856dc6fd122618}{}\label{classtensor_1_1Tensor_a4d665549d16efb911a856dc6fd122618}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Sub}\hypertarget{classtensor_1_1Tensor_afc63fe61d41c24c197bbf470274e78c5}{}\label{classtensor_1_1Tensor_afc63fe61d41c24c197bbf470274e78c5}
+
+\item 
+{\footnotesize template$<$typename L\+H\+S\+Type , typename R\+H\+S\+Type $>$ }\\class {\bfseries Binary\+Mul}\hypertarget{classtensor_1_1Tensor_a4e70ecf474c03f7e2051b75bb9af6110}{}\label{classtensor_1_1Tensor_a4e70ecf474c03f7e2051b75bb9af6110}
+
+\item 
+{\footnotesize template$<$typename X , typename Y , size\+\_\+t M$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ {\bfseries Add} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ const \&tensor\+\_\+1, \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ Y, M $>$ const \&tensor\+\_\+2)\hypertarget{classtensor_1_1Tensor_aa09bbe30c06ac53c4736151a98423eab}{}\label{classtensor_1_1Tensor_aa09bbe30c06ac53c4736151a98423eab}
+
+\item 
+{\footnotesize template$<$typename X , typename Y , size\+\_\+t M$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ {\bfseries Subtract} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ const \&tensor\+\_\+1, \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ Y, M $>$ const \&tensor\+\_\+2)\hypertarget{classtensor_1_1Tensor_aa9f4e32f5d75227d8a6e75ae813a1830}{}\label{classtensor_1_1Tensor_aa9f4e32f5d75227d8a6e75ae813a1830}
+
+\item 
+{\footnotesize template$<$typename X , typename Y , size\+\_\+t M1, size\+\_\+t M2$>$ }\\\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M1+M2-\/2 $>$ {\bfseries Multiply} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M1 $>$ const \&tensor\+\_\+1, \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ Y, M2 $>$ const \&tensor\+\_\+2)\hypertarget{classtensor_1_1Tensor_a444e6496f2d094a932c9df8bd2b6b845}{}\label{classtensor_1_1Tensor_a444e6496f2d094a932c9df8bd2b6b845}
+
+\item 
+{\footnotesize template$<$typename X , size\+\_\+t M$>$ }\\std\+::ostream \& {\bfseries operator$<$$<$} (std\+::ostream \&os, const \hyperlink{classtensor_1_1Tensor}{Tensor}$<$ X, M $>$ \&tensor)\hypertarget{classtensor_1_1Tensor_a604769864add641c2cb711a392fb919b}{}\label{classtensor_1_1Tensor_a604769864add641c2cb711a392fb919b}
+
+\item 
+{\footnotesize template$<$typename U , size\+\_\+t M, typename Container $>$ }\\void {\bfseries Fill} (\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ U, M $>$ \&tensor, Container const \&container)\hypertarget{classtensor_1_1Tensor_a4ca1c6ec88d6541c1445bfe953582a23}{}\label{classtensor_1_1Tensor_a4ca1c6ec88d6541c1445bfe953582a23}
+
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Typedef Documentation}
+\index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!value\+\_\+type@{value\+\_\+type}}
+\index{value\+\_\+type@{value\+\_\+type}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{value\+\_\+type}{value_type}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ typedef T {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf value\+\_\+type}}\hypertarget{classtensor_1_1Tensor_ad2bb23b5363bc4cdb97c43b48abb80f9}{}\label{classtensor_1_1Tensor_ad2bb23b5363bc4cdb97c43b48abb80f9}
+Any-\/rank array of type {\ttfamily T}, where rank {\ttfamily N} is a size\+\_\+t template. The underlying data is implemented as a dynamically allocated contiguous array. 
+
+\subsection{Constructor \& Destructor Documentation}
+\index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(size\+\_\+t const (\&indices)[N])}{Tensor(size_t const (&indices)[N])}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{size\+\_\+t const (\&)}]{indices\mbox{[}\+N\mbox{]}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [explicit]}}\hypertarget{classtensor_1_1Tensor_ac8fe69c54ef48595983b4fc06624fcb6}{}\label{classtensor_1_1Tensor_ac8fe69c54ef48595983b4fc06624fcb6}
+Creates a \hyperlink{classtensor_1_1Tensor}{Tensor} with dimensions described by indices. Elements are zero initialized. Note\+: dimensions index from 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(size\+\_\+t const (\&dimensions)[N], T const \&value)}{Tensor(size_t const (&dimensions)[N], T const &value)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{size\+\_\+t const (\&)}]{dimensions\mbox{[}\+N\mbox{]}, }
+\item[{T const \&}]{value}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a484451b19915ad181d2a077416879448}{}\label{classtensor_1_1Tensor_a484451b19915ad181d2a077416879448}
+Creates a \hyperlink{classtensor_1_1Tensor}{Tensor} with dimensions described by indices. Elements are copy initialized to value. Note\+: dimensions index from 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Shape$<$ N $>$ shape)}{Tensor(Shape< N > shape)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Shape}$<$ N $>$}]{shape}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [explicit]}}\hypertarget{classtensor_1_1Tensor_aa8d5f8097ed9c58f02eefca13cd6e4d5}{}\label{classtensor_1_1Tensor_aa8d5f8097ed9c58f02eefca13cd6e4d5}
+Creates a \hyperlink{classtensor_1_1Tensor}{Tensor} with dimensions described by indices. Elements are zero initialized. Note\+: dimensions index from 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Shape$<$ N $>$ shape, T const \&value)}{Tensor(Shape< N > shape, T const &value)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Shape}$<$ N $>$}]{shape, }
+\item[{T const \&}]{value}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a2682312974ba42709168df871ec7ebd9}{}\label{classtensor_1_1Tensor_a2682312974ba42709168df871ec7ebd9}
+Creates a \hyperlink{classtensor_1_1Tensor}{Tensor} with dimensions described by indices. Elements are copy initialized to value. Note\+: dimensions index from 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Tensor$<$ T, N $>$ const \&tensor)}{Tensor(Tensor< T, N > const &tensor)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_afd24db7e7bbd4d1864063096b45966ec}{}\label{classtensor_1_1Tensor_afd24db7e7bbd4d1864063096b45966ec}
+Copy construction, allocates memory and copies from {\ttfamily tensor} \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Tensor$<$ T, N $>$ \&\&tensor)}{Tensor(Tensor< T, N > &&tensor)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ \&\&}]{tensor}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a9b8003676fbd417e782269f31448e82e}{}\label{classtensor_1_1Tensor_a9b8003676fbd417e782269f31448e82e}
+Move construction, takes ownership of underlying data, {\ttfamily tensor} is destroyed \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Tensor$<$ T, N $>$\+::\+Proxy const \&proxy)}{Tensor(Tensor< T, N >::Proxy const &proxy)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$\+::{\bf Proxy} const \&}]{proxy}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_af8a1444d9f38bbe897740f0030199f46}{}\label{classtensor_1_1Tensor_af8a1444d9f38bbe897740f0030199f46}
+Constructs a reference to the {\ttfamily proxy} tensor. The tensors share the same underyling data, so changes will affect both tensors. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{Tensor(\+Expression$<$ Node\+Type $>$ const \&expression)}{Tensor(Expression< NodeType > const &expression)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$typename Node\+Type $>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::{\bf Tensor} (
+\begin{DoxyParamCaption}
+\item[{{\bf Expression}$<$ Node\+Type $>$ const \&}]{expression}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_ac325584759f20036bb5952a0701ee06d}{}\label{classtensor_1_1Tensor_ac325584759f20036bb5952a0701ee06d}
+Constructs the tensor produced by the expression 
+
+\subsection{Member Function Documentation}
+\index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!dimension@{dimension}}
+\index{dimension@{dimension}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{dimension(size\+\_\+t index) const }{dimension(size_t index) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ size\+\_\+t {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::dimension (
+\begin{DoxyParamCaption}
+\item[{size\+\_\+t}]{index}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_aa53f648dad035c24615bcda3247552e3}{}\label{classtensor_1_1Tensor_aa53f648dad035c24615bcda3247552e3}
+Get the dimension at index. Throws std\+::logic\+\_\+error if index is out of bounds. Note\+: indexing starts at 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator"!=@{operator"!=}}
+\index{operator"!=@{operator"!=}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator"!=(\+Tensor$<$ T, N $>$ const \&tensor) const }{operator!=(Tensor< T, N > const &tensor) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator!= (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_a534cf82af969e8289df6346d4af4da93}{}\label{classtensor_1_1Tensor_a534cf82af969e8289df6346d4af4da93}
+Returns true iff the tensor\textquotesingle{}s dimensions or data are not equivalent \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator"!=@{operator"!=}}
+\index{operator"!=@{operator"!=}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator"!=(\+Tensor$<$ X, N $>$ const \&tensor) const }{operator!=(Tensor< X, N > const &tensor) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ template$<$typename X $>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator!= (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ X, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_a236c88d3d0f0dd93c4a6ba6186cfeab5}{}\label{classtensor_1_1Tensor_a236c88d3d0f0dd93c4a6ba6186cfeab5}
+Returns true iff the tensor\textquotesingle{}s dimensions are different or any element satisfies e1 != e2 \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator()@{operator()}}
+\index{operator()@{operator()}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator()(\+Indices...\+args)}{operator()(Indices...args)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$typename... Indices$>$ {\bf Tensor}$<$ T, N-\/sizeof...({\bf Indices})$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator() (
+\begin{DoxyParamCaption}
+\item[{Indices...}]{args}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a5f17aba14f92ac8bb7302f85bb90d830}{}\label{classtensor_1_1Tensor_a5f17aba14f92ac8bb7302f85bb90d830}
+\begin{quote}
+used to implement const\+\_\+iterator-\/$>$ \end{quote}
+Returns the resulting tensor by applying left to right index expansion of the provided arguments. I.\+e. calling {\ttfamily tensor(1, 2)} on a rank 4 tensor is equivalent to {\ttfamily tensor(1, 2, \+:, \+:)}. Throws std\+::logic\+\_\+error if any of the indices are out bounds. Note\+: indexing starts at 1. \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator()@{operator()}}
+\index{operator()@{operator()}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator()(\+Indices...\+args) const }{operator()(Indices...args) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$typename... Indices$>$ {\bf Tensor}$<$ T, N-\/sizeof...({\bf Indices})$>$ const {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator() (
+\begin{DoxyParamCaption}
+\item[{Indices...}]{args}
+\end{DoxyParamCaption}
+) const}\hypertarget{classtensor_1_1Tensor_a18bad684c8592a78571528d46c1a2f50}{}\label{classtensor_1_1Tensor_a18bad684c8592a78571528d46c1a2f50}
+See operator() \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator-\/$>$@{operator-\/$>$}}
+\index{operator-\/$>$@{operator-\/$>$}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator-\/$>$() const }{operator->() const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ {\bf Tensor} const$\ast$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator-\/$>$ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_af950c636c45895afa12718ce19ab50d8}{}\label{classtensor_1_1Tensor_af950c636c45895afa12718ce19ab50d8}
+\begin{quote}
+used to implement iterator-\/$>$ \end{quote}
+\index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator=@{operator=}}
+\index{operator=@{operator=}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator=(\+Tensor$<$ T, N $>$ const \&tensor)}{operator=(Tensor< T, N > const &tensor)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$ \& {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator= (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a9d457724cf49cf72336afc8f87da5436}{}\label{classtensor_1_1Tensor_a9d457724cf49cf72336afc8f87da5436}
+Copy Constructs from {\ttfamily tensor}. Destroys itself first \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator=@{operator=}}
+\index{operator=@{operator=}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator=(\+Tensor$<$ T, N $>$ \&\&tensor)}{operator=(Tensor< T, N > &&tensor)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ {\bf Tensor}$<$T, N$>$\& {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator= (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ \&\&}]{tensor}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_ae4850d0bd0e1de0e1e2ed3dcc29e8cf4}{}\label{classtensor_1_1Tensor_ae4850d0bd0e1de0e1e2ed3dcc29e8cf4}
+Move constructs from {\ttfamily tensor}. Destroys itself first \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator=@{operator=}}
+\index{operator=@{operator=}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator=(\+Expression$<$ Node\+Type $>$ const \&rhs)}{operator=(Expression< NodeType > const &rhs)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$typename Node\+Type $>$ {\bf Tensor}$<$ T, N $>$ \& {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator= (
+\begin{DoxyParamCaption}
+\item[{{\bf Expression}$<$ Node\+Type $>$ const \&}]{rhs}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_aa3cf0d0d3d23717cd09f5f5b3d96ab20}{}\label{classtensor_1_1Tensor_aa3cf0d0d3d23717cd09f5f5b3d96ab20}
+\hyperlink{classtensor_1_1Tensor_1_1Proxy}{Proxy} constructs from {\ttfamily tensor}. Destroys itself first \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator==@{operator==}}
+\index{operator==@{operator==}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator==(\+Tensor$<$ T, N $>$ const \&tensor) const }{operator==(Tensor< T, N > const &tensor) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator== (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ T, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+) const}\hypertarget{classtensor_1_1Tensor_a9488658b562b622bda64a26b8d6dfa3b}{}\label{classtensor_1_1Tensor_a9488658b562b622bda64a26b8d6dfa3b}
+Returns true iff the tensor\textquotesingle{}s dimensions and data are equivalent \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator==@{operator==}}
+\index{operator==@{operator==}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator==(\+Tensor$<$ X, N $>$ const \&tensor) const }{operator==(Tensor< X, N > const &tensor) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$typename X $>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator== (
+\begin{DoxyParamCaption}
+\item[{{\bf Tensor}$<$ X, N $>$ const \&}]{tensor}
+\end{DoxyParamCaption}
+) const}\hypertarget{classtensor_1_1Tensor_a494681b92fd48be1cb1c14d97df8f861}{}\label{classtensor_1_1Tensor_a494681b92fd48be1cb1c14d97df8f861}
+Returns true iff the tensor\textquotesingle{}s dimensions are equal and every element satisfies e1 == e2 \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!operator\mbox{[}$\,$\mbox{]}@{operator[]}}
+\index{operator\mbox{[}$\,$\mbox{]}@{operator[]}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{operator[](\+Indices$<$ M $>$ const \&indices)}{operator[](Indices< M > const &indices)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$size\+\_\+t M$>$ {\bf Tensor}$<$ T, N-\/M $>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::operator\mbox{[}$\,$\mbox{]} (
+\begin{DoxyParamCaption}
+\item[{{\bf Indices}$<$ M $>$ const \&}]{indices}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_ad29b57f798891b3feca9455e05d016af}{}\label{classtensor_1_1Tensor_ad29b57f798891b3feca9455e05d016af}
+See operator() \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!rank@{rank}}
+\index{rank@{rank}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{rank()}{rank()}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ static constexpr size\+\_\+t {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::rank (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [static]}}\hypertarget{classtensor_1_1Tensor_af8cf6037659bed7a53c92888b51a34fb}{}\label{classtensor_1_1Tensor_af8cf6037659bed7a53c92888b51a34fb}
+Get {\ttfamily N} \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!shape@{shape}}
+\index{shape@{shape}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{shape() const noexcept}{shape() const noexcept}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ {\bf Shape}$<$N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::shape (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [noexcept]}}\hypertarget{classtensor_1_1Tensor_a27f61bd247cbcc9c3a62ca54fec494dd}{}\label{classtensor_1_1Tensor_a27f61bd247cbcc9c3a62ca54fec494dd}
+Get the tensor shape \index{tensor\+::\+Tensor@{tensor\+::\+Tensor}!slice@{slice}}
+\index{slice@{slice}!tensor\+::\+Tensor@{tensor\+::\+Tensor}}
+\subsubsection[{\texorpdfstring{slice(\+Indices...\+indices)}{slice(Indices...indices)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ template$<$size\+\_\+t... Slices, typename... Indices$>$ {\bf Tensor}$<$ T, sizeof...(Slices)$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::slice (
+\begin{DoxyParamCaption}
+\item[{Indices...}]{indices}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_a89e5758ea04096cc524b58184203f1a9}{}\label{classtensor_1_1Tensor_a89e5758ea04096cc524b58184203f1a9}
+Slices denotate the dimensions which are left free, while indices fix the remaining dimensions at the specified index. I.\+e. calling {\ttfamily tensor.\+slice$<$1, 3, 5$>$(1, 2)} on a rank 5 tensor is equivalent to {\ttfamily tensor(\+:, 1, \+:, 2, \+:)} and will produce a rank 3 tensor. Throws std\+::logic\+\_\+error if any of the indices are out of bounds. Note\+: indexing begins at 1. 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/tensor.\+hh\end{DoxyCompactItemize}

@@ -1,0 +1,117 @@
+\hypertarget{classtensor_1_1Tensor_1_1Iterator}{}\section{tensor\+:\+:Tensor$<$ T, N $>$\+:\+:Iterator Class Reference}
+\label{classtensor_1_1Tensor_1_1Iterator}\index{tensor\+::\+Tensor$<$ T, N $>$\+::\+Iterator@{tensor\+::\+Tensor$<$ T, N $>$\+::\+Iterator}}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator_a479a10ccedab15b66eef443122a87c04}{Iterator} (\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} const \&it)
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator_a5a9d9143961e421de88d707e6e71459b}{Iterator} (\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} \&\&it)
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \hyperlink{classtensor_1_1Tensor_1_1Iterator_ab7d565be8d0c23cc779348b61dde5a59}{operator$\ast$} ()
+\item 
+\hyperlink{classtensor_1_1Tensor}{Tensor}$<$ T, N $>$ \hyperlink{classtensor_1_1Tensor_1_1Iterator_a32dfcac4c414e45a29df53461eff3057}{operator-\/$>$} ()
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} \hyperlink{classtensor_1_1Tensor_1_1Iterator_ad9cd5e0539ec414abd5c93bca7309fb9}{operator++} (int)
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} \& \hyperlink{classtensor_1_1Tensor_1_1Iterator_a410d6649a240b5d565d852d6abc33e08}{operator++} ()
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} \hyperlink{classtensor_1_1Tensor_1_1Iterator_ae1a3486e4eeafb9b99446d22c08649d1}{operator-\/-\/} (int)
+\item 
+\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} \& \hyperlink{classtensor_1_1Tensor_1_1Iterator_ac2fa94ca1a7f534f75bd6569715b207d}{operator-\/-\/} ()
+\item 
+bool \hyperlink{classtensor_1_1Tensor_1_1Iterator_adb4377f2d10e25adae6bac65605f8254}{operator==} (\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} const \&it) const 
+\item 
+bool \hyperlink{classtensor_1_1Tensor_1_1Iterator_a5e385ec12ffd7c16f6ae06de500f3dc3}{operator!=} (\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} const \&it) const 
+\end{DoxyCompactItemize}
+\subsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+{\footnotesize template$<$typename U , size\+\_\+t M$>$ }\\class \hyperlink{classtensor_1_1Tensor_1_1Iterator_af4a07134de1525172d3c60c57e8f1496}{Tensor}
+\end{DoxyCompactItemize}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!Iterator@{Iterator}}
+\index{Iterator@{Iterator}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{Iterator(\+Iterator const \&it)}{Iterator(Iterator const &it)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::\+Iterator (
+\begin{DoxyParamCaption}
+\item[{{\bf Iterator} const \&}]{it}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_a479a10ccedab15b66eef443122a87c04}{}\label{classtensor_1_1Tensor_1_1Iterator_a479a10ccedab15b66eef443122a87c04}
+$<$ Copy construct an iterator to the same underlying \hyperlink{classtensor_1_1Tensor}{Tensor} \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!Iterator@{Iterator}}
+\index{Iterator@{Iterator}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{Iterator(\+Iterator \&\&it)}{Iterator(Iterator &&it)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::\+Iterator (
+\begin{DoxyParamCaption}
+\item[{{\bf Iterator} \&\&}]{it}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_a5a9d9143961e421de88d707e6e71459b}{}\label{classtensor_1_1Tensor_1_1Iterator_a5a9d9143961e421de88d707e6e71459b}
+Move constructs an iterator to the same underlying \hyperlink{classtensor_1_1Tensor}{Tensor}. Destroys {\ttfamily it}. 
+
+\subsection{Member Function Documentation}
+\index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator"!=@{operator"!=}}
+\index{operator"!=@{operator"!=}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator"!=(\+Iterator const \&it) const }{operator!=(Iterator const &it) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator!= (
+\begin{DoxyParamCaption}
+\item[{{\bf Iterator} const \&}]{it}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_1_1Iterator_a5e385ec12ffd7c16f6ae06de500f3dc3}{}\label{classtensor_1_1Tensor_1_1Iterator_a5e385ec12ffd7c16f6ae06de500f3dc3}
+Returns true iff the underlying pointers are not identical \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator$\ast$@{operator$\ast$}}
+\index{operator$\ast$@{operator$\ast$}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator$\ast$()}{operator*()}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator$\ast$ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_ab7d565be8d0c23cc779348b61dde5a59}{}\label{classtensor_1_1Tensor_1_1Iterator_ab7d565be8d0c23cc779348b61dde5a59}
+Create a reference to the underlying \hyperlink{classtensor_1_1Tensor}{Tensor} \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator++@{operator++}}
+\index{operator++@{operator++}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator++(int)}{operator++(int)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$\+::{\bf Iterator} {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator++ (
+\begin{DoxyParamCaption}
+\item[{int}]{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_ad9cd5e0539ec414abd5c93bca7309fb9}{}\label{classtensor_1_1Tensor_1_1Iterator_ad9cd5e0539ec414abd5c93bca7309fb9}
+Increment (postfix). Returns a temporary before increment \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator++@{operator++}}
+\index{operator++@{operator++}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator++()}{operator++()}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$\+::{\bf Iterator} \& {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator++ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_a410d6649a240b5d565d852d6abc33e08}{}\label{classtensor_1_1Tensor_1_1Iterator_a410d6649a240b5d565d852d6abc33e08}
+Increment (prefix). Returns $\ast$this \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator-\/-\/@{operator-\/-\/}}
+\index{operator-\/-\/@{operator-\/-\/}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator-\/-\/(int)}{operator--(int)}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$\+::{\bf Iterator} {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator-\/-\/ (
+\begin{DoxyParamCaption}
+\item[{int}]{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_ae1a3486e4eeafb9b99446d22c08649d1}{}\label{classtensor_1_1Tensor_1_1Iterator_ae1a3486e4eeafb9b99446d22c08649d1}
+Decrement (postfix). Returns a temporary before decrement \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator-\/-\/@{operator-\/-\/}}
+\index{operator-\/-\/@{operator-\/-\/}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator-\/-\/()}{operator--()}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$\+::{\bf Iterator} \& {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator-\/-\/ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_ac2fa94ca1a7f534f75bd6569715b207d}{}\label{classtensor_1_1Tensor_1_1Iterator_ac2fa94ca1a7f534f75bd6569715b207d}
+Decrement (prefix). Returns $\ast$this \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator-\/$>$@{operator-\/$>$}}
+\index{operator-\/$>$@{operator-\/$>$}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator-\/$>$()}{operator->()}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T , size\+\_\+t N$>$ {\bf Tensor}$<$ T, N $>$ {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator-\/$>$ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}\hypertarget{classtensor_1_1Tensor_1_1Iterator_a32dfcac4c414e45a29df53461eff3057}{}\label{classtensor_1_1Tensor_1_1Iterator_a32dfcac4c414e45a29df53461eff3057}
+Syntatic sugar for ($\ast$it). \index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!operator==@{operator==}}
+\index{operator==@{operator==}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{operator==(\+Iterator const \&it) const }{operator==(Iterator const &it) const }}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ bool {\bf tensor\+::\+Tensor}$<$ T, N $>$\+::Iterator\+::operator== (
+\begin{DoxyParamCaption}
+\item[{{\bf Iterator} const \&}]{it}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}\hypertarget{classtensor_1_1Tensor_1_1Iterator_adb4377f2d10e25adae6bac65605f8254}{}\label{classtensor_1_1Tensor_1_1Iterator_adb4377f2d10e25adae6bac65605f8254}
+Returns true iff the underlying pointers are identical 
+
+\subsection{Friends And Related Function Documentation}
+\index{tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}!Tensor@{Tensor}}
+\index{Tensor@{Tensor}!tensor\+::\+Tensor\+::\+Iterator@{tensor\+::\+Tensor\+::\+Iterator}}
+\subsubsection[{\texorpdfstring{Tensor}{Tensor}}]{\setlength{\rightskip}{0pt plus 5cm}template$<$typename T, size\+\_\+t N$>$ template$<$typename U , size\+\_\+t M$>$ friend class {\bf Tensor}\hspace{0.3cm}{\ttfamily [friend]}}\hypertarget{classtensor_1_1Tensor_1_1Iterator_af4a07134de1525172d3c60c57e8f1496}{}\label{classtensor_1_1Tensor_1_1Iterator_af4a07134de1525172d3c60c57e8f1496}
+\hyperlink{classtensor_1_1Tensor_1_1Iterator}{Iterator} with freedom across one dimension of a \hyperlink{classtensor_1_1Tensor}{Tensor}. Allows access to the underlying tensor data. 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/tensor.\+hh\end{DoxyCompactItemize}

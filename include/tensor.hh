@@ -100,6 +100,7 @@
 namespace tensor {
 
 /* --------------- Forward Declerations --------------- */
+
 template <size_t N> class Shape;
 template <typename T, size_t N = 0> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
@@ -108,34 +109,51 @@ template <typename LHS, typename RHS> class BinaryMul;
 
 /* ----------------- Template Meta-Patterns ----------------- */
 
-// does this really not exist in the standard library?
+/** Meta-template logical &&
+ */
 template <bool B1, bool B2>
 struct LogicalAnd { static bool const value = B1 && B2; };
 
+/** Boolean member `value` is true if T is an any-rank Tensor object, false o.w.
+ */
 template <typename T>
 struct IsTensor { static bool const value = false; };
 
+/** Tensor specialization of IsTensor, Boolean member `value` is true
+ */
 template <>
 template <typename T, size_t N>
 struct IsTensor<Tensor<T, N>> { static bool const value = true; };
 
+/** Boolean member `value` is true if T is a 0-rank Tensor object, false o.w.
+ */
 template <typename T>
 struct IsScalar { static bool const value = true; };
 
+/** Scalar specialization of IsScalar, Boolean member `value` is true
+ */
 template <>
 template <typename T>
 struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
 
+/** Tensor specialization of IsScalar, Boolean member `value` is false 
+ */
 template <>
 template <typename T, size_t N>
 struct IsScalar<Tensor<T, N>> { static bool const value = false; };
 
+/** Tensor member `value` is a wrapper for input `val` if val is
+ *  a Tensor, o.w. `value` is a reference to Tensor `val`
+ */
 template <typename T>
 struct ValueToTensor {
   ValueToTensor(T &&val): value(std::forward<T>(val)) {}
   Tensor<T, 0> value;
 };
 
+/** Tensor specialization of ValueToTensor, `value` is a 
+ *  const reference to the provided Tensor
+ */
 template <>
 template <typename T, size_t N>
 struct ValueToTensor<Tensor<T, N>> {
@@ -143,6 +161,9 @@ struct ValueToTensor<Tensor<T, N>> {
   Tensor<T, N> const &value;
 };
 
+/** BinaryAdd specialization of ValueToTensor, `value` is a 
+ *  const reference to the provided binary expression
+ */
 template <>
 template <typename LHS, typename RHS>
 struct ValueToTensor<BinaryAdd<LHS, RHS>> {
@@ -150,6 +171,9 @@ struct ValueToTensor<BinaryAdd<LHS, RHS>> {
   BinaryAdd<LHS, RHS> const &value;
 };
 
+/** BinarySub specialization of ValueToTensor, `value` is a 
+ *  const reference to the provided binary expression
+ */
 template <>
 template <typename LHS, typename RHS>
 struct ValueToTensor<BinarySub<LHS, RHS>> {
@@ -157,6 +181,9 @@ struct ValueToTensor<BinarySub<LHS, RHS>> {
   BinarySub<LHS, RHS> const &value;
 };
 
+/** BinaryMul specialization of ValueToTensor, `value` is a 
+ *  const reference to the provided binary expression
+ */
 template <>
 template <typename LHS, typename RHS>
 struct ValueToTensor<BinaryMul<LHS, RHS>> {
@@ -166,15 +193,19 @@ struct ValueToTensor<BinaryMul<LHS, RHS>> {
 
 /* ---------------------------------------------------------- */
 
+/** CRTP base for Tensor expressions
+ */
 template <typename NodeType>
 struct Expression {
   inline NodeType &self() { return *static_cast<NodeType *>(this); }
   inline NodeType const &self() const { return *static_cast<NodeType const*>(this); }
 };
 
-// Tensor Shape
 template <size_t N> /*@Shape<N>*/
 class Shape {
+/** Tensor shape object, where size_t template `N` represents the Tensor rank.
+ *  Implemented as a wrapper around size_t[N].
+ */
 public:
   /* -------------------- typedefs -------------------- */
   typedef size_t                    size_type;
@@ -190,26 +221,40 @@ public:
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Shape(size_t const (&dimensions)[N]);
-  Shape(Shape<N> const &shape);
+  explicit Shape(size_t const (&dimensions)[N]); /**< size_t[] constructor */
+  Shape(Shape<N> const &shape);                  /**< Copy constructor */
 
   /* ------------------ Assignment -------------------- */
 
-  Shape<N> &operator=(Shape<N> const &shape);
+  Shape<N> &operator=(Shape<N> const &shape);   /**< Copy assignment */
 
   /* -------------------- Getters --------------------- */
 
-  constexpr static size_t rank() { return N; }
-  size_t &operator[](size_t index);
+  constexpr static size_t rank() { return N; } /**< Get `N` */
+
+  /** Get dimension reference at `index`. Throws a std::logic_error 
+   * exception if index is out of bounds. Note: 1-based indexing.
+   */
+  size_t &operator[](size_t index);            
+
+  /** Get dimension at `index`. Throws a std::logic_error 
+   * exception if index is out of bounds. Note: 1-based indexing.
+   */
   size_t operator[](size_t index) const;
 
   /* -------------------- Equality -------------------- */
 
-  // Equality only compares against dimensions, not step size
-  bool operator==(Shape<N> const& shape) const noexcept;
+  /** `true` iff every dimension is identical */
+  bool operator==(Shape<N> const& shape) const noexcept; 
+
+  /** `true` iff any dimension is different */
   bool operator!=(Shape<N> const& shape) const noexcept { return !(*this == shape); }
+
+  /** `true` iff ranks are identical and every dimension is identical */
   template <size_t M>
-  bool operator==(Shape<M> const& shape) const noexcept;
+  bool operator==(Shape<M> const& shape) const noexcept; 
+
+  /** `true` iff ranks are not identical or any dimension is different */
   template <size_t M>
   bool operator!=(Shape<M> const& shape) const noexcept { return !(*this == shape); }
 
@@ -220,7 +265,8 @@ public:
 
   /* ------------------- Utility -------------------- */
 
-  size_t IndexProduct() const noexcept;
+  /** Returns the product of all of the indices */
+  size_t index_product() const noexcept;
 
   /* -------------------- Print --------------------- */
 
@@ -232,13 +278,13 @@ public:
 private:
   /* ------------------ Data ------------------ */
 
-  size_t dimensions_[N];
+  size_t dimensions_[N]; /**< Underlying data */
 
   /* --------------- Constructor --------------- */
 
   // FIXME :: dumb hack to avoid ambiguous overload
-  Shape(size_t const *dimensions, int);
-  Shape() = default;
+  Shape(size_t const *dimensions, int);  
+  Shape() = default;                      
 };
 
 template <size_t N>
@@ -303,7 +349,7 @@ bool Shape<N>::operator==(Shape<M> const& shape) const noexcept
 }
 
 template <size_t N>
-size_t Shape<N>::IndexProduct() const noexcept
+size_t Shape<N>::index_product() const noexcept
 {
   return std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
 }
@@ -317,9 +363,11 @@ std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
   return os;
 }
 
-// Is this really necessary?
 template <size_t N>
 class Indices {
+  /** Wrapper around size_t[N] to provide a specialized static array
+   *  for accessing Tensors. Largely unnecessory.
+   */
 public:
   explicit Indices(size_t const (&indices)[N]);
   size_t operator[](size_t index) const;
@@ -340,11 +388,12 @@ size_t Indices<N>::operator[](size_t index) const
   return indices_[index];
 }
 
-/**
- *  Tensor Object with compile time rank information
- */
 template <typename T, size_t N>
 class Tensor: public Expression<Tensor<T, N>> { /*@Tensor<T, N>*/
+/** Any-rank array of type `T`, where rank `N` is a size_t template.
+ *  The underlying data is implemented as a dynamically allocated contiguous
+ *  array.
+ */  
 public:
 
   /* ------------------ Type Definitions --------------- */
@@ -364,12 +413,13 @@ public:
 
   /* ------------------ Proxy Objects ----------------- */
 
-  /**
-   * Proxy Tensor Object used for building tensors from reference
-   * This is used only to differentiate proxy tensor Construction
-   */
 
   class Proxy { /*@Proxy<T,N>*/
+  /**
+   * Proxy Tensor Object used for building tensors from reference.
+   * This is used to differentiate proxy construction 
+   * for move and copy construction only.
+   */
   public:
     template <typename U, size_t M> friend class Tensor;
     Proxy() = delete;
@@ -381,45 +431,106 @@ public:
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Tensor(size_t const (&indices)[N]);
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  Elements are zero initialized. Note: dimensions index from 1.
+   */
+  explicit Tensor(size_t const (&dimensions)[N]);
+
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  Elements are copy initialized to value. Note: dimensions index from 1.
+   */
   Tensor(size_t const (&dimensions)[N], T const &value);
-  explicit Tensor(Shape<N> shape);
-  Tensor(Shape<N> shape, T const &value);
-  Tensor(Tensor<T, N> const &tensor);
-  Tensor(Tensor<T, N> &&tensor);
-  Tensor(Tensor<T, N>::Proxy const &proxy);
+
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  Elements are copy initialized to the values returned by `factory(args...)`
+   *  Note: dimensions index from 1.
+   */
+  template <typename FunctionType, typename... Arguments>
+  Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args);
+
+  /** Creates a Tensor with dimensions described by `shape`.
+   *  Elements are zero initialized. Note: dimensions index from 1.
+   */
+  explicit Tensor(Shape<N> const &shape): Tensor(shape.dimensions_) {}
+
+  /** Creates a Tensor with dimensions described by `shape`.
+   *  Elements are copy initialized to value. Note: dimensions index from 1.
+   */
+  Tensor(Shape<N> const &shape, T const &value): Tensor(shape.dimensions_, value) {}
+
+  /** Creates a Tensor with dimensions described by `shape`.
+   *  Elements are copy initialized to the values returned by `factory`
+   *  Note: dimensions index from 1.
+   */
+  template <typename FunctionType, typename... Arguments>
+  Tensor(Shape<N> const &shape, std::function<FunctionType> &f, Arguments&&... args)
+    : Tensor(shape.dimensions_, f, std::forward<Arguments>(args)...) {}
+
+  /** Copy construction, allocates memory and copies from `tensor` */
+  Tensor(Tensor<T, N> const &tensor); 
+
+  /** Move construction, takes ownership of underlying data, `tensor` is destroyed */
+  Tensor(Tensor<T, N> &&tensor); 
+
+  /** Constructs a reference to the `proxy` tensor. The tensors share 
+   *  the same underyling data, so changes will affect both tensors.
+   */
+  Tensor(Tensor<T, N>::Proxy const &proxy); 
+
+  /** Constructs the tensor produced by the expression */
   template <typename NodeType>
   Tensor(Expression<NodeType> const& expression);
 
   /* ------------------- Assignment ------------------- */
 
+  /** Copy Constructs from `tensor`. Destroys itself first */
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
+
+  /** Proxy constructs from `tensor`. Destroys itself first */
   template <typename NodeType>
   Tensor<T, N> &operator=(Expression<NodeType> const &rhs);
 
   /* ----------------- Getters ----------------- */
 
-  constexpr static size_t rank() { return N; }
+  constexpr static size_t rank() { return N; } /**< Get `N` */
+
+  /** Get the dimension at index. Throws std::logic_error if index
+   *  is out of bounds. Note: indexing starts at 1.
+   */
   size_t dimension(size_t index) const { return shape_[index]; }
-  Shape<N> shape() const noexcept { return shape_; }
-  // FIXME :: Any way to hide these and keep it-> functional?
-  Tensor *operator->() { return this; }
-  Tensor const *operator->() const { return this; }
+
+  Shape<N> shape() const noexcept { return shape_; } /**< Get the tensor shape */
+  // FIXME :: Is there a way to hide these and keep -> functional?
+  Tensor *operator->() { return this; } /**> used to implement iterator-> */
+  Tensor const *operator->() const { return this; } /**> used to implement const_iterator-> */
 
   /* ------------------ Access To Data ----------------- */
 
+  /** Returns the resulting tensor by applying left to right index expansion of
+   *  the provided arguments. I.e. calling `tensor(1, 2)` on a rank 4 tensor is
+   *  equivalent to `tensor(1, 2, :, :)`. Throws std::logic_error if any of the 
+   *  indices are out bounds. Note: indexing starts at 1.
+   */
   template <typename... Indices>
   Tensor<T, N - sizeof...(Indices)> operator()(Indices... args);
+
+  /** See operator()
+   */
   template <typename... Indices>
   Tensor<T, N - sizeof...(Indices)> const operator()(Indices... args) const;
 
-  // Access with containers
-  // The container must have compile time fixed size
-  // accessible through a size() method
+  /** See operator()
+   */
   template <size_t M>
   Tensor<T, N - M> operator[](Indices<M> const &indices);
 
-  // slicing
+  /** Slices denotate the dimensions which are left free, while indices
+   *  fix the remaining dimensions at the specified index. I.e. calling
+   *  `tensor.slice<1, 3, 5>(1, 2)` on a rank 5 tensor is equivalent to
+   *  `tensor(:, 1, :, 2, :)` and will produce a rank 3 tensor. Throws
+   *   std::logic_error if any of the indices are out of bounds. Note:
+   *   indexing begins at 1.
+   */
   template <size_t... Slices, typename... Indices>
   Tensor<T, sizeof...(Slices)> slice(Indices... indices);
   template <size_t... Slices, typename... Indices>
@@ -429,11 +540,25 @@ public:
 
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+
+  template <typename X, size_t M, typename>
+  friend Tensor<X, M> operator+(Tensor<X, M> const &tensor, X const &scalar);
+
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+
+  template <typename X, size_t M, typename>
+  friend Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar);
+
+  template <typename X, size_t M, typename>
+  friend Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor);
+
   template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
   Tensor<T, N> operator-() const;
+
+  template <typename X, size_t M, typename>
+  friend Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar);
 
   /* ------------------ Print to ostream --------------- */
 
@@ -442,10 +567,17 @@ public:
 
   /* -------------------- Equivalence ------------------ */
 
-  bool operator==(Tensor<T, N> const& tensor) const;
+  /** Returns true iff the tensor's dimensions and data are equivalent */
+  bool operator==(Tensor<T, N> const& tensor) const; 
+
+  /** Returns true iff the tensor's dimensions or data are not equivalent */
   bool operator!=(Tensor<T, N> const& tensor) const { return !(*this == tensor); }
+
+  /** Returns true iff the tensor's dimensions are equal and every element satisfies e1 == e2 */
   template <typename X>
   bool operator==(Tensor<X, N> const& tensor) const;
+
+  /** Returns true iff the tensor's dimensions are different or any element satisfies e1 != e2 */
   template <typename X>
   bool operator!=(Tensor<X, N> const& tensor) const { return !(*this == tensor); }
 
@@ -453,55 +585,70 @@ public:
 
   class Iterator { /*@Iterator<T, N>*/
   public:
+    /** Iterator with freedom across one dimension of a Tensor.
+     *  Allows access to the underlying tensor data.
+     */
 
     /* -------------- Friend Classes -------------- */
 
     template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
-    Iterator(Iterator const &it);
-    Iterator(Iterator &&it);
-    Tensor<T, N> operator*();
-    Tensor<T, N> operator->();
-    Iterator operator++(int);
-    Iterator &operator++();
-    Iterator operator--(int);
-    Iterator &operator--();
-    bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
-    bool operator!=(Iterator const &it) const { return !(it == *this); }
-  private:
-    Iterator(Tensor<T, N + 1> const &tensor, size_t index);
 
-    /**
-     * Data describing the underlying tensor
-     */
-    Shape<N> shape_;
+    /** Copy construct an iterator to the same underlying Tensor */
+    Iterator(Iterator const &it);  
+
+    /** Move construct an iterator to the same underlying Tensor. Destroys `it`. */
+    Iterator(Iterator &&it);       
+
+    Tensor<T, N> operator*();   /**< Create a reference to the underlying Tensor */
+    Tensor<T, N> operator->();  /**< Syntatic sugar for (*it). */
+    Iterator operator++(int);   /**< Increment (postfix). Returns a temporary before increment */
+    Iterator &operator++();     /**< Increment (prefix). Returns *this */
+    Iterator operator--(int);   /**< Decrement (postfix). Returns a temporary before decrement */
+    Iterator &operator--();     /**< Decrement (prefix). Returns *this */
+
+    /** Returns true iff the underlying pointers are identical */
+    bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
+
+    /** Returns true iff the underlying pointers are not identical */
+    bool operator!=(Iterator const &it) const { return !(it == *this); }
+
+  private:
+
+    // Direct construction
+    Iterator(Tensor<T, N + 1> const &tensor, size_t index);
+    Shape<N> shape_; // Data describing the underlying tensor 
     size_t strides_[N];
     value_type *data_;
     std::shared_ptr<T> ref_;
-
-    /**
-     * Step size of the underlying data pointer per increment
-     */
-    size_t stride_;
+    size_t stride_; // Step size of the underlying data pointer per increment
   };
 
   class ConstIterator { /*@ConstIterator<T, N>*/
   public:
+    /** Constant iterator with freedom across one dimension of a Tensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
 
     /* -------------- Friend Classes -------------- */
 
     template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
+
+    /** Copy construct an iterator to the same underlying Tensor */
     ConstIterator(ConstIterator const &it);
+
+    /** Move construct an iterator to the same underlying Tensor. Destroys `it`. */
     ConstIterator(ConstIterator &&it);
-    Tensor<T, N> const operator*();
-    Tensor<T, N> const operator->();
-    ConstIterator operator++(int);
-    ConstIterator &operator++();
-    ConstIterator operator--(int);
-    ConstIterator &operator--();
+
+    Tensor<T, N> const operator*();  /**< Create a reference to the underlying Tensor */
+    Tensor<T, N> const operator->(); /**< Syntatic sugar for (*it). */                                
+    ConstIterator operator++(int);   /**< Increment (postfix). Returns a temporary before increment */
+    ConstIterator &operator++();     /**< Increment (prefix). Returns *this */
+    ConstIterator operator--(int);   /**< Decrement (postfix). Returns a temporary before decrement */
+    ConstIterator &operator--();     /**< Decrement (prefix). Returns *this */
     bool operator==(ConstIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstIterator const &it) const { return !(it == *this); }
   private:
@@ -523,6 +670,9 @@ public:
 
   class ReverseIterator { /*@ReverseIterator<T, N>*/
   public:
+    /** Reverse iterator with freedom across one dimension of a Tensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
 
     /* -------------- Friend Classes -------------- */
 
@@ -530,14 +680,18 @@ public:
 
     /* --------------- Constructors --------------- */
 
+    /** Copy construct an iterator to the same underlying Tensor */
     ReverseIterator(ReverseIterator const &it);
+
+    /** Move construct an iterator to the same underlying Tensor. Destroys `it`. */
     ReverseIterator(ReverseIterator &&it);
-    Tensor<T, N> operator*();
-    Tensor<T, N> operator->();
-    ReverseIterator operator++(int);
-    ReverseIterator &operator++();
-    ReverseIterator operator--(int);
-    ReverseIterator &operator--();
+
+    Tensor<T, N> operator*();        /**< Create a reference to the underlying Tensor */
+    Tensor<T, N> operator->();       /**< Syntatic sugar for (*it). */                                
+    ReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
+    ReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
+    ReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
+    ReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
     bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
   private:
@@ -559,20 +713,27 @@ public:
 
   class ConstReverseIterator { /*@ConstReverseIterator<T, N>*/
   public:
+    /** Constant reverse iterator with freedom across one dimension of a Tensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
 
     /* -------------- Friend Classes -------------- */
 
     template <typename U, size_t M> friend class Tensor;
 
     /* --------------- Constructors --------------- */
+
+    /** Copy constructs an iterator to the same underlying Tensor */
     ConstReverseIterator(ConstReverseIterator const &it);
+
+    /** Move construct an iterator to the same underlying Tensor. Destroys `it`. */
     ConstReverseIterator(ConstReverseIterator &&it);
-    Tensor<T, N> const operator*();
-    Tensor<T, N> const operator->();
-    ConstReverseIterator operator++(int);
-    ConstReverseIterator &operator++();
-    ConstReverseIterator operator--(int);
-    ConstReverseIterator &operator--();
+    Tensor<T, N> const operator*();       /**< Create a reference to the underlying Tensor */
+    Tensor<T, N> const operator->();      /**< Syntatic sugar for (*it). */                                
+    ConstReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
+    ConstReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
+    ConstReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
+    ConstReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
     bool operator==(ConstReverseIterator const &it) const { return (it.data_ == this->data_); }
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
   private:
@@ -685,7 +846,7 @@ private:
 
 template <typename T, size_t N>
 Tensor<T, N>::Tensor(size_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), data_(new T[shape_.IndexProduct()]),
+  : shape_(Shape<N>(dimensions)), data_(new T[shape_.index_product()]),
   ref_(data_, _ARRAY_DELETER(T))
 { 
   for (size_t i = 0; i < N; ++i) 
@@ -700,16 +861,32 @@ Tensor<T, N>::Tensor(size_t const (&dimensions)[N], T const& value)
   for (size_t i = 0; i < N; ++i) 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeStrides();
-  size_t cumul = shape_.IndexProduct();
+  size_t cumul = shape_.index_product();
   data_ = new T[cumul];
   std::fill(data_, data_ + cumul, value);
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
+}
+
+template <typename T, size_t N>
+template <typename FunctionType, typename... Arguments>
+Tensor<T, N>::Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args)
+  : shape_(Shape<N>(dimensions))
+{
+  for (size_t i = 0; i < N; ++i) 
+    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
+  pInitializeStrides();
+  data_ = new T[shape_.index_product()];
+  std::function<void(T*)> value_setter = [&f, &args...](T *lhs) -> void {
+    *lhs = f(args...);
+  };
+  pMap(value_setter);
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
 template <typename T, size_t N, typename Container>
 void Fill(Tensor<T, N> &tensor, Container const &container)
 {
-  size_t cumul_sum = tensor.shape_.IndexProduct();
+  size_t cumul_sum = tensor.shape_.index_product();
   if (container.size() != cumul_sum)
     throw std::logic_error(NELEMENTS);
   auto it = container.begin();
@@ -722,33 +899,11 @@ void Fill(Tensor<T, N> &tensor, Container const &container)
 }
 
 template <typename T, size_t N>
-Tensor<T, N>::Tensor(Shape<N> shape)
-  : shape_(Shape<N>(shape)), data_(new T[shape.IndexProduct()]), ref_(data_, _ARRAY_DELETER(T))
-{ 
-  for (size_t i = 0; i < N; ++i) 
-    if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeStrides(); 
-}
-
-template <typename T, size_t N>
-Tensor<T, N>::Tensor(Shape<N> shape, T const &value)
-  : shape_(Shape<N>(shape))
-{
-  for (size_t i = 0; i < N; ++i) 
-    if (!shape.dimensions_[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
-  pInitializeStrides();
-  size_t cumul = shape_.IndexProduct();
-  data_ = new T[cumul];
-  std::fill(data_, data_ + cumul, value);
-  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
-}
-
-template <typename T, size_t N>
 Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
   : shape_(tensor.shape_)
 {
   pInitializeStrides();
-  size_t cumul = shape_.IndexProduct();
+  size_t cumul = shape_.index_product();
   this->data_ = new T[cumul];
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
@@ -863,7 +1018,7 @@ bool Tensor<T, N>::operator==(Tensor<T, N> const& tensor) const
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator==(Tensor const&)"));
 
-  size_t indices_product = shape_.IndexProduct();
+  size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
     if (data_[i] != tensor.data_[i]) return false;
   return true;
@@ -876,7 +1031,7 @@ bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
   if (shape_ != tensor.shape_)
     throw std::logic_error(DIMENSION_MISMATCH("Tensor::operator==(Tensor const&)"));
 
-  size_t indices_product = shape_.IndexProduct();
+  size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
     if (data_[i] != tensor.data_[i]) return false;
   return true;
@@ -890,7 +1045,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
   {
     for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
-  size_t cumul_index = tensor.shape_.IndexProduct();
+  size_t cumul_index = tensor.shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(tensor.shape_.dimensions_, N, dim_quotas);
 
@@ -1002,7 +1157,7 @@ Tensor<T, N - M> Tensor<T, N>::pSliceExpansion(size_t *placed_indices, size_t)
 template <typename T, size_t N>
 T * Tensor<T, N>::pDuplicateData() const
 {
-  size_t count = shape_.IndexProduct();
+  size_t count = shape_.index_product();
   T * data = new T[count];
   std::copy_n(this->data_, count, data);
   return data;
@@ -1041,7 +1196,7 @@ template <typename T, size_t N>
 void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
 {
   // this is the index upper bound for iteration
-  size_t cumul_index = shape_.IndexProduct();
+  size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
@@ -1057,7 +1212,7 @@ void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
     std::function<void(T *lhs, X *rhs)> const &fn)
 {
   // this is the index upper bound for iteration
-  size_t cumul_index = shape_.IndexProduct();
+  size_t cumul_index = shape_.index_product();
 
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
@@ -1073,7 +1228,7 @@ template <typename T, size_t N>
 template <typename X, typename Y>
 void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &tensor_2, std::function<void(T *lhs, X *rhs1, Y *rhs2)> const &fn)
 {
-  size_t cumul_index = shape_.IndexProduct();
+  size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
   for (size_t i = 0; i < cumul_index; ++i) {
@@ -1118,6 +1273,29 @@ Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
   return sum_tensor;
 }
 
+/** Elementwise Scalar-Tensor addition. Returns a Tensor with shape 
+ *  `tensor`, where each element of `tensor` is incremeneted with `scalar`.
+ */
+template <typename X, size_t N,
+          typename = typename std::enable_if<N != 0>::type>
+Tensor<X, N> operator+(Tensor<X, N> const &tensor, X const &scalar)
+{
+  Tensor<X, N> result {tensor.shape()};
+  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
+    *lhs = scalar + *rhs;
+  };
+  result.pUnaryMap(tensor, set_vals);
+  return result;
+}
+
+/** See operator+(Tensor<X, N> const &tensor, X const &scalar) */
+template <typename X, size_t N,
+          typename = typename std::enable_if<N != 0>::type>
+Tensor<X, N> operator+(X const &scalar, Tensor<X, N> const &tensor)
+{
+  return tensor + scalar;
+}
+
 template <typename X, typename Y, size_t M>
 Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
@@ -1129,6 +1307,34 @@ Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
   };
   diff_tensor.pBinaryMap(tensor_1, tensor_2, sub);
   return diff_tensor;
+}
+
+/** Elementwise Scalar-Tensor subtraction. Returns a Tensor with shape 
+ *  `tensor`, where each element of `tensor` is subtracted by `scalar`.
+ */
+template <typename X, size_t M,
+          typename = typename std::enable_if<M != 0>::type>
+Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar)
+{
+  Tensor<X, M> result {tensor.shape()};
+  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
+    *lhs = *rhs - scalar;
+  };
+  result.pUnaryMap(tensor, set_vals);
+  return result;
+}
+
+/** See operator-(Tensor<X, N> const &tensor, X const &scalar) */
+template <typename X, size_t M,
+          typename = typename std::enable_if<M != 0>::type>
+Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
+{
+  Tensor<X, M> result {tensor.shape()};
+  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
+    *lhs = scalar - *rhs;
+  };
+  result.pUnaryMap(tensor, set_vals);
+  return result;
 }
 
 template <typename X, typename Y, size_t M1, size_t M2>
@@ -1144,8 +1350,8 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2> prod_tensor(shape);
-  size_t cumul_index_1 = tensor_1.shape_.IndexProduct() / tensor_1.shape_.dimensions_[M1 - 1];
-  size_t cumul_index_2 = tensor_2.shape_.IndexProduct() / tensor_2.shape_.dimensions_[0];
+  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[M1 - 1];
+  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[0];
   size_t dim_quotas_1[M1 - 1], dim_quotas_2[M2 - 1];
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_quotas_1);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_quotas_2);
@@ -1165,6 +1371,29 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
     tensor_1.pUpdateQuotas(dim_quotas_1, 1);
   }
   return prod_tensor;
+}
+
+/** Elementwise Scalar-Tensor multiplication. Returns a Tensor with shape 
+ *  `tensor`, where each element of `tensor` is multiplied by `scalar`.
+ */
+template <typename X, size_t M, 
+          typename = typename std::enable_if<M != 0>::type>
+Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar)
+{
+  Tensor<X, M> result {tensor.shape()};
+  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
+    *lhs = scalar * *rhs;
+  };
+  result.pUnaryMap(tensor, set_vals);
+  return result;
+}
+
+/** See operator*(Tensor<X, N> const &tensor, X const &scalar) */
+template <typename X, size_t N,
+          typename = typename std::enable_if<N != 0>::type>
+Tensor<X, N> operator*(X const &scalar, Tensor<X, N> const &tensor)
+{
+  return tensor * scalar;
 }
 
 template <typename T, size_t N>
@@ -2415,7 +2644,7 @@ std::ostream &operator<<(std::ostream &os, BinarySub<LHSType, RHSType> const &bi
  */
 
 template <typename LHSType, typename RHSType>
-class BinaryMul: public Expression<BinaryMul<LHSType, RHSType>> {
+class BinaryMul: public Expression<BinaryMul<LHSType, RHSType>> { /*@BinaryMul*/
 public:
 
   /* ---------------- typedefs --------------- */

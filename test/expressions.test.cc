@@ -57,7 +57,6 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
   }
 }
 
-
 TEST_CASE("Scalar Arithmatic") {
   auto tensor_1 = Tensor<int32_t>(10);
   auto tensor_2 = Tensor<int32_t>(-10);
@@ -97,6 +96,48 @@ TEST_CASE("Scalar Arithmatic") {
   SECTION("Negation") {
     REQUIRE(-tensor_1 == -10);
     REQUIRE(-tensor_1 - 10 + -tensor_2 - 5 == -15);
+  }
+}
+
+TEST_CASE("Elementwise Arithmatic") {
+  auto tensor_1 = Tensor<int32_t, 3>({2, 3, 4}, 1);
+  SECTION("Scalar Tensor") {
+
+    Tensor<int32_t, 3> tensor_2 = tensor_1 + 4;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == 5);
+
+    tensor_2 = -6 + tensor_1;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == -5);
+
+    tensor_2 = tensor_1 - 11;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == -10);
+
+    tensor_2 = 11 - tensor_1;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == 10);
+
+    tensor_2 = tensor_1 * 100;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == 100);
+
+    tensor_2 = -100 * tensor_1;
+    for (size_t i = 1; i <= tensor_2.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_2.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_2.dimension(3); ++k)
+          REQUIRE(tensor_2(i, j, k) == -100);
   }
 }
 

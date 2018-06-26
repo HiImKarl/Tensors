@@ -28,13 +28,17 @@ run_test : $(TEST_OBJ)
 .PHONY : benchmark
 benchmark : LINKFLAGS += -lbenchmark -lpthread
 benchmark : run_benchmark
-	./run_benchmark
+	./run_benchmark --benchmark_out=benchmark.log --benchmark_out_format=json
 	rm run_benchmark
 
 run_benchmark : $(BENCHMARK_OBJ)
 	$(LINK) $^ -o $@ $(LINKFLAGS)
 
 -include $(BENCHMARK_OBJ.o=.d)
+
+.PHONY : documentation
+documentation :
+	doxygen Doxyfile
 
 .PHONY : clean
 
