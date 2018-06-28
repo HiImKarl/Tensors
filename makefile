@@ -15,9 +15,13 @@ TEST_OBJ := $(TEST_SRC:.cc=.o)
 BENCHMARK_SRC := $(wildcard $(BENCHMARK_DIR)/*benchmark.cc) 
 BENCHMARK_OBJ := $(BENCHMARK_SRC:.cc=.o)
 
-.PHONY : test 
-test : run_test
+.PHONY : test valgrind
+valgrind : run_test
 	valgrind --leak-check=full --show-leak-kinds=all ./run_test
+	rm run_test
+
+test : run_test
+	./run_test
 	rm run_test
 
 run_test : $(TEST_OBJ)

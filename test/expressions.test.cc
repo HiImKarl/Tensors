@@ -187,7 +187,7 @@ TEST_CASE("Tensor Multplication") {
     tensor_6(1, 2) = 1;
     tensor_6(2, 1) = 3;
     tensor_6(2, 2) = 2;
-
+ 
     Tensor<int32_t, 2> tensor_7 = tensor_6 * tensor_6;
     REQUIRE(tensor_7(1, 1) == 7);
     REQUIRE(tensor_7(1, 2) == 4);

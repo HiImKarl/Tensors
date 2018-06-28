@@ -820,8 +820,7 @@ private:
 
   // Data mapping
   template <size_t M>
-  void pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset = 0,
-      size_t offset = 0) const;
+  void pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset = 0) const;
   template <size_t M>
   size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
@@ -1166,18 +1165,15 @@ T * Tensor<T, N>::pDuplicateData() const
 // Update the quotas after one iterator increment
 template <typename T, size_t N>
 template <size_t M>
-void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset,
-    size_t offset) const
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset) const
 {
-  size_t dim_index = M;
+  int dim_index = M - 1;
   bool propogate = true;
-  while (dim_index && propogate) {
-    --dim_quotas[dim_index - 1];
+  while (dim_index >= 0 && propogate) {
+    --dim_quotas[dim_index];
+    if (!dim_quotas[dim_index]) dim_quotas[dim_index] = shape_.dimensions_[dim_index + quota_offset]; 
+    else propogate = false;
     --dim_index;
-    if (!dim_quotas[dim_index - 1 + quota_offset])
-      dim_quotas[dim_index - 1 + quota_offset] = shape_.dimensions_[dim_index - 1 + quota_offset + offset];
-    else
-      propogate = false;
   }
 }
 
@@ -1203,6 +1199,7 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
     size_t index = pEvaluateIndex(dim_quotas);
     fn(&(data_[index]));
     pUpdateQuotas(dim_quotas);
+
   }
 }
 
@@ -1365,10 +1362,10 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
           value += *(tensor_1.data_ + t1_index + tensor_1.strides_[M1 - 1] * x) *
             *(tensor_2.data_ + t2_index + tensor_2.strides_[0] * x);
       prod_tensor.data_[index] = value;
-      tensor_2.pUpdateQuotas(dim_quotas_2, 1, 1);
+      tensor_2.pUpdateQuotas(dim_quotas_2, 1);
       ++index;
     }
-    tensor_1.pUpdateQuotas(dim_quotas_1, 1);
+    tensor_1.pUpdateQuotas(dim_quotas_1);
   }
   return prod_tensor;
 }

@@ -4,5 +4,6 @@
 *.d
 .clang-format
 *.log
+*tags
 Documentation/
 bin/
