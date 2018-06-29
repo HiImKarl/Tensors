@@ -818,9 +818,30 @@ private:
 
   /* ----------------- Utility -------------------- */
 
-  // Data mapping
+  // Used to wrap the index with the Tensor when calling pUpdateQuotas
+  struct Index {
+    template <typename X, size_t M> friend class Tensor;
+    Index(Tensor<T, N> const &_tensor)
+      : index(0), tensor(_tensor) {}
+    int index;
+    Tensor<T, N> const &tensor;
+  };
+
+  // Data mapping for pMap
   template <size_t M>
-  void pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset = 0) const;
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], Index &index, size_t quota_offset = 0);
+
+  // Data mapping for pUnaryMap -- ASSUMES EQUAL SHAPES
+  template <typename X, size_t M>
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::Index &index1,
+    typename Tensor<X, N>::Index &index2);
+
+  // Data mapping for pBinaryMap -- ASSUMES EQUAL SHAPES
+  template <typename X, typename Y, size_t M>
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::Index &index1,
+    typename Tensor<X, N>::Index &index2, 
+    typename Tensor<Y, N>::Index &index3);
+
   template <size_t M>
   size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
@@ -906,10 +927,10 @@ Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
   this->data_ = new T[cumul];
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
+  typename Tensor<T, N>::Index index{*this};
   for (size_t i = 0; i < cumul; ++i) {
-    size_t index = tensor.pEvaluateIndex(dim_quotas);
-    this->data_[i] = tensor.data_[index];
-    pUpdateQuotas(dim_quotas);
+    this->data_[i] = tensor.data_[index.index];
+    pUpdateQuotas(dim_quotas, index);
   }
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
@@ -1165,14 +1186,66 @@ T * Tensor<T, N>::pDuplicateData() const
 // Update the quotas after one iterator increment
 template <typename T, size_t N>
 template <size_t M>
-void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], size_t quota_offset) const
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index, size_t quota_offset)
 {
   int dim_index = M - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
     --dim_quotas[dim_index];
-    if (!dim_quotas[dim_index]) dim_quotas[dim_index] = shape_.dimensions_[dim_index + quota_offset]; 
-    else propogate = false;
+    index.index += index.tensor.strides_[dim_index + quota_offset];
+    if (!dim_quotas[dim_index]) {
+      dim_quotas[dim_index] = index.tensor.shape_.dimensions_[dim_index + quota_offset]; 
+      index.index -= dim_quotas[dim_index] * index.tensor.strides_[dim_index + quota_offset];
+    } else {
+      propogate = false;
+    }
+    --dim_index;
+  }
+}
+
+template <typename T, size_t N>
+template <typename X, size_t M>
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index1, 
+    typename Tensor<X, N>::Index &index2)
+{
+  int dim_index = M - 1;
+  bool propogate = true;
+  while (dim_index >= 0 && propogate) {
+    --dim_quotas[dim_index];
+    index1.index += index1.tensor.strides_[dim_index];
+    index2.index += index2.tensor.strides_[dim_index];
+    if (!dim_quotas[dim_index]) {
+      dim_quotas[dim_index] = index1.tensor.shape_.dimensions_[dim_index]; 
+      index1.index -= dim_quotas[dim_index] * index1.tensor.strides_[dim_index];
+      index2.index -= dim_quotas[dim_index] * index2.tensor.strides_[dim_index];
+    } else {
+      propogate = false;
+    }
+    --dim_index;
+  }
+}
+
+template <typename T, size_t N>
+template <typename X, typename Y, size_t M>
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index1,
+    typename Tensor<X, N>::Index &index2, 
+    typename Tensor<Y, N>::Index &index3)
+{
+  int dim_index = M - 1;
+  bool propogate = true;
+  while (dim_index >= 0 && propogate) {
+    --dim_quotas[dim_index];
+    index1.index += index1.tensor.strides_[dim_index];
+    index2.index += index2.tensor.strides_[dim_index];
+    index3.index += index3.tensor.strides_[dim_index];
+    if (!dim_quotas[dim_index]) {
+      dim_quotas[dim_index] = index1.tensor.shape_.dimensions_[dim_index]; 
+      index1.index -= dim_quotas[dim_index] * index1.tensor.strides_[dim_index];
+      index2.index -= dim_quotas[dim_index] * index2.tensor.strides_[dim_index];
+      index3.index -= dim_quotas[dim_index] * index3.tensor.strides_[dim_index];
+    } else {
+      propogate = false;
+    }
     --dim_index;
   }
 }
@@ -1195,11 +1268,10 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
   size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
+  typename Tensor<T, N>::Index index{*this};
   for (size_t i = 0; i < cumul_index; ++i) {
-    size_t index = pEvaluateIndex(dim_quotas);
-    fn(&(data_[index]));
-    pUpdateQuotas(dim_quotas);
-
+    fn(&(data_[index.index]));
+    pUpdateQuotas(dim_quotas, index);
   }
 }
 
@@ -1213,11 +1285,11 @@ void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
 
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
+  typename Tensor<T, N>::Index index{*this};
+  typename Tensor<X, N>::Index t_index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
-    size_t index = pEvaluateIndex(dim_quotas);
-    size_t t_index = tensor.pEvaluateIndex(dim_quotas);
-    fn(&(data_[index]), &(tensor.data_[t_index]));
-    pUpdateQuotas(dim_quotas);
+    fn(&(data_[index.index]), &(tensor.data_[t_index.index]));
+    pUpdateQuotas<X>(dim_quotas, index, t_index);
   }
 }
 
@@ -1228,12 +1300,12 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
   size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
+  typename Tensor<T, N>::Index index{*this};
+  typename Tensor<X, N>::Index t1_index{tensor_1};
+  typename Tensor<Y, N>::Index t2_index{tensor_2};
   for (size_t i = 0; i < cumul_index; ++i) {
-    size_t index = pEvaluateIndex(dim_quotas);
-    size_t t1_index = tensor_1.pEvaluateIndex(dim_quotas);
-    size_t t2_index = tensor_2.pEvaluateIndex(dim_quotas);
-    fn(&data_[index], &tensor_1.data_[t1_index], &tensor_2.data_[t2_index]);
-    pUpdateQuotas(dim_quotas);
+    fn(&data_[index.index], &tensor_1.data_[t1_index.index], &tensor_2.data_[t2_index.index]);
+    pUpdateQuotas<X, Y>(dim_quotas, index, t1_index, t2_index);
   }
 }
 
@@ -1353,19 +1425,19 @@ Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_quotas_1);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_quotas_2);
   size_t index = 0;
+  typename Tensor<X, M1>::Index t1_index{tensor_1};
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
+    typename Tensor<Y, M2>::Index t2_index{tensor_2};
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
-      size_t t1_index = tensor_1.pEvaluateIndex(dim_quotas_1);
-      size_t t2_index = tensor_2.pEvaluateIndex(dim_quotas_2, 1);
       X value {};
       for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x)
-          value += *(tensor_1.data_ + t1_index + tensor_1.strides_[M1 - 1] * x) *
-            *(tensor_2.data_ + t2_index + tensor_2.strides_[0] * x);
+          value += *(tensor_1.data_ + t1_index.index + tensor_1.strides_[M1 - 1] * x) *
+            *(tensor_2.data_ + t2_index.index + tensor_2.strides_[0] * x);
       prod_tensor.data_[index] = value;
-      tensor_2.pUpdateQuotas(dim_quotas_2, 1);
+      Tensor<Y, M2>::pUpdateQuotas(dim_quotas_2, t2_index, 1);
       ++index;
     }
-    tensor_1.pUpdateQuotas(dim_quotas_1);
+    Tensor<X, M1>::pUpdateQuotas(dim_quotas_1, t1_index);
   }
   return prod_tensor;
 }
