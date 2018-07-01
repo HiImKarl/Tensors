@@ -209,3 +209,31 @@ TEST_CASE("Tensor Multplication") {
         REQUIRE(tensor_4(i, j) == 0);
   }
 }
+
+TEST_CASE("Miscillaneous") {
+  auto tensor = Tensor<int32_t, 4>({2, 4, 6, 8});
+  for (size_t i = 1; i <= tensor.dimension(1); ++i)
+    for (size_t j = 1; j <= tensor.dimension(2); ++j)
+      for (size_t k = 1; k <= tensor.dimension(3); ++k)
+        for (size_t l = 1; l <= tensor.dimension(4); ++l)
+          tensor(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
+
+  SECTION("Tranpose") {
+    Tensor<int32_t, 2> mat = tensor.slice<2, 4>(2, 2);
+    auto mat_t = transpose(mat);
+    REQUIRE(mat_t.rank() == 2);
+    REQUIRE(mat_t.dimension(1) == 8);
+    REQUIRE(mat_t.dimension(2) == 4);
+    for (size_t i = 1; i <= mat.dimension(1); ++i)
+      for (size_t j = 1; j <= mat.dimension(2); ++j)
+          REQUIRE(mat(i, j) == mat_t(j, i));
+
+    Tensor<int32_t, 1> vec = mat.slice<2>(3);
+    Tensor<int32_t, 2> vec_t = transpose(vec);
+    REQUIRE(vec_t.rank() == 2);
+    REQUIRE(vec_t.dimension(1) == 1);
+    REQUIRE(vec_t.dimension(2) == 8);
+    for (size_t i = 1; i <= vec.dimension(1); ++i)
+      REQUIRE(vec(i) == vec_t(1, i));
+  }
+}

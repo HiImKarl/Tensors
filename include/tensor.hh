@@ -109,34 +109,38 @@ template <typename LHS, typename RHS> class BinaryMul;
 
 /* ----------------- Template Meta-Patterns ----------------- */
 
-/** Meta-template logical &&
- */
+/** Meta-template logical && */
 template <bool B1, bool B2>
 struct LogicalAnd { static bool const value = B1 && B2; };
 
-/** Boolean member `value` is true if T is an any-rank Tensor object, false o.w.
+/** Boolean member `value` is true if T is an any-rank Tensor 
+ * object, false o.w.  
  */
 template <typename T>
 struct IsTensor { static bool const value = false; };
 
-/** Tensor specialization of IsTensor, Boolean member `value` is true
+/** Tensor specialization of IsTensor, Boolean member 
+ * `value` is true
  */
 template <>
 template <typename T, size_t N>
 struct IsTensor<Tensor<T, N>> { static bool const value = true; };
 
-/** Boolean member `value` is true if T is a 0-rank Tensor object, false o.w.
+/** Boolean member `value` is true if T is a 0-rank 
+ * Tensor object, false o.w.
  */
 template <typename T>
 struct IsScalar { static bool const value = true; };
 
-/** Scalar specialization of IsScalar, Boolean member `value` is true
+/** Scalar specialization of IsScalar, Boolean member 
+ * `value` is true
  */
 template <>
 template <typename T>
 struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
 
-/** Tensor specialization of IsScalar, Boolean member `value` is false 
+/** Tensor specialization of IsScalar, Boolean member 
+ * `value` is false 
  */
 template <>
 template <typename T, size_t N>
@@ -193,8 +197,7 @@ struct ValueToTensor<BinaryMul<LHS, RHS>> {
 
 /* ---------------------------------------------------------- */
 
-/** CRTP base for Tensor expressions
- */
+/** CRTP base for Tensor expressions */
 template <typename NodeType>
 struct Expression {
   inline NodeType &self() { return *static_cast<NodeType *>(this); }
@@ -261,7 +264,10 @@ public:
   /* ----------------- Expressions ------------------ */
 
   template <typename X, typename Y, size_t M1, size_t M2>
-  friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+  friend Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+
+  template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 2> &mat);
+  template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 1> &vec);
 
   /* ------------------- Utility -------------------- */
 
@@ -478,7 +484,8 @@ public:
   Tensor(Tensor<T, N>::Proxy const &proxy); 
 
   /** Constructs the tensor produced by the expression */
-  template <typename NodeType>
+  template <typename NodeType,
+            typename = typename std::enable_if<NodeType::rank() == N>::type>
   Tensor(Expression<NodeType> const& expression);
 
   /* ------------------- Assignment ------------------- */
@@ -539,13 +546,13 @@ public:
   /* -------------------- Expressions ------------------- */
 
   template <typename X, typename Y, size_t M>
-  friend Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+  friend Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
   template <typename X, size_t M, typename>
   friend Tensor<X, M> operator+(Tensor<X, M> const &tensor, X const &scalar);
 
   template <typename X, typename Y, size_t M>
-  friend Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+  friend Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
   template <typename X, size_t M, typename>
   friend Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar);
@@ -554,7 +561,7 @@ public:
   friend Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor);
 
   template <typename X, typename Y, size_t M1, size_t M2>
-  friend Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+  friend Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
   Tensor<T, N> operator-() const;
 
   template <typename X, size_t M, typename>
@@ -753,33 +760,63 @@ public:
     size_t stride_;
   };
 
+  /** Returns an iterator for a Tensor, equivalent to *this dimension
+   *  fixed at index (the iteration index). Note: indexing begins at 
+   *  1. std::logic_error will be thrown if `index` is out of bounds.
+   */
   typename Tensor<T, N - 1>::Iterator begin(size_t index);
+
+  /** Returns a just-past-the-end iterator for a Tensor, equivalent 
+   * to *this dimension fixed at index (the iteration index). 
+   * Note: indexing begins at 1. std::logic_error will be thrown 
+   * if `index` is out of bounds.
+   */
   typename Tensor<T, N - 1>::Iterator end(size_t index);
+
+  /** Equivalent to Tensor<T, N>::begin(1) */
   typename Tensor<T, N - 1>::Iterator begin();
+  /** Equivalent to Tensor<T, N>::end(1) */
   typename Tensor<T, N - 1>::Iterator end();
 
+  /** See Tensor<T, N>::begin(size_t), except returns a const iterator */
   typename Tensor<T, N - 1>::ConstIterator cbegin(size_t index) const;
+  /** See Tensor<T, N>::end(size_t), except returns a const iterator */
   typename Tensor<T, N - 1>::ConstIterator cend(size_t index) const;
+  /** See Tensor<T, N>::begin(), except returns a const iterator */
   typename Tensor<T, N - 1>::ConstIterator cbegin() const;
+  /** See Tensor<T, N>::end(), except returns a const iterator */
   typename Tensor<T, N - 1>::ConstIterator cend() const;
 
+  /** See Tensor<T, N>::begin(size_t), except returns a reverse iterator */
   typename Tensor<T, N - 1>::ReverseIterator rbegin(size_t index);
+  /** See Tensor<T, N>::end(size_t), except returns a reverse iterator */
   typename Tensor<T, N - 1>::ReverseIterator rend(size_t index);
+  /** See Tensor<T, N>::begin(), except returns a reverse iterator */
   typename Tensor<T, N - 1>::ReverseIterator rbegin();
+  /** See Tensor<T, N>::end(), except returns a reverse iterator */
   typename Tensor<T, N - 1>::ReverseIterator rend();
 
+  /** See Tensor<T, N>::begin(size_t), except returns a const reverse iterator */
   typename Tensor<T, N - 1>::ConstReverseIterator crbegin(size_t index) const;
+  /** See Tensor<T, N>::end(size_t), except returns a const reverse iterator */
   typename Tensor<T, N - 1>::ConstReverseIterator crend(size_t index) const;
+  /** See Tensor<T, N>::begin(), except returns a const reverse iterator */
   typename Tensor<T, N - 1>::ConstReverseIterator crbegin() const;
+  /** See Tensor<T, N>::end(), except returns a const reverse iterator */
   typename Tensor<T, N - 1>::ConstReverseIterator crend() const;
 
   /* ----------------- Utility Functions ---------------- */
+  /** Returns a deep copy of this tensor, equivalent to calling copy constructor */
+  Tensor<T, N> copy() const; 
 
-  Tensor<T, N> copy() const;
+  /** Returns a reference: only used to invoke reference constructor */
   Tensor<T, N>::Proxy ref();
+
   template <typename U, size_t M, typename Container>
   friend void Fill(Tensor<U, M> &tensor, Container const &container);
-  
+
+  template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 2> &mat);
+  template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 1> &vec);
 
 private:
 
@@ -903,6 +940,11 @@ Tensor<T, N>::Tensor(size_t const (&dimensions)[N], std::function<FunctionType> 
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
+/** Fills the elements of `tensor` with the elements in container.
+ *  container must implement a forwards iterator. The number of 
+ *  elements in container must be equivalent to the capacity of
+ *  `tensor`, otherwise a std::logic_error is thrown.
+ */
 template <typename T, size_t N, typename Container>
 void Fill(Tensor<T, N> &tensor, Container const &container)
 {
@@ -951,7 +993,7 @@ Tensor<T, N>::Tensor(Tensor<T, N>::Proxy const &proxy)
 }
 
 template <typename T, size_t N>
-template <typename NodeType>
+template <typename NodeType, typename>
 Tensor<T, N>::Tensor(Expression<NodeType> const& expression)
 {
   auto result = expression.self()();
@@ -1057,7 +1099,9 @@ bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
   return true;
 }
 
-// possible iostream overload implemention
+/** Prints `tensor` to an ostream, using square braces "[]" to denotate
+ *  dimensions. I.e. a 1x1x1 Tensor with element x will appear as [[[x]]]
+ */
 template <typename T, size_t N>
 std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 {
@@ -1330,9 +1374,9 @@ Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, s
 /* -------------------------- Expressions -------------------------- */
 
 template <typename X, typename Y, size_t M>
-Tensor<X, M> Add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
+Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
-  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Add(Tensor const&, Tensor const&)"));
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("add(Tensor const&, Tensor const&)"));
   Tensor<X, M> sum_tensor(tensor_1.shape_);
   std::function<void(X *, X*, Y*)> add = [](X *x, X *y, Y *z) -> void
   {
@@ -1366,9 +1410,9 @@ Tensor<X, N> operator+(X const &scalar, Tensor<X, N> const &tensor)
 }
 
 template <typename X, typename Y, size_t M>
-Tensor<X, M> Subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
+Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
-  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("Subtract(Tensor const&, Tensor const&)"));
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("subtract(Tensor const&, Tensor const&)"));
   Tensor<X, M> diff_tensor(tensor_1.shape_);
   std::function<void(X *, X*, Y*)> sub = [](X *x, X *y, Y *z) -> void
   {
@@ -1407,13 +1451,13 @@ Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
 }
 
 template <typename X, typename Y, size_t M1, size_t M2>
-Tensor<X, M1 + M2 - 2> Multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2)
+Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2)
 {
-  static_assert(M1 || M2, OVERLOAD_RESOLUTION("Multiply(Tensor const&, Tensor const&)"));
-  static_assert(M1, SCALAR_TENSOR_MULT("Multiply(Tensor const&, Tensor const&)"));
-  static_assert(M2, SCALAR_TENSOR_MULT("Multiply(Tensor const&, Tensor const&)"));
+  static_assert(M1 || M2, OVERLOAD_RESOLUTION("multiply(Tensor const&, Tensor const&)"));
+  static_assert(M1, SCALAR_TENSOR_MULT("multiply(Tensor const&, Tensor const&)"));
+  static_assert(M2, SCALAR_TENSOR_MULT("multiply(Tensor const&, Tensor const&)"));
   if (tensor_1.shape_.dimensions_[0] != tensor_2.shape_.dimensions_[M2 - 1])
-    throw std::logic_error(INNER_DIMENSION_MISMATCH("Multiply(Tensor const&, Tensor const&)"));
+    throw std::logic_error(INNER_DIMENSION_MISMATCH("multiply(Tensor const&, Tensor const&)"));
   auto shape = Shape<M1 + M2 - 2>();
 
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
@@ -1493,6 +1537,49 @@ template <typename T, size_t N>
 typename Tensor<T, N>::Proxy Tensor<T, N>::ref() 
 {
   return Proxy(*this);
+}
+
+/** Returns a transposed Matrix, sharing the same underlying data as vec. If
+ *  the dimension of `mat` is [n, m], the dimensions of the resulting matrix will be
+ *  [m, n]. Note: This is only applicable to matrices and vectors
+ */
+template <typename T>
+Tensor<T, 2> transpose(Tensor<T, 2> &mat)
+{
+  //static_assert(N == 2, "Cannot tranpose non-matrix");
+  size_t transposed_dimensions[2];
+  transposed_dimensions[0] = mat.shape_.dimensions_[1];
+  transposed_dimensions[1] = mat.shape_.dimensions_[0];
+  size_t transposed_strides[2];
+  transposed_strides[0] = mat.strides_[1];
+  transposed_strides[1] = mat.strides_[0];
+  return Tensor<T, 2>(transposed_dimensions, transposed_strides,
+      mat.data_, std::shared_ptr<T>(mat.ref_));
+}
+
+/** See Tensor<T, N> transpose(Tensor<T, N> &)
+ */
+template <typename T>
+Tensor<T, 2> const transpose(Tensor<T, 2> const &mat) 
+{
+  return (*const_cast<typename std::decay<decltype(mat)>::type*>(mat)).tranpose();
+}
+
+/** Returns a transposed Matrix, sharing the same underlying data as vec. If
+ *  the dimension of `vec` is [n], the dimensions of the resulting matrix will be
+ *  [1, n]. Note: This is only applicable to matrices and vectors
+ */
+template <typename T>
+Tensor<T, 2> transpose(Tensor<T, 1> &vec) 
+{
+  size_t transposed_dimensions[2];
+  transposed_dimensions[0] = 1;
+  transposed_dimensions[1] = vec.shape_.dimensions_[0];
+  size_t transposed_strides[2];
+  transposed_strides[0] = 1;
+  transposed_strides[1] = vec.strides_[0];
+  return Tensor<T, 2>(transposed_dimensions, transposed_strides,
+      vec.data_, std::shared_ptr<T>(vec.ref_));
 }
 
 /* ------------------------------- Iterator ----------------------------- */
@@ -2006,7 +2093,8 @@ public:
   Tensor(Tensor<T, 0> const &tensor);
   Tensor(Tensor<T, 0> &&tensor);
   Tensor(Tensor<T, 0>::Proxy const &proxy);
-  template <typename NodeType>
+  template <typename NodeType,
+            typename = typename std::enable_if<NodeType::rank() == 0>::type>
   Tensor(Expression<NodeType> const& expression);
 
   /* ------------- Assignment ------------- */
@@ -2064,15 +2152,15 @@ public:
 
   // Addition
   template <typename X, typename Y>
-  friend Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
+  friend Tensor<X, 0> add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
-  // Subtraction
+  // subtraction
   template <typename X, typename Y>
-  friend Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
+  friend Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
   // Multiplication
   template <typename X, typename Y>
-  friend Tensor<X, 0> Multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
+  friend Tensor<X, 0> multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
   // Negation
   Tensor<T, 0> operator-() const;
@@ -2198,7 +2286,10 @@ public:
 
   /* ------------- Utility Functions ------------ */
 
+  /** Returns an identical Tensor<T, 0> (copy constructed) of `*this` */
   Tensor<T, 0> copy() const;
+
+  /** Returns a proxy object of `this`, used only for Tensor<T, 0>::Tensor(Tensor<T, 0>::Proxy const&) */
   Tensor<T, 0>::Proxy ref();
 
 private:
@@ -2252,7 +2343,7 @@ Tensor<T, 0>::Tensor(Tensor<T, 0>::Proxy const &proxy)
 {}
 
 template <typename T>
-template <typename NodeType>
+template <typename NodeType, typename>
 Tensor<T, 0>::Tensor(Expression<NodeType> const& expression)
 {
   Tensor<T, 0> result = expression.self()();
@@ -2297,24 +2388,24 @@ bool Tensor<T, 0>::operator==(X val) const
 /* ----------------------- Expressions ----------------------- */
 
 template <typename X, typename Y>
-Tensor<X, 0> Add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
+Tensor<X, 0> add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
   return Tensor<X, 0>(tensor_1() + tensor_2());
 }
 
 template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
-inline Tensor<X, 0> Add(X const& x, Y const & y) { return Tensor<X, 0>(x + y); }
+inline Tensor<X, 0> add(X const& x, Y const & y) { return Tensor<X, 0>(x + y); }
 
 template <typename X, typename Y>
-Tensor<X, 0> Subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
+Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
   return Tensor<X, 0>(tensor_1() - tensor_2());
 }
 
 template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
-inline Tensor<X, 0> Subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
+inline Tensor<X, 0> subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
 
 // Directly overload operator*
 template <typename X, typename Y>
@@ -2631,7 +2722,7 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Addition"));
-  return Add(ValueToTensor<LHSType>(lhs_).value(indices...),
+  return add(ValueToTensor<LHSType>(lhs_).value(indices...),
              ValueToTensor<RHSType>(rhs_).value(indices...));
 }
 
@@ -2687,7 +2778,7 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() - sizeof...(Indices)> BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Subtraction"));
-  return Subtract(
+  return subtract(
       ValueToTensor<LHSType>(lhs_).value(indices...),
       ValueToTensor<RHSType>(rhs_).value(indices...));
 }
@@ -2746,7 +2837,7 @@ template <typename... Indices>
 Tensor<typename LHSType::value_type, LHSType::rank() + RHSType::rank() - sizeof...(Indices) - 2> BinaryMul<LHSType, RHSType>::operator()(Indices... indices) const
 {
   static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS("Binary Multiplication"));
-  return Multiply(ValueToTensor<LHSType>(lhs_).value(),
+  return multiply(ValueToTensor<LHSType>(lhs_).value(),
                   ValueToTensor<RHSType>(rhs_).value())(indices...);
 }
 

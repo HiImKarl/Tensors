@@ -15,11 +15,12 @@ TEST_OBJ := $(TEST_SRC:.cc=.o)
 BENCHMARK_SRC := $(wildcard $(BENCHMARK_DIR)/*benchmark.cc) 
 BENCHMARK_OBJ := $(BENCHMARK_SRC:.cc=.o)
 
-.PHONY : test valgrind
+.PHONY : valgrind
 valgrind : run_test
 	valgrind --leak-check=full --show-leak-kinds=all ./run_test
 	rm run_test
 
+.PHONY : test 
 test : run_test
 	./run_test
 	rm run_test
@@ -32,7 +33,9 @@ run_test : $(TEST_OBJ)
 .PHONY : benchmark
 benchmark : LINKFLAGS += -lbenchmark -lpthread
 benchmark : run_benchmark
+	sudo cpupower frequency-set --governor performance
 	./run_benchmark --benchmark_out=benchmark.log --benchmark_out_format=json
+	sudo cpupower frequency-set --governor powersave
 	rm run_benchmark
 
 run_benchmark : $(BENCHMARK_OBJ)
