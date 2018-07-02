@@ -75,11 +75,13 @@
 
 // Arithmetic Operations
 #define RANK_MISMATCH(METHOD) \
-  METHOD "Failed -- Tensors have different ranks"
+  METHOD "Failed -- Shapes have different ranks"
 #define DIMENSION_MISMATCH(METHOD) \
-  METHOD " Failed -- Tensor have different dimensions"
+  METHOD " Failed -- Shapes have different dimensions"
 #define INNER_DIMENSION_MISMATCH(METHOD) \
-  METHOD " Failed -- Tensors have different inner dimensions"
+  METHOD " Failed -- Shapes have different inner dimensions"
+#define ELEMENT_COUNT_MISMATCH(METHOD) \
+  METHOD " Failed -- Shapes have different total number of elements" 
 #define SCALAR_TENSOR_MULT(METHOD) \
   METHOD " Failed -- Cannot multiple tensors with scalars"
 
@@ -106,6 +108,12 @@ template <typename T, size_t N = 0> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
 template <typename LHS, typename RHS> class BinarySub;
 template <typename LHS, typename RHS> class BinaryMul;
+
+/* -------------------- Type Definitions ----------------- */
+
+template <typename T> using Scalar = Tensor<T, 0>;
+template <typename T> using Vector = Tensor<T, 1>;
+template <typename T> using Matrix = Tensor<T, 2>;
 
 /* ----------------- Template Meta-Patterns ----------------- */
 
@@ -815,6 +823,14 @@ public:
   template <typename U, size_t M, typename Container>
   friend void Fill(Tensor<U, M> &tensor, Container const &container);
 
+  /** Create a Tensor with shape `shape`, using the elements of `tensor`.
+   *  The new Tensor will allocate new data data and then copy from `tensor`. 
+   *  The number of elements of `tensor` must match that of `shape`, 
+   *  or a std::logic_error is thrown.
+   */
+  template <size_t M>
+  Tensor<T, M> resize(Shape<M> const &shape) const;
+
   template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 2> &mat);
   template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 1> &vec);
 
@@ -882,6 +898,7 @@ private:
   template <size_t M>
   size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
+  void pMap(std::function<void(T const &lhs)> const &fn) const;
   template <typename X>
   void pUnaryMap(Tensor<X, N> const &tensor, std::function<void(T *lhs, X *rhs)> const &fn);
   template <typename X, typename Y>
@@ -894,7 +911,11 @@ private:
   // Initialize strides :: DIMENSIONS MUST BE INITIALIZED FIRST
   void pInitializeStrides();
 
-  // Declare all fields in jthe constructor
+  // Declare all fields in the constructor, but initialize strides
+  // assuming no gaps
+  Tensor(size_t const *dimensions, T *data, std::shared_ptr<T> &&_ref);
+
+  // Declare all fields in the constructor
   Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&_ref);
 
 }; // Tensor
@@ -1320,6 +1341,20 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
 }
 
 template <typename T, size_t N>
+void Tensor<T, N>::pMap(std::function<void(T const &lhs)> const &fn) const
+{
+  // this is the index upper bound for iteration
+  size_t cumul_index = shape_.index_product();
+  size_t dim_quotas[N];
+  std::copy_n(shape_.dimensions_, N, dim_quotas);
+  typename Tensor<T, N>::Index index{*this};
+  for (size_t i = 0; i < cumul_index; ++i) {
+    fn(data_[index.index]);
+    pUpdateQuotas(dim_quotas, index);
+  }
+}
+
+template <typename T, size_t N>
 template <typename X>
 void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
     std::function<void(T *lhs, X *rhs)> const &fn)
@@ -1363,13 +1398,21 @@ void Tensor<T, N>::pInitializeStrides()
   }
 }
 
-// private constructor
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(size_t const *dimensions, T *data, std::shared_ptr<T> &&ref)
+  : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
+{
+  pInitializeStrides();
+}
+
+// private constructors
 template <typename T, size_t N>
 Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&ref)
   : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
 {
   std::copy_n(strides, N, strides_);
 }
+
 
 /* -------------------------- Expressions -------------------------- */
 
@@ -1523,9 +1566,24 @@ Tensor<T, N> Tensor<T, N>::operator-() const
 
 /* --------------------------- Useful Functions ------------------------- */
 
-// creates a tensor with a different shape but the same number of elements
-// template <typename T, size_t N1, size_t N2>
-// Tensor<T, N1> Resize(Tensor<T, N2> const &tensor) {}
+template <typename T, size_t N>
+template <size_t M>
+Tensor<T, M> Tensor<T, N>::resize(Shape<M> const &shape) const
+{
+  size_t num_elems = shape_.index_product();
+  if (num_elems != shape.index_product()) 
+    throw std::logic_error(ELEMENT_COUNT_MISMATCH("Tensor<T, M> Tensor<T, N>::resize(Shape<N> const &shape)"));
+
+  T *data = new T[num_elems];
+  size_t index = 0;
+  std::function<void(T const &lhs)> fill_buff = [&data, &index](T const &lhs) ->void {
+    data[index++] = lhs;
+  };
+  pMap(fill_buff);
+  auto tensor = Tensor<T, M>(shape.dimensions_, data, 
+      std::shared_ptr<T>(data, _ARRAY_DELETER(T)));
+  return tensor;
+}
 
 template <typename T, size_t N>
 Tensor<T, N> Tensor<T, N>::copy() const
@@ -2864,6 +2922,7 @@ BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression
 #undef RANK_MISMATCH
 #undef DIMENSION_MISMATCH
 #undef INNER_DIMENSION_MISMATCH
+#undef ELEMENT_COUNT_MISMATCH
 #undef SCALAR_TENSOR_MULT
 #undef DEBUG
 #undef OVERLOAD_RESOLUTION

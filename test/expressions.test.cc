@@ -236,4 +236,22 @@ TEST_CASE("Miscillaneous") {
     for (size_t i = 1; i <= vec.dimension(1); ++i)
       REQUIRE(vec(i) == vec_t(1, i));
   }
+
+  SECTION("Resize") {
+    Tensor<int32_t, 2> mat = tensor.slice<2, 4>(2, 2);
+    Tensor<int32_t, 1> vec = mat.resize(Shape<1>({32}));
+    REQUIRE(vec.rank() == 1);
+    REQUIRE(vec.dimension(1) == 32);
+    int32_t correct_number = 2121;
+    int32_t countdown = 8;
+    for (size_t i = 1; i <= vec.dimension(1); ++i) {
+      REQUIRE(correct_number == vec(i));
+      ++correct_number;
+      --countdown;
+      if (!countdown) {
+        correct_number += 92;
+        countdown = 8;
+      }
+    }
+  }
 }
