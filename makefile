@@ -25,7 +25,7 @@ test : run_test
 	./run_test
 	rm run_test
 
-run_test : $(TEST_OBJ)
+run_test : ${TEST_OBJ}
 	$(LINK) $^ -o $@ $(LINKFLAGS) 
 
 -include $(TEST_OBJ:.o=.d)

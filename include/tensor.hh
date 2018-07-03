@@ -501,7 +501,7 @@ public:
   /** Copy Constructs from `tensor`. Destroys itself first */
   Tensor<T, N> &operator=(Tensor<T, N> const &tensor);
 
-  /** Proxy constructs from `tensor`. Destroys itself first */
+  /** Evaluates `rhs` and move constructs. Destroys itself first */
   template <typename NodeType>
   Tensor<T, N> &operator=(Expression<NodeType> const &rhs);
 
@@ -570,6 +570,10 @@ public:
 
   template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+
+  /** Allocates a Tensor with shape equivalent to *this, and whose
+   *  elements are equivalent to *this with operator-() applied.
+   */
   Tensor<T, N> operator-() const;
 
   template <typename X, size_t M, typename>
@@ -823,10 +827,10 @@ public:
   template <typename U, size_t M, typename Container>
   friend void Fill(Tensor<U, M> &tensor, Container const &container);
 
-  /** Create a Tensor with shape `shape`, using the elements of `tensor`.
-   *  The new Tensor will allocate new data data and then copy from `tensor`. 
-   *  The number of elements of `tensor` must match that of `shape`, 
-   *  or a std::logic_error is thrown.
+  /** Allocates a Tensor with shape `shape`, whose total number of elements 
+   *  must be equivalent to *this (or std::logic_error is thrown). The 
+   *  resulting Tensor is filled by iterating through *this and copying
+   *  over the values.
    */
   template <size_t M>
   Tensor<T, M> resize(Shape<M> const &shape) const;
@@ -1416,6 +1420,10 @@ Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, s
 
 /* -------------------------- Expressions -------------------------- */
 
+/** Creates a Tensor whose elements are the elementwise sum of `tensor1` 
+ *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+ *  a std::logic_error is thrown. 
+ */
 template <typename X, typename Y, size_t M>
 Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
@@ -1452,6 +1460,10 @@ Tensor<X, N> operator+(X const &scalar, Tensor<X, N> const &tensor)
   return tensor + scalar;
 }
 
+/** Creates a Tensor whose elements are the elementwise difference of `tensor1` 
+ *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+ *  a std::logic_error is thrown. 
+ */
 template <typename X, typename Y, size_t M>
 Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 {
@@ -1493,6 +1505,13 @@ Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
   return result;
 }
 
+/** Produces a Tensor which is the Tensor product of `tensor_1` and 
+ *  `tensor_2`. Tensor multiplication is equivalent to matrix multiplication
+ *  scaled to higher dimensions, i.e. shapes 2x3x4 * 4x3x2 -> 2x3x3x2
+ *  The inner dimensions of `tensor_1` and `tensor_2` must match, or 
+ *  std::logic error is thrown. Note: VERY EXPENSIVE, the time complexity
+ *  to produce a N rank Tensor with all dimensions m is O(m^(N+1)).
+ */
 template <typename X, typename Y, size_t M1, size_t M2>
 Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2)
 {
@@ -2073,6 +2092,10 @@ typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crend() const
 template <>
 class Shape<0> { /*@Shape<0>*/
 public:
+  /** Scalar specialization of Shape. This is an empty structure 
+   *  (sizeof(Shape<0>) will return 1 byte). This is specialized
+   *  solely to provide convience for scalar specializing Tensor
+   */
 
   /* -------------------- typedefs -------------------- */
   typedef size_t                    size_type;
@@ -2097,11 +2120,17 @@ public:
 
   /* -------------------- Equality -------------------- */
 
-  // Equality only compares against dimensions, not step size
+  /** This will always return true */
   bool operator==(Shape<0> const&) const noexcept { return true; }
+
+  /** This will always return false */
   bool operator!=(Shape<0> const&) const noexcept { return false; }
+
+  /** This will always return false */
   template <size_t M>
   bool operator==(Shape<M> const&) const noexcept { return false; }
+  
+  /** This will always return true */
   template <size_t M>
   bool operator!=(Shape<M> const&) const noexcept { return true; }
 
@@ -2117,6 +2146,10 @@ private:
 template <typename T>
 class Tensor<T, 0>: public Expression<Tensor<T, 0>> { /*@Tensor<T, 0>*/
 public:
+  /** Scalar specialization of Tensor object. The major motivation is
+   *  the ability to implicitly convert to the underlying data type,
+   *  allowing the Scalar to effectively be used as an ordinary value.
+   */
   typedef T                 value_type;
   typedef T&                reference_type;
   typedef T const&          const_reference_type;
@@ -2128,12 +2161,11 @@ public:
 
   /* ----------- Proxy Objects ------------ */
 
+  class Proxy { /*@Proxy<T,0>*/
   /**
    * Proxy Tensor Object used for building tensors from reference
    * This is used only to differentiate proxy tensor Construction
    */
-
-  class Proxy { /*@Proxy<T,0>*/
   public:
     template <typename U, size_t N> friend class Tensor;
     Proxy() = delete;
@@ -2145,28 +2177,39 @@ public:
 
   /* -------------- Constructors -------------- */
 
-  Tensor();
-  explicit Tensor(value_type &&val);
-  explicit Tensor(Shape<0>);
-  Tensor(Tensor<T, 0> const &tensor);
-  Tensor(Tensor<T, 0> &&tensor);
-  Tensor(Tensor<T, 0>::Proxy const &proxy);
+  Tensor(); /**< Constructs a new Scalar whose value is zero-initialized */
+  /**< Constructs a new Scalar whose value is forwarded `val` */
+  explicit Tensor(value_type &&val); 
+  explicit Tensor(Shape<0>); /**< Constructs a new Scalar whose value is zero-initialized */
+  /**< Constructs a new Scalar and whose value copies `tensor`'s */
+  Tensor(Tensor<T, 0> const &tensor); 
+  /**< Moves data from `tensor`. `tensor` is destroyed. */
+  Tensor(Tensor<T, 0> &&tensor);      
+  /**< Constructs a Scalar who shares underlying data with proxy's underyling Scalar. */
+  Tensor(Tensor<T, 0>::Proxy const &proxy); 
+  /**< Evaluates `expression` and move constructs from the resulting scalar */
   template <typename NodeType,
             typename = typename std::enable_if<NodeType::rank() == 0>::type>
   Tensor(Expression<NodeType> const& expression);
 
   /* ------------- Assignment ------------- */
 
+  /** Copy Constructs from `tensor`. Destroys itself first */
   Tensor<T, 0> &operator=(Tensor<T, 0> const &tensor);
+
+  /** Evaluates `rhs` and move constructs. Destroys itself first */
   template <typename X> Tensor<T, 0> &operator=(Tensor<X, 0> const &tensor);
 
   /* -------------- Getters -------------- */
 
-  constexpr static size_t rank() { return 0; }
-  Shape<0> shape() const noexcept { return shape_; }
-  value_type &operator()() { return *data_; }
+  constexpr static size_t rank() { return 0; } /**< Returns 0 */
+  Shape<0> shape() const noexcept { return shape_; } /**< Returns a scalar shape */
+  value_type &operator()() { return *data_; } /**< Returns the data as a reference */
+  /**< Returns the data as a const reference */
   value_type const &operator()() const { return *data_; }
-  Tensor *operator->() { return this; }
+  /**< Used to implement iterator->, should not be used explicitly */
+  Tensor *operator->() { return this; } 
+  /**< Used to implement const_iterator->, should not be used explicitly */
   Tensor const *operator->() const { return this; }
 
   /* -------------- Setters -------------- */
@@ -2175,7 +2218,7 @@ public:
             typename = typename std::enable_if<std::is_convertible<
             typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type>
-  Tensor<T, 0> &operator=(X&& elem);
+  Tensor<T, 0> &operator=(X&& elem); /**< Assigns `elem` to the underlying data */
 
   /* --------------- Print --------------- */
 
@@ -2208,19 +2251,15 @@ public:
 
   /* ------------ Expressions ------------- */
 
-  // Addition
   template <typename X, typename Y>
   friend Tensor<X, 0> add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
-  // subtraction
   template <typename X, typename Y>
   friend Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
-  // Multiplication
   template <typename X, typename Y>
   friend Tensor<X, 0> multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
-  // Negation
   Tensor<T, 0> operator-() const;
 
   /* ---------- Type Conversion ----------- */

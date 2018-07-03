@@ -6,7 +6,7 @@ using namespace tensor;
 
 TEST_CASE("Tensor Access", "[int]") {
 
-  /*     -- Tensor Initialization --   */
+  //     -- Tensor Initialization --   
   auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
 
   // Initialize values
@@ -15,8 +15,6 @@ TEST_CASE("Tensor Access", "[int]") {
       for (size_t k = 1; k <= tensor_1.dimension(3); ++k)
         for (size_t l = 1; l <= tensor_1.dimension(4); ++l) 
           tensor_1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
-
-  /*     --------------------------   */
 
   SECTION("Dimensions and Rank") {
     auto tensor_2 = tensor_1(1);

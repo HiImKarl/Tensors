@@ -5,7 +5,7 @@ using namespace tensor;
 
 TEST_CASE("Tensor Assignment", "[int]") {
 
-  /*     -- Tensor Initialization --   */
+  //     -- Tensor Initialization --   
   auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
 
   // Initialize values
@@ -15,7 +15,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
         for (size_t l = 1; l <= tensor_1.dimension(4); ++l) 
           tensor_1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l;
 
-  /*     --------------------------   */
+  //     --------------------------   
 
   SECTION("Assigning Tensors to Tensors") {
 
@@ -147,13 +147,11 @@ TEST_CASE("Tensor Assignment", "[int]") {
   }
 
   SECTION("Assigning Scalar Tensors to Tensors") {
-    /* same type */
     Tensor<int32_t> scalar_1(0);
     tensor_1(1, 1, 1, 1) = scalar_1;
     REQUIRE(tensor_1(1, 1, 1, 1) == 0);
     REQUIRE(tensor_1(1, 1, 1, 1) == scalar_1);
 
-    /* different type */
     Tensor<double> scalar_2(-12);
     tensor_1(1, 1, 1, 1) = scalar_2;
     REQUIRE(tensor_1(1, 1, 1, 1) == -12);
@@ -161,11 +159,9 @@ TEST_CASE("Tensor Assignment", "[int]") {
   }
 
   SECTION("Assigning Tensors to Lvalues") {
-    /* same type */
     int32_t VALUE = -tensor_1(1, 1, 1, 1);
     REQUIRE(VALUE == -1111);
 
-    /* different_type */
     float fVALUE = -tensor_1(1,1,1,1);
     REQUIRE(fVALUE == -1111);
   }
@@ -173,7 +169,7 @@ TEST_CASE("Tensor Assignment", "[int]") {
 
 TEST_CASE("Scalar Assignment", "[int]") {
 
-  /*     -- Tensor Initialization --   */
+  //     -- Tensor Initialization --   
   auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
 
   // Initialize a scalar tensor;
@@ -189,7 +185,7 @@ TEST_CASE("Scalar Assignment", "[int]") {
 
   stensor_1 = 0;
 
-  /*     --------------------------   */
+  //     --------------------------   
 
   SECTION("Assigning Tensors to Tensors") {
     Tensor<int32_t, 2> t2({3, 4});
@@ -259,8 +255,7 @@ TEST_CASE("Scalar Assignment", "[int]") {
     for (size_t i = 1; i <= t3.dimension(1); ++i)
       for (size_t j = 1; j <= t3.dimension(2); ++j)
         for (size_t k = 1; k <= t3.dimension(3); ++k)
-          for (size_t l = 1; l <= t3.dimension(4); ++l)
-            REQUIRE(tensor_1(i, j, k, l) == -1 * (int)(i + 10 * j + 100 * k + 1000 * l));
+          for (size_t l = 1; l <= t3.dimension(4); ++l) REQUIRE(tensor_1(i, j, k, l) == -1 * (int)(i + 10 * j + 100 * k + 1000 * l));
   }
 
   SECTION("Assigning Scalar Values to Tensors") {
@@ -307,4 +302,3 @@ TEST_CASE("Scalar Assignment", "[int]") {
     REQUIRE(VALUE == 0);
   }
 }
-

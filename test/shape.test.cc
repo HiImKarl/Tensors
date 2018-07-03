@@ -5,7 +5,7 @@ using namespace tensor;
 
 TEST_CASE("Shapes") {
   
-  /*     -- Shape Initialization --     */
+  //     -- Shape Initialization --     
   auto shape = Shape<8>({1, 2, 3, 4, 5, 6, 7, 8});
   auto scalar_shape = Shape<0>();
   

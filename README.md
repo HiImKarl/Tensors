@@ -1,98 +1,40 @@
 
-Tensor Template header-only library, where the rank of the tensor must be a compile time constant.
+# Tensor
 
-## Definition
+C++11 Tensor Template header-only library, with compile time rank. This library makes heavy use of template expressions and meta-programming to optimize Tensor mathematics and provide simple syntax. 
 
-Tensors are defined as follows, where T is the tensor data type (which must be a non-reference type) and N is the rank of the tensor.
+## Getting Started
 
-```c++
-template <typename T, uint32_t N = 0>
-class Tensor;
+
+### Prerequisites
+C++11 is the minimum C++ standard required to compile the library. Below is a list of compilers that has successfully ran the unit tests:
+
+The following compilers have succesfully built and ran the tests:
+* gcc 6.3+
+
+
+### Installation
+
+The entire library is contained in a single header file: include/tensor.hh. The only requirement is to clone the repo (or download from the browser): 
+```
+git clone git@github.com:HiImKarl/Tensors.git
+```
+And then copy include/tensor.hh into your project. 
+
+To build the tests and benchmarks, [Google's benchmark framework](https://github.com/google/benchmark) is required. You can follow the install instructions in the Github link. 
+
+If you have all of the prerequisites, from the from the root directory:
+```
+mkdir build && cd build
+cmake -G <Prefered Generator> ..
+make
 ```
 
-## Rank and Dimensions
-The rank and dimensions of tensors can be retrieved with the following methods
+### Running the tests
 
-```c++
-constexpr uint32_t rank() const noexcept;
-uint32_t dimension(uint32_t) const;
-```
+Tests are developed with the [catch](https://github.com/catchorg/Catch2) framework.
+The test executable is named tests, located in ./test/, relative to the build directory.
 
-## Instaniation and Access
+### Running the benchmarks
 
-You can access tensor values with operator(), which is vardiacally expanded and checked at compile time to ensure the number of arguments don't exceed the rank of the tensor
-
- ```c++
- // The following instantiates a 3rd degree tensor with dimensions 3x4x5
- // The circle brackets are required, an std::initializer_list constructor is not implemented 
- Tensor<string, 3> my_tensor({3, 4, 5});
- 
- // The following instantiates a scalar
- Tensor<double> my_scalar();
- 
- // Tensors are indexed beginning at 1
- // You can access a 4x5 tensor in my_tensor with
- my_tensor(1);
- 
- // You can access the scalar with 
- my_scalar();
- // or just
- my_scalar;
- 
- // example
- string str = my_tensor(2, 1, 4);
- double x = my_scalar;
-```
-
-
-## Assignment
-```c++
-// Values are undefined/default-constructed until user assignment 
-Tensor<double, 3> my_tensor({2, 4, 3});
-for (int i = 1; i <= my_tensor.dimension(1); ++i) 
-  for (int j = 1; j <= my_tensor.dimension(2); ++j) 
-    for (int k = 1; k <= my_tensor.dimension(3); ++k) 
-      my_tensor(i, j, k) = i + 10 * j + 100 * k;  
-
-// scalars can be given its template parameter
-Tensor<double> my_scalar {};
-my_scalar = 3.1415;
-
-// multi-dimensional tensors can also be assigned to each other as long as the indices match
-Tensor<double, 4> tensor_1 {3, 7, 14, 5};
-Tensor<double, 3> tensor_2 {7, 14, 5};
-//... instantiate the values in tensor_1 and tensor_2
-tensor_1(2) = tensor_2;
-tensor_2(1, 3) = tensor_2(7, 12);
-```
-
-## Addition and Subtraction
-```c++
-
-Tensor<int, 4> tensor_1 {1, 2, 3, 4};
-Tensor<long, 2> tensor_2 {3, 4};
-//... instantiate values
-tensor_1(1, 1) += tensor_2;
-tensor_1(1, 1) -= tensor_2;
-```
-
-## Printing the Tensor
-```c++
-// An implementation for ostream << has also been provided
-Tensor<int, 4> tensor_1 {1, 2, 3, 4};
-//... instantiate values
-std::cout << tensor_1 << std::endl;
-```
-
-## Error Handling
-
-If the rank of the tensor does not match what you are trying to do, compilation will fail. If you try to access an element that is out of bounds, an std::logic_error exception will be thrown.
-
-## Running the Unit Tests
-
-The tests are in /test/test.cc. (For now) you will need a port of gcc if you are on Windows.
-Run the following in the root directory:
-```
-make test
-```
-
+The benchmark executable is named benchmarks, located in ./benchmark/, relative to the build directory.

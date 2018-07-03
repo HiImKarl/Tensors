@@ -58,3 +58,4 @@ TEST_CASE("Slicing Tensors", "[pod]") {
           REQUIRE(const_tensor.slice<1, 2, 3>()(i, j, k) == (int)(100 * i + 10 * j + k));
   }
 }
+

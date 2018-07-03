@@ -209,7 +209,6 @@ TEST_CASE("Tensor Multplication") {
         REQUIRE(tensor_4(i, j) == 0);
   }
 }
-
 TEST_CASE("Miscillaneous") {
   auto tensor = Tensor<int32_t, 4>({2, 4, 6, 8});
   for (size_t i = 1; i <= tensor.dimension(1); ++i)
