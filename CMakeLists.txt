@@ -1,17 +1,20 @@
 cmake_minimum_required(VERSION 3.0)
 project(Example LANGUAGES CXX)
 
-set(CMAKE_MODULE_PATH 
-	${CMAKE_MODULE_DIR}
-	${PROJECT_SOURCE_DIR}/cmake
-	)
-
-include(CTest)
-
 if((CMAKE_CXX_COMPILER_ID MATCHES GNU) OR (CMAKE_CXX_COMPILER_ID MATCHES clang))
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
 add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
+
+include (CTest)
+add_test(NAME run_tests COMMAND tests)
+
+add_custom_target(
+	test_memcheck 
+	COMMAND ${CMAKE_CTEST_COMMAND}
+	--force-new-ctest-process --test-action memcheck
+    COMMAND cat "${CMAKE_BINARY_DIR}/Testing/Temporary/MemoryChecker.*.log"
+	)
 

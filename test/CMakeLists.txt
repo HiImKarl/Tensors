@@ -3,14 +3,18 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/include
 	)
 
-file(GLOB TEST_SRC "${PROJECT_SOURCE_DIR}/test/*.cc")
-add_executable(tests ${TEST_SRC}) 
+file(GLOB TEST_CC "*.cc")
 
-add_test(NAME MyTests COMMAND tests)
+foreach(ONE_TEST_CC ${TEST_CC})
 
-add_custom_target(
-	test_memcheck 
-	COMMAND ${CMAKE_CTEST_COMMAND}
-	--force-new-ctest-process --test-action memcheck
-    COMMAND cat "${CMAKE_BINARY_DIR}/Testing/Temporary/MemoryChecker.*.log"
-	)
+	get_filename_component(ONE_TEST_EXEC ${ONE_TEST_CC} NAME_WE)
+
+	set(TARGET_NAME test_${ONE_TEST_EXEC})
+
+	add_executable(${TARGET_NAME} ${ONE_TEST_CC})
+	set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME ${ONE_TEST_EXEC}) 
+
+endforeach()
+
+add_executable(tests ${TEST_CC}) 
+
