@@ -1,6 +1,6 @@
 find_package(Threads REQUIRED)
 
-file(GLOB_RECURSE ALL_BENCH_CC *.cc)
+file(GLOB_RECURSE ALL_BENCH_CC *.benchmark.cc)
 
 include_directories(
 	${PROJECT_SOURCE_DIR}/include
@@ -14,7 +14,7 @@ foreach(ONE_BENCH_CC ${ALL_BENCH_CC})
    # Avoid name collision 
    set(TARGET_NAME bench_${ONE_BENCH_EXEC})
 
-   add_executable(${TARGET_NAME} ${ONE_BENCH_CC})
+   add_executable(${TARGET_NAME} ${ONE_BENCH_CC} benchmark.cc)
    set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME ${ONE_BENCH_EXEC}) 
    target_link_libraries(
 	   ${TARGET_NAME} benchmark
@@ -23,7 +23,7 @@ foreach(ONE_BENCH_CC ${ALL_BENCH_CC})
 
 endforeach()
 
-add_executable(benchmarks ${ALL_BENCH_CC})
+add_executable(benchmarks ${ALL_BENCH_CC} benchmark.cc)
 target_link_libraries(
    benchmarks benchmark
    ${CMAKE_THREAD_LIBS_INIT}

@@ -3,7 +3,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/include
 	)
 
-file(GLOB TEST_CC "*.cc")
+file(GLOB TEST_CC *.test.cc)
 
 foreach(ONE_TEST_CC ${TEST_CC})
 
@@ -11,10 +11,10 @@ foreach(ONE_TEST_CC ${TEST_CC})
 
 	set(TARGET_NAME test_${ONE_TEST_EXEC})
 
-	add_executable(${TARGET_NAME} ${ONE_TEST_CC})
+	add_executable(${TARGET_NAME} ${ONE_TEST_CC} test.cc)
 	set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME ${ONE_TEST_EXEC}) 
 
 endforeach()
 
-add_executable(tests ${TEST_CC}) 
+add_executable(tests ${TEST_CC} test.cc) 
 
