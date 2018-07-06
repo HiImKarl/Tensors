@@ -130,7 +130,6 @@ struct IsTensor { static bool const value = false; };
 /** Tensor specialization of IsTensor, Boolean member 
  * `value` is true
  */
-template <>
 template <typename T, size_t N>
 struct IsTensor<Tensor<T, N>> { static bool const value = true; };
 
@@ -143,14 +142,12 @@ struct IsScalar { static bool const value = true; };
 /** Scalar specialization of IsScalar, Boolean member 
  * `value` is true
  */
-template <>
 template <typename T>
 struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
 
 /** Tensor specialization of IsScalar, Boolean member 
  * `value` is false 
  */
-template <>
 template <typename T, size_t N>
 struct IsScalar<Tensor<T, N>> { static bool const value = false; };
 
@@ -167,7 +164,6 @@ struct ValueAsTensor {
 /** Tensor specialization of ValueAsTensor, `value` is a 
  *  const reference to the provided Tensor
  */
-template <>
 template <typename T, size_t N>
 struct ValueAsTensor<Tensor<T, N>> {
   ValueAsTensor(Tensor<T, N> const &val): value(val) {}
@@ -185,7 +181,6 @@ struct ValueAsTensor<Tensor<T, N>> {
 /** BinaryAdd specialization of ValueAsTensor, `value` is a 
  *  const reference to the provided binary expression
  */
-template <>
 template <typename LHS, typename RHS>
 struct ValueAsTensor<BinaryAdd<LHS, RHS>> {
   ValueAsTensor(BinaryAdd<LHS, RHS> const &val): value(val) {}
@@ -205,7 +200,6 @@ struct ValueAsTensor<BinaryAdd<LHS, RHS>> {
 /** BinarySub specialization of ValueAsTensor, `value` is a 
  *  const reference to the provided binary expression
  */
-template <>
 template <typename LHS, typename RHS>
 struct ValueAsTensor<BinarySub<LHS, RHS>> {
   ValueAsTensor(BinarySub<LHS, RHS> const &val): value(val) {}
@@ -224,7 +218,6 @@ struct ValueAsTensor<BinarySub<LHS, RHS>> {
 /** BinaryMul specialization of ValueAsTensor, `value` is a 
  *  const reference to the provided binary expression
  */
-template <>
 template <typename LHS, typename RHS>
 struct ValueAsTensor<BinaryMul<LHS, RHS>> {
   ValueAsTensor(BinaryMul<LHS, RHS> const &val): value(val) {}
@@ -608,16 +601,16 @@ public:
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
-  template <typename X, size_t M, typename>
+  template <typename X, size_t M>
   friend Tensor<X, M> operator+(Tensor<X, M> const &tensor, X const &scalar);
 
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
-  template <typename X, size_t M, typename>
+  template <typename X, size_t M>
   friend Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar);
 
-  template <typename X, size_t M, typename>
+  template <typename X, size_t M>
   friend Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor);
 
   template <typename X, typename Y, size_t M1, size_t M2>
@@ -628,7 +621,7 @@ public:
    */
   Tensor<T, N> operator-() const;
 
-  template <typename X, size_t M, typename>
+  template <typename X, size_t M>
   friend Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar);
 
   /* ------------------ Print to ostream --------------- */
@@ -937,9 +930,9 @@ private:
   /* ----------------- Utility -------------------- */
 
   // Used to wrap the index with the Tensor when calling pUpdateQuotas
-  struct Index {
+  struct IndexReference {
     template <typename X, size_t M> friend class Tensor;
-    Index(Tensor<T, N> const &_tensor)
+    IndexReference(Tensor<T, N> const &_tensor)
       : index(0), tensor(_tensor) {}
     int index;
     Tensor<T, N> const &tensor;
@@ -947,18 +940,18 @@ private:
 
   // Data mapping for pMap
   template <size_t M>
-  static void pUpdateQuotas(size_t (&dim_quotas)[M], Index &index, size_t quota_offset = 0);
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], IndexReference &index, size_t quota_offset = 0);
 
   // Data mapping for pUnaryMap -- ASSUMES EQUAL SHAPES
   template <typename X, size_t M>
-  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::Index &index1,
-    typename Tensor<X, N>::Index &index2);
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::IndexReference &index1,
+    typename Tensor<X, N>::IndexReference &index2);
 
   // Data mapping for pBinaryMap -- ASSUMES EQUAL SHAPES
   template <typename X, typename Y, size_t M>
-  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::Index &index1,
-    typename Tensor<X, N>::Index &index2, 
-    typename Tensor<Y, N>::Index &index3);
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::IndexReference &index1,
+    typename Tensor<X, N>::IndexReference &index2, 
+    typename Tensor<Y, N>::IndexReference &index3);
 
   template <size_t M>
   size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
@@ -1066,7 +1059,7 @@ Tensor<T, N>::Tensor(Tensor<T, N> const &tensor)
   this->data_ = new T[cumul];
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
-  typename Tensor<T, N>::Index index{*this};
+  typename Tensor<T, N>::IndexReference index{*this};
   for (size_t i = 0; i < cumul; ++i) {
     this->data_[i] = tensor.data_[index.index];
     pUpdateQuotas(dim_quotas, index);
@@ -1182,7 +1175,7 @@ template <typename T, size_t N>
 template <size_t... Slices, typename... Indices>
 Tensor<T, sizeof...(Slices)> Tensor<T, N>::slice(Indices... indices)
 {
-  static_assert(sizeof...(Slices));
+  static_assert(sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
   static_assert(N == sizeof...(Slices) + sizeof...(indices), SLICES_OUT_OF_BOUNDS);
   size_t placed_indices[N];
   // Initially fill the array with 1s
@@ -1369,7 +1362,7 @@ T * Tensor<T, N>::pDuplicateData() const
 // Update the quotas after one iterator increment
 template <typename T, size_t N>
 template <size_t M>
-void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index, size_t quota_offset)
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], IndexReference &index, size_t quota_offset)
 {
   int dim_index = M - 1;
   bool propogate = true;
@@ -1388,8 +1381,8 @@ void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index, size_t q
 
 template <typename T, size_t N>
 template <typename X, size_t M>
-void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index1, 
-    typename Tensor<X, N>::Index &index2)
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], IndexReference &index1, 
+    typename Tensor<X, N>::IndexReference &index2)
 {
   int dim_index = M - 1;
   bool propogate = true;
@@ -1410,9 +1403,9 @@ void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index1,
 
 template <typename T, size_t N>
 template <typename X, typename Y, size_t M>
-void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], Index &index1,
-    typename Tensor<X, N>::Index &index2, 
-    typename Tensor<Y, N>::Index &index3)
+void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], IndexReference &index1,
+    typename Tensor<X, N>::IndexReference &index2, 
+    typename Tensor<Y, N>::IndexReference &index3)
 {
   int dim_index = M - 1;
   bool propogate = true;
@@ -1451,7 +1444,7 @@ void Tensor<T, N>::pMap(std::function<void(T *lhs)> const &fn)
   size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
-  typename Tensor<T, N>::Index index{*this};
+  typename Tensor<T, N>::IndexReference index{*this};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn(&(data_[index.index]));
     pUpdateQuotas(dim_quotas, index);
@@ -1465,7 +1458,7 @@ void Tensor<T, N>::pMap(std::function<void(T const &lhs)> const &fn) const
   size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
-  typename Tensor<T, N>::Index index{*this};
+  typename Tensor<T, N>::IndexReference index{*this};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn(data_[index.index]);
     pUpdateQuotas(dim_quotas, index);
@@ -1482,8 +1475,8 @@ void Tensor<T, N>::pUnaryMap(Tensor<X, N> const &tensor,
 
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
-  typename Tensor<T, N>::Index index{*this};
-  typename Tensor<X, N>::Index t_index{tensor};
+  typename Tensor<T, N>::IndexReference index{*this};
+  typename Tensor<X, N>::IndexReference t_index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn(&(data_[index.index]), &(tensor.data_[t_index.index]));
     pUpdateQuotas<X>(dim_quotas, index, t_index);
@@ -1497,9 +1490,9 @@ void Tensor<T, N>::pBinaryMap(Tensor<X, N> const &tensor_1, Tensor<Y, N> const &
   size_t cumul_index = shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(shape_.dimensions_, N, dim_quotas);
-  typename Tensor<T, N>::Index index{*this};
-  typename Tensor<X, N>::Index t1_index{tensor_1};
-  typename Tensor<Y, N>::Index t2_index{tensor_2};
+  typename Tensor<T, N>::IndexReference index{*this};
+  typename Tensor<X, N>::IndexReference t1_index{tensor_1};
+  typename Tensor<Y, N>::IndexReference t2_index{tensor_2};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn(&data_[index.index], &tensor_1.data_[t1_index.index], &tensor_2.data_[t2_index.index]);
     pUpdateQuotas<X, Y>(dim_quotas, index, t1_index, t2_index);
@@ -1554,8 +1547,7 @@ Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
 /** Elementwise Scalar-Tensor addition. Returns a Tensor with shape 
  *  `tensor`, where each element of `tensor` is incremeneted with `scalar`.
  */
-template <typename X, size_t N,
-          typename = typename std::enable_if<N != 0>::type>
+template <typename X, size_t N>
 Tensor<X, N> operator+(Tensor<X, N> const &tensor, X const &scalar)
 {
   Tensor<X, N> result {tensor.shape()};
@@ -1566,13 +1558,14 @@ Tensor<X, N> operator+(Tensor<X, N> const &tensor, X const &scalar)
   return result;
 }
 
+
 /** See operator+(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t N,
-          typename = typename std::enable_if<N != 0>::type>
+template <typename X, size_t N>
 Tensor<X, N> operator+(X const &scalar, Tensor<X, N> const &tensor)
 {
   return tensor + scalar;
 }
+
 
 /** Creates a Tensor whose elements are the elementwise difference of `tensor1` 
  *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
@@ -1594,8 +1587,7 @@ Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
 /** Elementwise Scalar-Tensor subtraction. Returns a Tensor with shape 
  *  `tensor`, where each element of `tensor` is subtracted by `scalar`.
  */
-template <typename X, size_t M,
-          typename = typename std::enable_if<M != 0>::type>
+template <typename X, size_t M>
 Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar)
 {
   Tensor<X, M> result {tensor.shape()};
@@ -1607,8 +1599,7 @@ Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar)
 }
 
 /** See operator-(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t M,
-          typename = typename std::enable_if<M != 0>::type>
+template <typename X, size_t M>
 Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
 {
   Tensor<X, M> result {tensor.shape()};
@@ -1618,6 +1609,7 @@ Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
   result.pUnaryMap(tensor, set_vals);
   return result;
 }
+
 
 /** Produces a Tensor which is the Tensor product of `tensor_1` and 
  *  `tensor_2`. Tensor multiplication is equivalent to matrix multiplication
@@ -1645,9 +1637,9 @@ Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, dim_quotas_1);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, dim_quotas_2);
   size_t index = 0;
-  typename Tensor<X, M1>::Index t1_index{tensor_1};
+  typename Tensor<X, M1>::IndexReference t1_index{tensor_1};
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
-    typename Tensor<Y, M2>::Index t2_index{tensor_2};
+    typename Tensor<Y, M2>::IndexReference t2_index{tensor_2};
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
       X value {};
       for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x)
@@ -1665,8 +1657,7 @@ Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
 /** Elementwise Scalar-Tensor multiplication. Returns a Tensor with shape 
  *  `tensor`, where each element of `tensor` is multiplied by `scalar`.
  */
-template <typename X, size_t M, 
-          typename = typename std::enable_if<M != 0>::type>
+template <typename X, size_t M>
 Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar)
 {
   Tensor<X, M> result {tensor.shape()};
@@ -1678,8 +1669,7 @@ Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar)
 }
 
 /** See operator*(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t N,
-          typename = typename std::enable_if<N != 0>::type>
+template <typename X, size_t N>
 Tensor<X, N> operator*(X const &scalar, Tensor<X, N> const &tensor)
 {
   return tensor * scalar;
@@ -2335,9 +2325,10 @@ public:
   Tensor<T, 0> &operator=(X&& elem); /**< Assigns `elem` to the underlying data */
 
   /* --------------- Print --------------- */
-
+ 
   template <typename X, size_t M>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M> &tensor);
+
   template <typename X>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, 0> &tensor);
 
@@ -2608,6 +2599,18 @@ template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
 inline Tensor<X, 0> add(X const& x, Y const & y) { return Tensor<X, 0>(x + y); }
 
+template <typename X>
+Tensor<X, 0> operator+(Tensor<X, 0> const &tensor, X const &scalar) 
+{
+  return Tensor<X, 0>(tensor() + scalar);
+}
+
+template <typename X>
+Tensor<X, 0> operator+(X const &scalar, Tensor<X, 0> const &tensor) 
+{
+  return Tensor<X, 0>(tensor() + scalar);
+}
+
 template <typename X, typename Y>
 Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
@@ -2618,11 +2621,35 @@ template <typename X, typename Y, typename = typename std::enable_if<
           LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
 inline Tensor<X, 0> subtract(X const& x, Y const & y) { return Tensor<X, 0>(x - y); }
 
+template <typename X>
+Tensor<X, 0> operator-(Tensor<X, 0> const &tensor, X const &scalar) 
+{
+  return Tensor<X, 0>(tensor() - scalar);
+}
+
+template <typename X>
+Tensor<X, 0> operator-(X const &scalar, Tensor<X, 0> const &tensor) 
+{
+  return Tensor<X, 0>(scalar - tensor());
+}
+
 // Directly overload operator*
 template <typename X, typename Y>
 inline Tensor<X, 0> operator*(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
   return Tensor<X, 0>(tensor_1() * tensor_2());
+}
+
+template <typename X>
+Tensor<X, 0> operator*(Tensor<X, 0> const &tensor, X const &scalar) 
+{
+  return Tensor<X, 0>(tensor() * scalar);
+}
+
+template <typename X>
+Tensor<X, 0> operator*(X const &scalar, Tensor<X, 0> const &tensor) 
+{
+  return Tensor<X, 0>(tensor() * scalar);
 }
 
 template <typename T>
@@ -2944,6 +2971,20 @@ BinaryAdd<LHSType, RHSType> operator+(Expression<LHSType> const &lhs, Expression
   return BinaryAdd<LHSType, RHSType>(lhs.self(), rhs.self());
 }
 
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator+(Expression<NodeType> const &expression, typename NodeType::value_type const& scalar)
+{
+  return expression.self()() + scalar;
+}
+
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator+(typename NodeType::value_type const& scalar, Expression<NodeType> const &expression)
+{
+  return expression.self()() + scalar;
+}
+
 /* ----------------- Print ----------------- */
 
 template <typename LHSType, typename RHSType>
@@ -2999,6 +3040,20 @@ template <typename LHSType, typename RHSType>
 BinarySub<LHSType, RHSType> operator-(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
 {
   return BinarySub<LHSType, RHSType>(lhs.self(), rhs.self());
+}
+
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator-(Expression<NodeType> const &expression, typename NodeType::value_type const& scalar)
+{
+  return expression.self()() - scalar;
+}
+
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator-(typename NodeType::value_type const& scalar, Expression<NodeType> const &expression)
+{
+  return scalar - expression.self()();
 }
 
 /* ----------------- Print ----------------- */
@@ -3057,6 +3112,20 @@ template <typename LHSType, typename RHSType>
 BinaryMul<LHSType, RHSType> operator*(Expression<LHSType> const &lhs, Expression<RHSType> const &rhs)
 {
   return BinaryMul<LHSType, RHSType>(lhs.self(), rhs.self());
+}
+
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator*(Expression<NodeType> const &expression, typename NodeType::value_type const& scalar)
+{
+  return expression.self()() * scalar;
+}
+
+template <typename NodeType>
+Tensor<typename NodeType::value_type, NodeType::rank()>
+operator*(typename NodeType::value_type const& scalar, Expression<NodeType> const &expression)
+{
+  return scalar * expression.self()();
 }
 
 } // tensor

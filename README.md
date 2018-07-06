@@ -20,6 +20,7 @@ C++11 is the minimum C++ standard required to compile the library. Below is a li
 
 The following compilers have succesfully built and ran the tests:
 * gcc 6.3+
+* clang 3.5+
 
 ### Installation
 
@@ -66,6 +67,32 @@ Fill(t6, 0); // t5 is now also filled with zeros
 
 #### Indexing Tensors
 
+Tensors can be accessed with `operator()` or the `at` method. It is not necessary to
+access the tensor to the individual element; partial access will return a tensor with
+the slice of the original tensor with the same underlying data (effectively a reference
+to that tensor slice).
+**Tensors are indexed beginning at 1!** This is true for all tensor methods.
+```C++
+// Create a 2x3x4x5 or ensor of boolean false
+Tensor<bool, 4> t0({2, 3, 4, 5}, false); 
+// t1, a 4x5 tensor of booleans (false) is the (2, 2) slice of t0. 
+Tensor<bool, 2> t1 = t0(2, 2); 
+// t1 is also the (2, 2) slice of t0, and is effectively the same as t1.
+Tensor<bool, 2> t2 = t0.at(2, 2);
+```
+
+The only difference between `operator()` and `at` is that if a Scalar value is returned,
+`operator()` returns a reference to the value itself, while `at` returns a 0-rank tensor,
+whose only element is the value. Since references are maintained by Tensors, using `at` 
+is less efficient that `operator()` (if you don't the reference).
+
+```C++
+// returns a bool&, the (2, 2, 2, 2) slice of t0
+t0(2, 2, 2, 2) 
+// returns a 0-rank tenor, whose underlying value is the (2, 2, 2, 2) slice of t0
+t0.at(2, 2, 2, 2) 
+
+```
 
 
 #### Tensor mathematics
@@ -115,10 +142,14 @@ The test executable is located in ./test/, relative to the build directory. Afte
 ```
 
 Benchmarks are written with [Google benchmark](https://github.com/google/benchmark)
-The benchmark executable is located in ./benchmark/, relative to the build directory. After building, run the benchmarks with
+The benchmark executable is located in ./benchmark/, relative to the build directory. 
+To get an accurate benchmark, you may need to disable certain cpu power/performance features.
+You can run the benchmarks with:
 ```
+sudo cpupower frequency-set --governor performance # disable power save for linux systems
 ./benchmark/benchmarks # or 
 ./benchmark/benchmark_<unit>
+sudo cpupower frequency-set --governor powersave   # back to default mode
 ```
 
 ## Contributing

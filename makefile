@@ -1,9 +1,9 @@
 TEST_DIR := test
 BENCHMARK_DIR := benchmark
 
-CXX := g++
+CXX := clang++-3.5
 CXXFLAGS := -O3 -I./include -I./external -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD -g
-LINK := g++
+LINK := clang++-3.5
 LINKFLAGS := -g
 
 TEMPORARY_PATTERNS := *.o *~ *.d
@@ -33,9 +33,7 @@ run_test : ${TEST_OBJ}
 .PHONY : benchmark
 benchmark : LINKFLAGS += -lbenchmark -lpthread
 benchmark : run_benchmark
-	sudo cpupower frequency-set --governor performance
 	./run_benchmark --benchmark_out=benchmark.log --benchmark_out_format=json
-	sudo cpupower frequency-set --governor powersave
 	rm run_benchmark
 
 run_benchmark : $(BENCHMARK_OBJ)
