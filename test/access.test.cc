@@ -31,4 +31,12 @@ TEST_CASE("Tensor Access", "[int]") {
     Indices<4> indices({1, 1, 1, 1});
     REQUIRE(tensor_1[indices] == 1111);
   }
+
+  SECTION("at vs operator()") {
+    REQUIRE(typeid(tensor_1(1)) == typeid(tensor_1.at(1)));
+    REQUIRE(typeid(tensor_1(1, 1)) == typeid(tensor_1.at(1, 1)));
+    REQUIRE(typeid(tensor_1(1, 1, 1)) == typeid(tensor_1.at(1, 1, 1)));
+    REQUIRE(typeid(tensor_1(1, 1, 1, 1)) != typeid(tensor_1.at(1, 1, 1, 1)));
+    REQUIRE(typeid(int) == typeid(tensor_1(1,1,1,1)));
+  }
 }

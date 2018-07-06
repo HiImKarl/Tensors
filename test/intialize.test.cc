@@ -26,10 +26,10 @@ TEST_CASE("Intializing Tensors", "[int]") {
 
   SECTION("Rank and Dimensions") {
     REQUIRE(tensor_1.rank() == 4);
-    REQUIRE(tensor_1(1).rank() == 3);
-    REQUIRE(tensor_1(1, 1).rank() == 2);
-    REQUIRE(tensor_1(1, 1, 1).rank() == 1);
-    REQUIRE(tensor_1(1, 1, 1, 1).rank() == 0);
+    REQUIRE(tensor_1.at(1).rank() == 3);
+    REQUIRE(tensor_1.at(1, 1).rank() == 2);
+    REQUIRE(tensor_1.at(1, 1, 1).rank() == 1);
+    REQUIRE(tensor_1.at(1, 1, 1, 1).rank() == 0);
     for (int i = 1; i <= 4; ++i) REQUIRE(tensor_1.dimension(i) == i);
     for (int i = 1; i <= 3; ++i) REQUIRE(tensor_1(1).dimension(i) == i + 1);
   }
@@ -86,11 +86,17 @@ TEST_CASE("Intializing Tensors", "[int]") {
     auto naturals = Tensor<int32_t, 3>({2, 3, 4});
     std::deque<int32_t> container{};
     for (int i = 0; i < 24; ++i) container.push_back(i);
-    Fill(naturals, container);
+    Fill(naturals, container.begin(), container.end());
     for (size_t i = 1; i <= naturals.dimension(1); ++i)
       for (size_t j = 1; j <= naturals.dimension(2); ++j)
         for (size_t k = 1; k <= naturals.dimension(3); ++k)
           REQUIRE((size_t)naturals(i, j, k) == (i - 1) * 12 + (j - 1) * 4 + k - 1);
+
+    Fill(naturals, 1);
+    for (size_t i = 1; i <= naturals.dimension(1); ++i)
+      for (size_t j = 1; j <= naturals.dimension(2); ++j)
+        for (size_t k = 1; k <= naturals.dimension(3); ++k)
+          REQUIRE((size_t)naturals(i, j, k) == 1);
  }
 
  SECTION("Factory Method") {

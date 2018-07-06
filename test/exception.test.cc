@@ -43,8 +43,8 @@ TEST_CASE("Logic Errors") {
     Tensor<int32_t, 3> tensor_1({1, 2, 3});
     std::vector<int32_t> vec_incorrect(7, 0);
     std::vector<int32_t> vec_correct(6, 0);
-    REQUIRE_NOTHROW(Fill(tensor_1, vec_correct));
-    REQUIRE_THROWS_AS(Fill(tensor_1, vec_incorrect), std::logic_error);
+    REQUIRE_NOTHROW(Fill(tensor_1, vec_correct.begin(), vec_correct.end()));
+    REQUIRE_THROWS_AS(Fill(tensor_1, vec_incorrect.begin(), vec_incorrect.end()), std::logic_error);
   }
 
   SECTION("Iterator") {
