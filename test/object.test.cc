@@ -1,5 +1,5 @@
-#include "tensor.hh"
-#include "catch.hh"
+#include <tensor.hh>
+#include <catch.hh>
 
 template <int *ConstructorCounter, int *DestructorCounter>
 struct TestStruct {

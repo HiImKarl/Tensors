@@ -601,17 +601,16 @@ public:
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
-  template <typename X, size_t M>
-  friend Tensor<X, M> operator+(Tensor<X, M> const &tensor, X const &scalar);
+  template <typename X, typename Y, size_t M, typename FunctionType>
+  friend Tensor<X, M> elem_wise(Tensor<X, M> const &tensor, Y const &scalar,
+      FunctionType &&fn);
+
+  template <typename X, typename Y, size_t M, typename FunctionType>
+  friend Tensor<X, M> elem_wise(Tensor<X, M> const &tensor1, Tensor<Y, M> const &tensor_2,
+      FunctionType &&fn);
 
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
-
-  template <typename X, size_t M>
-  friend Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar);
-
-  template <typename X, size_t M>
-  friend Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor);
 
   template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
@@ -620,9 +619,6 @@ public:
    *  elements are equivalent to *this with operator-() applied.
    */
   Tensor<T, N> operator-() const;
-
-  template <typename X, size_t M>
-  friend Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar);
 
   /* ------------------ Print to ostream --------------- */
 
@@ -1544,26 +1540,32 @@ Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
   return sum_tensor;
 }
 
-/** Elementwise Scalar-Tensor addition. Returns a Tensor with shape 
- *  `tensor`, where each element of `tensor` is incremeneted with `scalar`.
+/** Elementwise Scalar-Tensor operation. Returns a Tensor with shape 
+ *  `tensor`, where each element of the new Tensor is the result of `fn` 
+ *  applied with the corresponding `tensor` elements and `scalar`.
  */
-template <typename X, size_t N>
-Tensor<X, N> operator+(Tensor<X, N> const &tensor, X const &scalar)
+template <typename X, typename Y, size_t M, typename FunctionType>
+Tensor<X, M> elem_wise(Tensor<X, M> const &tensor, Y const &scalar,
+      FunctionType &&fn)
 {
-  Tensor<X, N> result {tensor.shape()};
-  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
-    *lhs = scalar + *rhs;
+  Tensor<X, M> result {tensor.shape()};
+  std::function<void(X*, X*)> set_vals = [&scalar, &fn](X *lhs, X *rhs) -> void {
+    *lhs = fn(*rhs, scalar);
   };
   result.pUnaryMap(tensor, set_vals);
   return result;
 }
 
-
-/** See operator+(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t N>
-Tensor<X, N> operator+(X const &scalar, Tensor<X, N> const &tensor)
+template <typename X, typename Y, size_t M, typename FunctionType>
+Tensor<X, M> elem_wise(Tensor<X, M> const &tensor1, Tensor<Y, M> const &tensor2,
+      FunctionType &&fn)
 {
-  return tensor + scalar;
+  Tensor<X, M> result {tensor1.shape()};
+  std::function<void(X*, X*, Y*)> set_vals = [&fn](X *lhs, X *rhs1, Y *rhs2) -> void {
+    *lhs = fn(*rhs1, *rhs2);
+  };
+  result.pBinaryMap(tensor1, tensor2, set_vals);
+  return result;
 }
 
 

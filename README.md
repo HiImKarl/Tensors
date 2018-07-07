@@ -19,7 +19,7 @@ This is a multi-dimensional array library, where array rank must be known at com
 C++11 is the minimum C++ standard required to compile the library. Below is a list of compilers that has successfully ran the unit tests:
 
 The following compilers have succesfully built and ran the tests:
-* gcc 6.3+
+* gcc 6.4+
 * clang 3.5+
 
 ### Installation
