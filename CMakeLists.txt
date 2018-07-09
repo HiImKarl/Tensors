@@ -5,10 +5,15 @@ if((CMAKE_CXX_COMPILER_ID MATCHES GNU) OR (CMAKE_CXX_COMPILER_ID MATCHES clang))
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
+find_package(benchmark QUIET)
+
+if (benchmark_FOUND)
+	add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
+endif (benchmark_FOUND)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
 
-include (CTest)
+include(CTest)
 add_test(NAME run_tests COMMAND tests)
 
 add_custom_target(
