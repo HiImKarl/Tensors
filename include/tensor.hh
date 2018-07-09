@@ -519,7 +519,8 @@ public:
   /** Constructs a reference to the `proxy` tensor. The tensors share 
    *  the same underyling data, so changes will affect both tensors.
    */
-  Tensor(Tensor<T, N>::Proxy const &proxy); 
+
+	Tensor(typename Tensor<T, N>::Proxy const &proxy); 
 
   /** Constructs the tensor produced by the expression */
   template <typename NodeType,
@@ -863,7 +864,7 @@ public:
   Tensor<T, N> copy() const; 
 
   /** Returns a reference: only used to invoke reference constructor */
-  Tensor<T, N>::Proxy ref();
+  typename Tensor<T, N>::Proxy ref();
 
   template <typename U, size_t M, typename RAIt>
   friend void Fill(Tensor<U, M> &tensor, RAIt const &begin, RAIt const &end);
@@ -940,12 +941,12 @@ private:
 
   // Data mapping for pUnaryMap -- ASSUMES EQUAL SHAPES
   template <typename X, size_t M>
-  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::IndexReference &index1,
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], typename Tensor<T, N>::IndexReference &index1,
     typename Tensor<X, N>::IndexReference &index2);
 
   // Data mapping for pBinaryMap -- ASSUMES EQUAL SHAPES
   template <typename X, typename Y, size_t M>
-  static void pUpdateQuotas(size_t (&dim_quotas)[M], Tensor<T, N>::IndexReference &index1,
+  static void pUpdateQuotas(size_t (&dim_quotas)[M], typename Tensor<T, N>::IndexReference &index1,
     typename Tensor<X, N>::IndexReference &index2, 
     typename Tensor<Y, N>::IndexReference &index3);
 
@@ -1072,7 +1073,7 @@ Tensor<T, N>::Tensor(Tensor<T, N> &&tensor)
 }
 
 template <typename T, size_t N>
-Tensor<T, N>::Tensor(Tensor<T, N>::Proxy const &proxy)
+Tensor<T, N>::Tensor(typename Tensor<T, N>::Proxy const &proxy)
   : shape_(proxy.tensor_.shape_), data_(proxy.tensor_.data_), ref_(proxy.tensor_.ref_)
 {
   std::copy_n(proxy.tensor_.strides_, N, strides_);
@@ -2292,7 +2293,7 @@ public:
   /**< Moves data from `tensor`. `tensor` is destroyed. */
   Tensor(Tensor<T, 0> &&tensor);      
   /**< Constructs a Scalar who shares underlying data with proxy's underyling Scalar. */
-  Tensor(Tensor<T, 0>::Proxy const &proxy); 
+  Tensor(typename Tensor<T, 0>::Proxy const &proxy); 
   /**< Evaluates `expression` and move constructs from the resulting scalar */
   template <typename NodeType,
             typename = typename std::enable_if<NodeType::rank() == 0>::type>
@@ -2494,7 +2495,7 @@ public:
   Tensor<T, 0> copy() const;
 
   /** Returns a proxy object of `this`, used only for Tensor<T, 0>::Tensor(Tensor<T, 0>::Proxy const&) */
-  Tensor<T, 0>::Proxy ref();
+  typename Tensor<T, 0>::Proxy ref();
 
 private:
 
@@ -2542,7 +2543,7 @@ Tensor<T, 0>::Tensor(Tensor<T, 0> &&tensor): shape_(Shape<0>()), data_(tensor.da
 }
 
 template <typename T>
-Tensor<T, 0>::Tensor(Tensor<T, 0>::Proxy const &proxy)
+Tensor<T, 0>::Tensor(typename Tensor<T, 0>::Proxy const &proxy)
   : shape_(Shape<0>()), data_(proxy.tensor_.data_), ref_(proxy.tensor_.ref_)
 {}
 

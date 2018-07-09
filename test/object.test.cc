@@ -15,8 +15,8 @@ std::ostream& operator<<(std::ostream &os, TestStruct<i1, i2> const &T)
 }
 
 using namespace tensor;
-static int constructor_counter;
-static int destructor_counter;
+int constructor_counter;
+int destructor_counter;
 
 static Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> test_func()
 {

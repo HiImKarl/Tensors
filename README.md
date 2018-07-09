@@ -21,6 +21,7 @@ C++11 is the minimum C++ standard required to compile the library. Below is a li
 The following compilers have succesfully built and ran the tests:
 * gcc 6.4+
 * clang 3.5+
+* MSVC++ 19.10+
 
 ### Installation
 

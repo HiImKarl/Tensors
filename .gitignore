@@ -10,3 +10,4 @@ bin/
 build/
 makefile
 q
+Win32
