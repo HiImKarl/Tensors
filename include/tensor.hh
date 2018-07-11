@@ -47,6 +47,8 @@
   "Incorrect number of elements provided -- "
 #define ZERO_ELEMENT(CLASS) \
   CLASS " Cannot be constructed with a zero dimension"
+#define EXPECTING_C_ARRAY \
+  "Expecting argument to be a C-array"
 
 // Out of bounds
 #define DIMENSION_INVALID(METHOD) \
@@ -75,7 +77,7 @@
 
 // Arithmetic Operations
 #define RANK_MISMATCH(METHOD) \
-  METHOD "Failed -- Shapes have different ranks"
+  METHOD "Failed -- Expecting same rank"
 #define DIMENSION_MISMATCH(METHOD) \
   METHOD " Failed -- Shapes have different dimensions"
 #define INNER_DIMENSION_MISMATCH(METHOD) \
@@ -432,6 +434,21 @@ size_t Indices<N>::operator[](size_t index) const
   return indices_[index];
 }
 
+/** Proxy object used to construct 
+ *
+ */
+template <typename Array>
+struct _A {
+  _A(Array const &_value);
+  Array const &value;
+};
+
+template <typename Array>
+_A<Array>::_A(Array const &_value): value(_value)
+{
+  static_assert(std::is_array<Array>::value, EXPECTING_C_ARRAY);
+}
+
 template <typename T, size_t N>
 class Tensor: public Expression<Tensor<T, N>> { /*@Tensor<T, N>*/
 /** Any-rank array of type `T`, where rank `N` is a size_t template.
@@ -492,6 +509,13 @@ public:
   template <typename FunctionType, typename... Arguments>
   Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args);
 
+  /** Use a C multi-dimensional array to initialize the tensor. The
+   *  multi-dimensional array must be enclosed by the _A struct, and
+   *  be equal to the tensor's declared rank. 
+   */
+  template <typename Array>
+  Tensor(_A<Array> &&md_array);
+
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are zero initialized. Note: dimensions index from 1.
    */
@@ -520,7 +544,7 @@ public:
    *  the same underyling data, so changes will affect both tensors.
    */
 
-	Tensor(typename Tensor<T, N>::Proxy const &proxy); 
+  Tensor(typename Tensor<T, N>::Proxy const &proxy); 
 
   /** Constructs the tensor produced by the expression */
   template <typename NodeType,
@@ -926,7 +950,22 @@ private:
 
   /* ----------------- Utility -------------------- */
 
-  // Used to wrap the index with the Tensor when calling pUpdateQuotas
+  // Copy the dimensions of a C multi-dimensional array 
+  template <typename Array, size_t Index>
+  struct SetDimensions {
+    void operator()(size_t (&dimensions)[N]) {
+      dimensions[Index] = std::extent<Array, Index>::value;
+      SetDimensions<Array, Index + 1>{}(dimensions);
+    }
+  };
+
+  // Base condition
+  template <typename Array>
+  struct SetDimensions<Array, N> {
+    void operator()(size_t (&)[N]) {}
+  };
+
+  // Used to wrap the index with a Tensor reference when calling pUpdateQuotas
   struct IndexReference {
     template <typename X, size_t M> friend class Tensor;
     IndexReference(Tensor<T, N> const &_tensor)
@@ -1009,42 +1048,28 @@ Tensor<T, N>::Tensor(size_t const (&dimensions)[N], std::function<FunctionType> 
     if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeStrides();
   data_ = new T[shape_.index_product()];
-  std::function<void(T*)> value_setter = [&f, &args...](T *lhs) -> void {
-    *lhs = f(args...);
-  };
+  std::function<void(T*)> value_setter = 
+    [&f, &args...](T *lhs) -> void { *lhs = f(args...); };
   pMap(value_setter);
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
-/** Fills the elements of `tensor` with the elements between.
- *  `begin` and `end`, which must be random access iterators. The number 
- *  elements between `begin` and `end` must be equivalent to the capacity of
- *  `tensor`, otherwise std::logic_error is thrown.
- */
-template <typename U, size_t M, typename RAIt>
-void Fill(Tensor<U, M> &tensor, RAIt const &begin, RAIt const &end)
+template <typename T, size_t N>
+template <typename Array>
+Tensor<T, N>::Tensor(_A<Array> &&md_array)
 {
-  size_t cumul_sum = tensor.shape_.index_product();
-  auto dist_sum = std::distance(begin, end);
-  if (dist_sum > 0 && cumul_sum != (size_t)dist_sum)
-    throw std::logic_error(NELEMENTS);
-  RAIt it = begin;
-  std::function<void(U *)> allocate = [&it](U *x) -> void
-  {
-    *x = *it;
-    ++it;
-  };
-  tensor.pMap(allocate);
-}
-
-template <typename U, size_t M, typename X>
-void Fill(Tensor<U, M> &tensor, X const &value)
-{
-  std::function<void(U *)> allocate = [&value](U *x) -> void
-  {
-    *x = value;
-  };
-  tensor.pMap(allocate);
+  using ArrayType = typename std::remove_all_extents<Array>::type;
+  static_assert(std::rank<Array>::value == N, RANK_MISMATCH("Tensor::Tensor(_A&)"));
+  SetDimensions<Array, 0>{}(shape_.dimensions_);
+  pInitializeStrides();
+  data_ = new T[shape_.index_product()];
+  // Make use of the fact C multi-dimensional arrays are 
+  // allocated in memory contiguously
+  ArrayType *ptr = (ArrayType *)md_array.value;
+  std::function<void(T*)> value_setter = 
+    [&ptr](T *lhs) -> void { *lhs = *(ptr++); };
+  pMap(value_setter);
+  ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
 }
 
 template <typename T, size_t N>
@@ -1721,6 +1746,39 @@ template <typename T, size_t N>
 typename Tensor<T, N>::Proxy Tensor<T, N>::ref() 
 {
   return Proxy(*this);
+}
+
+/** Fills the elements of `tensor` with the elements between.
+ *  `begin` and `end`, which must be random access iterators. The number 
+ *  elements between `begin` and `end` must be equivalent to the capacity of
+ *  `tensor`, otherwise std::logic_error is thrown.
+ */
+template <typename U, size_t M, typename RAIt>
+void Fill(Tensor<U, M> &tensor, RAIt const &begin, RAIt const &end)
+{
+  size_t cumul_sum = tensor.shape_.index_product();
+  auto dist_sum = std::distance(begin, end);
+  if (dist_sum > 0 && cumul_sum != (size_t)dist_sum)
+    throw std::logic_error(NELEMENTS);
+  RAIt it = begin;
+  std::function<void(U *)> allocate = [&it](U *x) -> void
+  {
+    *x = *it;
+    ++it;
+  };
+  tensor.pMap(allocate);
+}
+
+/** Assigns to each element in Tensor the value `value`
+ */
+template <typename U, size_t M, typename X>
+void Fill(Tensor<U, M> &tensor, X const &value)
+{
+  std::function<void(U *)> allocate = [&value](U *x) -> void
+  {
+    *x = value;
+  };
+  tensor.pMap(allocate);
 }
 
 /** Returns a transposed Matrix, sharing the same underlying data as vec. If
@@ -3137,6 +3195,7 @@ operator*(typename NodeType::value_type const& scalar, Expression<NodeType> cons
 #undef NCONSTRUCTOR_0TENSOR
 #undef NELEMENTS
 #undef ZERO_ELEMENT
+#undef EXPECTING_C_ARRAY
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS

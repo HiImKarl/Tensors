@@ -82,6 +82,19 @@ TEST_CASE("Intializing Tensors", "[int]") {
           REQUIRE(twos(i, j, k) == 2);
  }
 
+ SECTION("C Multi-dimensional arrays") {
+    Tensor<int32_t, 3> naturals = _A<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}});
+    REQUIRE(naturals.rank() == 3);
+    REQUIRE(naturals.dimension(1) == 1);
+    REQUIRE(naturals.dimension(2) == 6);
+    REQUIRE(naturals.dimension(3) == 2);
+    int counter = 0;
+    for (size_t i = 1; i <= naturals.dimension(1); ++i)
+      for (size_t j = 1; j <= naturals.dimension(2); ++j)
+        for (size_t k = 1; k <= naturals.dimension(3); ++k)
+          REQUIRE(naturals(i, j, k) == ++counter);
+ }
+
  SECTION("Fill Method") {
     auto naturals = Tensor<int32_t, 3>({2, 3, 4});
     std::deque<int32_t> container{};
@@ -112,7 +125,6 @@ TEST_CASE("Intializing Tensors", "[int]") {
         for (size_t k = 1; k <= naturals.dimension(3); ++k)
           REQUIRE((size_t)naturals(i, j, k) == (i - 1) * 12 + (j - 1) * 4 + k - 1);
  }
-
 }
 
 TEST_CASE("Initializing Scalars") {
