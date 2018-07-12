@@ -964,17 +964,17 @@ private:
   /* ----------------- Utility -------------------- */
 
   // Copy the dimensions of a C multi-dimensional array 
-  template <typename Array, size_t Index>
+  template <typename Array, size_t Index, size_t Limit>
   struct SetDimensions {
     void operator()(size_t (&dimensions)[N]) {
       dimensions[Index] = std::extent<Array, Index>::value;
-      SetDimensions<Array, Index + 1>{}(dimensions);
+      SetDimensions<Array, Index + 1, Limit>{}(dimensions);
     }
   };
-
+	
   // Base condition
-  template <typename Array>
-  struct SetDimensions<Array, N> {
+  template <typename Array, size_t Limit>
+  struct SetDimensions<Array, Limit, Limit> {
     void operator()(size_t (&)[N]) {}
   };
 
@@ -1071,7 +1071,7 @@ Tensor<T, N>::Tensor(_A<Array> &&md_array)
 {
   using ArrayType = typename std::remove_all_extents<Array>::type;
   static_assert(std::rank<Array>::value == N, RANK_MISMATCH("Tensor::Tensor(_A&)"));
-  SetDimensions<Array, 0>{}(shape_.dimensions_);
+  SetDimensions<Array, 0, N>{}(shape_.dimensions_);
   pInitializeStrides();
   data_ = new T[shape_.index_product()];
   // Make use of the fact C multi-dimensional arrays are 
