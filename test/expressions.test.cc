@@ -4,8 +4,8 @@
 using namespace tensor;
 
 TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
-  auto tensor_1 = Tensor<int32_t, 3>({2, 3, 4});
-  auto tensor_2 = Tensor<int32_t, 3>({2, 3, 4});
+  auto tensor_1 = Tensor<int32_t, 3>{2, 3, 4};
+  auto tensor_2 = Tensor<int32_t, 3>{2, 3, 4};
   for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
     for (size_t j = 1; j <= tensor_1.dimension(2); ++j)
       for (size_t k = 1; k <= tensor_1.dimension(3); ++k)
@@ -134,8 +134,8 @@ TEST_CASE("Elementwise Arithmatic") {
 }
 
 TEST_CASE("Tensor Multplication") {
-  auto tensor_1 = Tensor<int32_t, 3>({2, 3, 4});
-  auto tensor_2 = Tensor<int32_t, 3>({4, 3, 2});
+  auto tensor_1 = Tensor<int32_t, 3>{2, 3, 4};
+  auto tensor_2 = Tensor<int32_t, 3>{4, 3, 2};
   for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
     for (size_t j = 1; j <= tensor_1.dimension(2); ++j)
       for (size_t k = 1; k <= tensor_1.dimension(3); ++k)
@@ -202,7 +202,7 @@ TEST_CASE("Tensor Multplication") {
   }
 }
 TEST_CASE("Miscillaneous") {
-  auto tensor = Tensor<int32_t, 4>({2, 4, 6, 8});
+  auto tensor = Tensor<int32_t, 4>{2, 4, 6, 8};
   for (size_t i = 1; i <= tensor.dimension(1); ++i)
     for (size_t j = 1; j <= tensor.dimension(2); ++j)
       for (size_t k = 1; k <= tensor.dimension(3); ++k)

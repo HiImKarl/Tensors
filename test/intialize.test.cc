@@ -7,7 +7,7 @@ using namespace tensor;
 TEST_CASE("Intializing Tensors", "[int]") {
 
   /*     -- Tensor Initialization --   */
-  auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
+  auto tensor_1 = Tensor<int32_t, 4>{1, 2, 3, 4};
 
   // Initialize values
   for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
@@ -96,7 +96,7 @@ TEST_CASE("Intializing Tensors", "[int]") {
  }
 
  SECTION("Fill Method") {
-    auto naturals = Tensor<int32_t, 3>({2, 3, 4});
+    auto naturals = Tensor<int32_t, 3>{2, 3, 4};
     std::deque<int32_t> container{};
     for (int i = 0; i < 24; ++i) container.push_back(i);
     Fill(naturals, container.begin(), container.end());
@@ -119,7 +119,7 @@ TEST_CASE("Intializing Tensors", "[int]") {
       return count - x;
     };
 
-    auto naturals = Tensor<int32_t, 3>(Shape<3>({2, 3, 4}), factory, 1);
+    auto naturals = Tensor<int32_t, 3>(Shape<3>{2, 3, 4}, factory, 1);
     for (size_t i = 1; i <= naturals.dimension(1); ++i)
       for (size_t j = 1; j <= naturals.dimension(2); ++j)
         for (size_t k = 1; k <= naturals.dimension(3); ++k)

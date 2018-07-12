@@ -7,7 +7,7 @@ using namespace tensor;
 TEST_CASE("Tensor Access", "[int]") {
 
   //     -- Tensor Initialization --   
-  auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
+  auto tensor_1 = Tensor<int32_t, 4>{1, 2, 3, 4};
 
   // Initialize values
   for (size_t i = 1; i <= tensor_1.dimension(1); ++i)

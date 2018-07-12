@@ -7,6 +7,7 @@
 #include <exception>
 #include <utility>
 #include <type_traits>
+#include <initializer_list>
 #include <numeric>
 #include <functional>
 #include <memory>
@@ -264,7 +265,7 @@ public:
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Shape(size_t const (&dimensions)[N]); /**< size_t[] constructor */
+  explicit Shape(std::initializer_list<size_t> dimensions); /**< initializer_list constructor */
   Shape(Shape<N> const &shape);                  /**< Copy constructor */
 
   /* ------------------ Assignment -------------------- */
@@ -330,25 +331,37 @@ private:
 
   // FIXME :: dumb hack to avoid ambiguous overload
   Shape(size_t const *dimensions, int);  
+  Shape(size_t const (&dimensions)[N]); 
   Shape() = default;                      
 };
 
 template <size_t N>
-Shape<N>::Shape(size_t const (&dimensions)[N])
+Shape<N>::Shape(std::initializer_list<size_t> dimensions)
 {
-  for (size_t i = 0; i < N; ++i) 
-    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Shape"));
-  std::copy_n(dimensions, N, dimensions_);
+  if (dimensions.size() != N) throw std::logic_error(RANK_MISMATCH("Shape::Shape(std::initializer_list)"));
+  size_t *shape_ptr = dimensions_;
+  for (size_t dim : dimensions) {
+    if (!dim) throw std::logic_error(ZERO_ELEMENT("Shape"));
+    *(shape_ptr++) = dim;
+  }
 }
 
 template <size_t N>
 Shape<N>::Shape(Shape const &shape)
 {
+  for (size_t i = 0; i < N; ++i) if (!shape.dimensions_[i]) 
+    throw std::logic_error(ZERO_ELEMENT("Shape"));
   std::copy_n(shape.dimensions_, N, dimensions_);
 }
 
 template <size_t N>
 Shape<N>::Shape(size_t const *dimensions, int)
+{
+  std::copy_n(dimensions, N, dimensions_);
+}
+
+template <size_t N>
+Shape<N>::Shape(size_t const (&dimensions)[N])
 {
   std::copy_n(dimensions, N, dimensions_);
 }
@@ -495,7 +508,7 @@ public:
   /** Creates a Tensor with dimensions described by `dimensions`.
    *  Elements are zero initialized. Note: dimensions index from 1.
    */
-  explicit Tensor(size_t const (&dimensions)[N]);
+  explicit Tensor(std::initializer_list<size_t> dimensions);
 
   /** Creates a Tensor with dimensions described by `dimensions`.
    *  Elements are copy initialized to value. Note: dimensions index from 1.
@@ -519,7 +532,7 @@ public:
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are zero initialized. Note: dimensions index from 1.
    */
-  explicit Tensor(Shape<N> const &shape): Tensor(shape.dimensions_) {}
+  explicit Tensor(Shape<N> const &shape);
 
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are copy initialized to value. Note: dimensions index from 1.
@@ -1017,12 +1030,10 @@ private:
 /* ----------------------------- Constructors ------------------------- */
 
 template <typename T, size_t N>
-Tensor<T, N>::Tensor(size_t const (&dimensions)[N])
+Tensor<T, N>::Tensor(std::initializer_list<size_t> dimensions)
   : shape_(Shape<N>(dimensions)), data_(new T[shape_.index_product()]),
   ref_(data_, _ARRAY_DELETER(T))
 { 
-  for (size_t i = 0; i < N; ++i) 
-    if (!dimensions[i]) throw std::logic_error(ZERO_ELEMENT("Tensor"));
   pInitializeStrides(); 
 }
 
@@ -1070,6 +1081,14 @@ Tensor<T, N>::Tensor(_A<Array> &&md_array)
     [&ptr](T *lhs) -> void { *lhs = *(ptr++); };
   pMap(value_setter);
   ref_ = std::shared_ptr<T>(data_, _ARRAY_DELETER(T));
+}
+
+template <typename T, size_t N>
+Tensor<T, N>::Tensor(Shape<N> const &shape)
+  : shape_(shape), data_(new T[shape_.index_product()]),
+  ref_(data_, _ARRAY_DELETER(T))
+{
+  pInitializeStrides();
 }
 
 template <typename T, size_t N>
