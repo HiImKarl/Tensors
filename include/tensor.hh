@@ -107,7 +107,7 @@ namespace tensor {
 /* --------------- Forward Declerations --------------- */
 
 template <size_t N> class Shape;
-template <typename T, size_t N = 0> class Tensor;
+template <typename T, size_t N> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
 template <typename LHS, typename RHS> class BinarySub;
 template <typename LHS, typename RHS> class BinaryMul;
@@ -329,9 +329,7 @@ private:
 
   /* --------------- Constructor --------------- */
 
-  // FIXME :: dumb hack to avoid ambiguous overload
-  Shape(size_t const *dimensions, int);  
-  Shape(size_t const (&dimensions)[N]); 
+  Shape(size_t const *dimensions);
   Shape() = default;                      
 };
 
@@ -355,13 +353,7 @@ Shape<N>::Shape(Shape const &shape)
 }
 
 template <size_t N>
-Shape<N>::Shape(size_t const *dimensions, int)
-{
-  std::copy_n(dimensions, N, dimensions_);
-}
-
-template <size_t N>
-Shape<N>::Shape(size_t const (&dimensions)[N])
+Shape<N>::Shape(size_t const *dimensions)
 {
   std::copy_n(dimensions, N, dimensions_);
 }
@@ -971,7 +963,7 @@ private:
       SetDimensions<Array, Index + 1, Limit>{}(dimensions);
     }
   };
-	
+  
   // Base condition
   template <typename Array, size_t Limit>
   struct SetDimensions<Array, Limit, Limit> {
@@ -1552,7 +1544,7 @@ void Tensor<T, N>::pInitializeStrides()
 
 template <typename T, size_t N>
 Tensor<T, N>::Tensor(size_t const *dimensions, T *data, std::shared_ptr<T> &&ref)
-  : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
+  : shape_(Shape<N>(dimensions)), data_(data), ref_(std::move(ref))
 {
   pInitializeStrides();
 }
@@ -1560,7 +1552,7 @@ Tensor<T, N>::Tensor(size_t const *dimensions, T *data, std::shared_ptr<T> &&ref
 // private constructors
 template <typename T, size_t N>
 Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, std::shared_ptr<T> &&ref)
-  : shape_(Shape<N>(dimensions, 0)), data_(data), ref_(std::move(ref))
+  : shape_(Shape<N>(dimensions)), data_(data), ref_(std::move(ref))
 {
   std::copy_n(strides, N, strides_);
 }
@@ -2414,19 +2406,33 @@ public:
 
   /* ------------ Equivalence ------------ */
 
+  /** Equivalence between underlying data */
   bool operator==(Tensor<T, 0> const& tensor) const { return *data_ == *(tensor.data_); }
+
+  /** Non-equivalence between underlying data */
   bool operator!=(Tensor<T, 0> const& tensor) const { return !(*this == tensor); }
+
+  /** Equivalence between underlying data */
   template <typename X>
   bool operator==(Tensor<X, 0> const& tensor) const { return *data_ == *(tensor.data_); }
+
+  /** Non-equivalence between underlying data */
   template <typename X>
   bool operator!=(Tensor<X, 0> const& tensor) const { return !(*this == tensor); }
 
+  /** Equivalence Scalar with an element of a type default-convertible 
+   *  to the underlying data type.
+   */
   template <typename X,
             typename = typename std::enable_if
             <std::is_convertible
             <typename std::remove_reference<T>::type,
             typename std::remove_reference<X>::type>::value>::type
   > bool operator==(X val) const;
+
+  /** Non-equivalence Scalar with an element of a type default-convertible 
+   *  to the underlying data type.
+   */
   template <typename X,
             typename = typename std::enable_if
             <std::is_convertible
@@ -2446,11 +2452,6 @@ public:
   friend Tensor<X, 0> multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
   Tensor<T, 0> operator-() const;
-
-  /* ---------- Type Conversion ----------- */
-
-  operator T &() { return *data_; }
-  operator T const&() const { return *data_; }
 
   /* ---------------- Iterator -------------- */
 

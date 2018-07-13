@@ -147,15 +147,15 @@ TEST_CASE("Tensor Assignment", "[int]") {
   }
 
   SECTION("Assigning Scalar Tensors to Tensors") {
-    Tensor<int32_t> scalar_1(0);
-    tensor_1(1, 1, 1, 1) = scalar_1;
+    Scalar<int32_t> scalar_1(0);
+    tensor_1(1, 1, 1, 1) = scalar_1();
     REQUIRE(tensor_1(1, 1, 1, 1) == 0);
-    REQUIRE(tensor_1(1, 1, 1, 1) == scalar_1);
+    REQUIRE(tensor_1(1, 1, 1, 1) == scalar_1());
 
-    Tensor<double> scalar_2(-12);
-    tensor_1(1, 1, 1, 1) = scalar_2;
+    Scalar<double> scalar_2(-12);
+    tensor_1(1, 1, 1, 1) = scalar_2();
     REQUIRE(tensor_1(1, 1, 1, 1) == -12);
-    REQUIRE(tensor_1(1, 1, 1, 1) == scalar_2);
+    REQUIRE(tensor_1(1, 1, 1, 1) == scalar_2());
   }
 
   SECTION("Assigning Tensors to Lvalues") {
@@ -173,7 +173,7 @@ TEST_CASE("Scalar Assignment", "[int]") {
   auto tensor_1 = Tensor<int32_t, 4>({1, 2, 3, 4});
 
   // Initialize a scalar tensor;
-  Tensor<int32_t> stensor_1{};
+  Scalar<int32_t> stensor_1{};
 
   // Initialize values
   for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
@@ -281,9 +281,9 @@ TEST_CASE("Scalar Assignment", "[int]") {
   }
 
   SECTION("Assigning Scalar Tensors to Tensors") {
-    tensor_1(1, 1, 1, 1) = stensor_1;
+    tensor_1(1, 1, 1, 1) = stensor_1();
     REQUIRE(tensor_1(1, 1, 1, 1) == 0);
-    REQUIRE(tensor_1(1, 1, 1, 1) == stensor_1);
+    REQUIRE(tensor_1(1, 1, 1, 1) == stensor_1());
   }
 
   SECTION("Assigning Scalar Values to Scalar Tensors") {
@@ -298,7 +298,7 @@ TEST_CASE("Scalar Assignment", "[int]") {
   }
 
   SECTION("Assigning Scalar Tensors to Lvalues") {
-    int32_t VALUE = stensor_1;
+    int32_t VALUE = stensor_1();
     REQUIRE(VALUE == 0);
   }
 }

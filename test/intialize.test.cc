@@ -131,8 +131,8 @@ TEST_CASE("Initializing Scalars") {
 
   /*     -- Tensor Initialization --   */
 
-  Tensor<int32_t> scalar_1{};       // Initialize a scalar tensor;
-  Tensor<int32_t> scalar_2(0);      // Initialize and assign in the same expression
+  Scalar<int32_t> scalar_1{};       // Initialize a scalar tensor;
+  Scalar<int32_t> scalar_2(0);      // Initialize and assign in the same expression
 
   /*     --------------------------   */
 

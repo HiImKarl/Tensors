@@ -23,7 +23,7 @@ TEST_CASE("Shapes") {
   }
 
   SECTION("Scalar Constructor") {
-    auto tensor = Tensor<int>(scalar_shape);
+    auto tensor = Scalar<int>(scalar_shape);
     REQUIRE(tensor.rank() == 0);
     REQUIRE(tensor() == 0);
   }

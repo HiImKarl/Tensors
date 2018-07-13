@@ -44,7 +44,7 @@ TEST_CASE("Single Tensor") {
   }
 
   SECTION("Single Scalar Constructor") {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>> scalar{};
+    Scalar<TestStruct<&constructor_counter, &destructor_counter>> scalar{};
     REQUIRE(constructor_counter == 1);
   }
 }

@@ -58,8 +58,8 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
 }
 
 TEST_CASE("Scalar Arithmatic") {
-  auto tensor_1 = Tensor<int32_t>(10);
-  auto tensor_2 = Tensor<int32_t>(-10);
+  auto tensor_1 = Scalar<int32_t>(10);
+  auto tensor_2 = Scalar<int32_t>(-10);
 
   SECTION("Binary Addition/Subtract") {
     REQUIRE(tensor_1() + tensor_2() == 0);
@@ -70,10 +70,10 @@ TEST_CASE("Scalar Arithmatic") {
     REQUIRE(10 + tensor_1 == 20);
     REQUIRE(tensor_1 - 10 == 0);
 
-    Tensor<int32_t> tensor_3 = tensor_1 + tensor_2;
+    Scalar<int32_t> tensor_3 = tensor_1 + tensor_2;
     REQUIRE(tensor_3 == 0);
 
-    Tensor<int32_t> tensor_4 = tensor_1 - tensor_2;
+    Scalar<int32_t> tensor_4 = tensor_1 - tensor_2;
     REQUIRE(tensor_4 == 20);
   }
 
@@ -89,7 +89,7 @@ TEST_CASE("Scalar Arithmatic") {
     REQUIRE((tensor_1 * tensor_2)() == -100);
     REQUIRE(tensor_1 * 4 == 40);
 
-    Tensor<int32_t> tensor_3 = tensor_1 * tensor_2;
+    Scalar<int32_t> tensor_3 = tensor_1 * tensor_2;
     REQUIRE(tensor_3 == -100);
   }
 
