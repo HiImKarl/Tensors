@@ -55,6 +55,21 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
         for (size_t k = 1; k <= tensor_3.dimension(3); ++k)
           REQUIRE(tensor_3(i, j, k) == (int)(-100000 * i + -10000 * j + -1000 * k));
   }
+
+  SECTION("Assignment Arithmetic:") {
+    tensor_1 = tensor_1 + tensor_2;
+    for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_1.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_1.dimension(3); ++k)
+          REQUIRE(tensor_1(i, j, k) == (int)(100100 * i + 10010 * j + 1001 * k));
+
+    tensor_1 = tensor_1 - tensor_2;
+
+    for (size_t i = 1; i <= tensor_1.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_1.dimension(2); ++j)
+        for (size_t k = 1; k <= tensor_1.dimension(3); ++k)
+          REQUIRE(tensor_1(i, j, k) == (int)(100000 * i + 10000 * j + 1000 * k));
+  }
 }
 
 TEST_CASE("Scalar Arithmatic") {
@@ -91,6 +106,29 @@ TEST_CASE("Scalar Arithmatic") {
 
     Scalar<int32_t> tensor_3 = tensor_1 * tensor_2;
     REQUIRE(tensor_3 == -100);
+  }
+
+  SECTION("Assignment arithmetic") {
+    tensor_1 += 10;
+    REQUIRE(tensor_1() == 20);
+    tensor_1 -= 10;
+    REQUIRE(tensor_1() == 10);
+    tensor_1 *= 10;
+    REQUIRE(tensor_1() == 100);
+    tensor_1 += tensor_2;
+    REQUIRE(tensor_1() == 90);
+    tensor_1 -= tensor_2;
+    REQUIRE(tensor_1() == 100);
+    tensor_1 /= tensor_2;
+    REQUIRE(tensor_1() == -10);
+    tensor_1 += tensor_1 + tensor_2;
+    REQUIRE(tensor_1() == -30);
+    tensor_1 -= tensor_1 + tensor_2;
+    REQUIRE(tensor_1() == 10);
+    tensor_1 *= tensor_1 - tensor_2;
+    REQUIRE(tensor_1() == 200);
+    tensor_1 /= tensor_1 + 10 * tensor_2;
+    REQUIRE(tensor_1() == 2);
   }
 
   SECTION("Negation") {
@@ -174,7 +212,7 @@ TEST_CASE("Tensor Multplication") {
     REQUIRE(tensor_5.dimension(3) == 3);
     REQUIRE(tensor_5.dimension(4) == 2);
 
-    Tensor<int32_t, 2> tensor_6({2, 2});
+    Tensor<int32_t, 2> tensor_6{2, 2};
     tensor_6(1, 1) = 2;
     tensor_6(1, 2) = 1;
     tensor_6(2, 1) = 3;
@@ -200,7 +238,18 @@ TEST_CASE("Tensor Multplication") {
       for (size_t j = 1; j <= tensor_4.dimension(2); ++j)
         REQUIRE(tensor_4(i, j) == 0);
   }
+
+  SECTION("Assignment Arithmetic") {
+    Tensor<int32_t, 2> tensor_3 = _A<int[2][2]>({{2, 3}, {4, 5}});
+    Tensor<int32_t, 2> tensor_4 = _A<int[2][2]>({{6, 7}, {8, 9}});
+    tensor_3 = tensor_3 * tensor_4 + tensor_4;
+    int correct_vals[2][2] = {{42, 48}, {72, 82}};
+    for (size_t i = 1; i <= tensor_3.dimension(1); ++i)
+      for (size_t j = 1; j <= tensor_3.dimension(2); ++j)
+        REQUIRE(tensor_3(i, j) == correct_vals[i - 1][j - 1]);
+  }
 }
+
 TEST_CASE("Miscillaneous") {
   auto tensor = Tensor<int32_t, 4>{2, 4, 6, 8};
   for (size_t i = 1; i <= tensor.dimension(1); ++i)

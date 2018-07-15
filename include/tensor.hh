@@ -79,6 +79,8 @@
 // Arithmetic Operations
 #define RANK_MISMATCH(METHOD) \
   METHOD "Failed -- Expecting same rank"
+#define EXPECTED_SCALAR(METHOD) \
+  METHOD "Failed -- Expecting Scalar"
 #define DIMENSION_MISMATCH(METHOD) \
   METHOD " Failed -- Shapes have different dimensions"
 #define INNER_DIMENSION_MISMATCH(METHOD) \
@@ -153,6 +155,20 @@ struct IsScalar<Tensor<T, 0>> { static bool const value = true; };
  */
 template <typename T, size_t N>
 struct IsScalar<Tensor<T, N>> { static bool const value = false; };
+
+/** Provides `value` equal to the rank of `type`, 0 
+ *  if not a tensor::Tensor type (C mutli-dimensional arrays 
+ *  are considered to be rank 0 in this context)
+ */
+template <typename T>
+struct Rank { enum: size_t { value = 0 }; };
+
+/** Provides `value` equal to the rank of `type`, 0 
+ *  if not a tensor::Tensor type (C mutli-dimensional arrays 
+ *  are considered to be rank 0 in this context)
+ */
+template <typename T, size_t N>
+struct Rank<Tensor<T, N>> { enum: size_t { value = N }; };
 
 /** Tensor member `value` is a wrapper for input `val` if val is
  *  a Tensor, o.w. `value` is a reference to Tensor `val`
@@ -628,22 +644,46 @@ public:
 
   /* -------------------- Expressions ------------------- */
 
-  template <typename X, typename Y, size_t M>
-  friend Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
-
   template <typename X, typename Y, size_t M, typename FunctionType>
   friend Tensor<X, M> elem_wise(Tensor<X, M> const &tensor, Y const &scalar,
       FunctionType &&fn);
 
   template <typename X, typename Y, size_t M, typename FunctionType>
-  friend Tensor<X, M> elem_wise(Tensor<X, M> const &tensor1, Tensor<Y, M> const &tensor_2,
-      FunctionType &&fn);
+  friend Tensor<X, M> elem_wise(Tensor<X, M> const &tensor1, Tensor<Y, M> const &tensor_2, FunctionType &&fn);
+
+  template <typename X, typename Y, size_t M>
+  friend Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
+
+  template <typename RHS>
+  Tensor<T, N> &operator+=(Expression<RHS> const &rhs);
+
+  /* FIXME
+  template <typename X>
+  Tensor<T, N> &operator+=(Tensor<T, N> const &scalar);
+  */
+
 
   template <typename X, typename Y, size_t M>
   friend Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2);
 
+  template <typename RHS>
+  Tensor<T, N> &operator-=(Expression<RHS> const &rhs);
+
+  /* FIXME
+  template <typename X>
+  Tensor<T, N> &operator-=(Tensor<T, N> const &scalar);
+  */
+
   template <typename X, typename Y, size_t M1, size_t M2>
   friend Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> const& tensor_2);
+
+  template <typename RHS>
+  Tensor<T, N> &operator*=(Expression<RHS> const &rhs);
+
+  /* FIXME
+  template <typename X>
+  Tensor<T, N> &operator*=(Tensor<T, N> const &scalar);
+  */
 
   /** Allocates a Tensor with shape equivalent to *this, and whose
    *  elements are equivalent to *this with operator-() applied.
@@ -1560,23 +1600,6 @@ Tensor<T, N>::Tensor(size_t const *dimensions, size_t const *strides, T *data, s
 
 /* -------------------------- Expressions -------------------------- */
 
-/** Creates a Tensor whose elements are the elementwise sum of `tensor1` 
- *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
- *  a std::logic_error is thrown. 
- */
-template <typename X, typename Y, size_t M>
-Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
-{
-  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("add(Tensor const&, Tensor const&)"));
-  Tensor<X, M> sum_tensor(tensor_1.shape_);
-  std::function<void(X *, X*, Y*)> add = [](X *x, X *y, Y *z) -> void
-  {
-    *x = *y + *z;
-  };
-  sum_tensor.pBinaryMap(tensor_1, tensor_2, add);
-  return sum_tensor;
-}
-
 /** Elementwise Scalar-Tensor operation. Returns a Tensor with shape 
  *  `tensor`, where each element of the new Tensor is the result of `fn` 
  *  applied with the corresponding `tensor` elements and `scalar`.
@@ -1605,6 +1628,33 @@ Tensor<X, M> elem_wise(Tensor<X, M> const &tensor1, Tensor<Y, M> const &tensor2,
   return result;
 }
 
+/** Creates a Tensor whose elements are the elementwise sum of `tensor1` 
+ *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+ *  a std::logic_error is thrown. 
+ */
+template <typename X, typename Y, size_t M>
+Tensor<X, M> add(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2)
+{
+  if (tensor_1.shape_ != tensor_2.shape_) throw std::logic_error(DIMENSION_MISMATCH("add(Tensor const&, Tensor const&)"));
+  Tensor<X, M> sum_tensor(tensor_1.shape_);
+  std::function<void(X *, X*, Y*)> add = [](X *x, X *y, Y *z) -> void
+  {
+    *x = *y + *z;
+  };
+  sum_tensor.pBinaryMap(tensor_1, tensor_2, add);
+  return sum_tensor;
+}
+
+template <typename T, size_t N>
+template <typename RHS>
+Tensor<T, N> &Tensor<T, N>::operator+=(Expression<RHS> const &rhs)
+{
+  auto tensor = rhs.self()();
+  if (shape_ != tensor.shape_)
+      throw std::logic_error(DIMENSION_MISMATCH("Tensor<T, N>::operator+=(Expression<RHS> const&)"));
+  *this = *this + tensor;
+  return *this;
+}
 
 /** Creates a Tensor whose elements are the elementwise difference of `tensor1` 
  *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
@@ -1623,32 +1673,16 @@ Tensor<X, M> subtract(Tensor<X, M> const& tensor_1, Tensor<Y, M> const& tensor_2
   return diff_tensor;
 }
 
-/** Elementwise Scalar-Tensor subtraction. Returns a Tensor with shape 
- *  `tensor`, where each element of `tensor` is subtracted by `scalar`.
- */
-template <typename X, size_t M>
-Tensor<X, M> operator-(Tensor<X, M> const &tensor, X const &scalar)
+template <typename T, size_t N>
+template <typename RHS>
+Tensor<T, N> &Tensor<T, N>::operator-=(Expression<RHS> const &rhs)
 {
-  Tensor<X, M> result {tensor.shape()};
-  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
-    *lhs = *rhs - scalar;
-  };
-  result.pUnaryMap(tensor, set_vals);
-  return result;
+  auto tensor = rhs.self()();
+  if (shape_ != tensor.shape_)
+      throw std::logic_error(DIMENSION_MISMATCH("Tensor<T, N>::operator-=(Expression<RHS> const&)"));
+  *this = *this - tensor;
+  return *this;
 }
-
-/** See operator-(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t M>
-Tensor<X, M> operator-(X const &scalar, Tensor<X, M> const &tensor)
-{
-  Tensor<X, M> result {tensor.shape()};
-  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
-    *lhs = scalar - *rhs;
-  };
-  result.pUnaryMap(tensor, set_vals);
-  return result;
-}
-
 
 /** Produces a Tensor which is the Tensor product of `tensor_1` and 
  *  `tensor_2`. Tensor multiplication is equivalent to matrix multiplication
@@ -1693,25 +1727,13 @@ Tensor<X, M1 + M2 - 2> multiply(Tensor<X, M1> const& tensor_1, Tensor<Y, M2> con
   return prod_tensor;
 }
 
-/** Elementwise Scalar-Tensor multiplication. Returns a Tensor with shape 
- *  `tensor`, where each element of `tensor` is multiplied by `scalar`.
- */
-template <typename X, size_t M>
-Tensor<X, M> operator*(Tensor<X, M> const &tensor, X const &scalar)
+template <typename T, size_t N>
+template <typename RHS>
+Tensor<T, N> &Tensor<T, N>::operator*=(Expression<RHS> const &rhs)
 {
-  Tensor<X, M> result {tensor.shape()};
-  std::function<void(X*, X*)> set_vals = [&scalar](X *lhs, X *rhs) -> void {
-    *lhs = scalar * *rhs;
-  };
-  result.pUnaryMap(tensor, set_vals);
-  return result;
-}
-
-/** See operator*(Tensor<X, N> const &tensor, X const &scalar) */
-template <typename X, size_t N>
-Tensor<X, N> operator*(X const &scalar, Tensor<X, N> const &tensor)
-{
-  return tensor * scalar;
+  auto tensor = rhs.self()();
+  *this = *this * tensor;
+  return *this;
 }
 
 template <typename T, size_t N>
@@ -2445,11 +2467,31 @@ public:
   template <typename X, typename Y>
   friend Tensor<X, 0> add(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
+  template <typename RHS>
+  Tensor<T, 0> &operator+=(Expression<RHS> const &rhs);
+
+  Tensor<T, 0> &operator+=(T const &scalar);
+
   template <typename X, typename Y>
   friend Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
 
+  template <typename RHS>
+  Tensor<T, 0> &operator-=(Expression<RHS> const &rhs);
+
+  Tensor<T, 0> &operator-=(T const &scalar);
+
   template <typename X, typename Y>
   friend Tensor<X, 0> multiply(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2);
+
+  template <typename RHS>
+  Tensor<T, 0> &operator*=(Expression<RHS> const &rhs);
+
+  Tensor<T, 0> &operator*=(T const &scalar);
+
+  template <typename RHS>
+  Tensor<T, 0> &operator/=(Expression<RHS> const &rhs);
+
+  Tensor<T, 0> &operator/=(T const &scalar);
 
   Tensor<T, 0> operator-() const;
 
@@ -2692,6 +2734,23 @@ Tensor<X, 0> operator+(X const &scalar, Tensor<X, 0> const &tensor)
   return Tensor<X, 0>(tensor() + scalar);
 }
 
+template <typename T>
+template <typename RHS>
+Tensor<T, 0> &Tensor<T, 0>::operator+=(Expression<RHS> const &rhs)
+{
+  auto scalar = rhs.self()();
+  static_assert(Rank<decltype(scalar)>::value == 0, EXPECTED_SCALAR("Tensor<T, 0>::operator+=(Expression<RHS> const&)"));
+  *this = *this + scalar;
+  return *this;
+}
+
+template <typename T>
+Tensor<T, 0> &Tensor<T, 0>::operator+=(T const &scalar)
+{
+  *data_ += scalar;
+  return *this;
+}
+
 template <typename X, typename Y>
 Tensor<X, 0> subtract(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
 {
@@ -2714,6 +2773,24 @@ Tensor<X, 0> operator-(X const &scalar, Tensor<X, 0> const &tensor)
   return Tensor<X, 0>(scalar - tensor());
 }
 
+template <typename T>
+template <typename RHS>
+Tensor<T, 0> &Tensor<T, 0>::operator-=(Expression<RHS> const &rhs)
+{
+  auto scalar = rhs.self()();
+  static_assert(Rank<decltype(scalar)>::value == 0, 
+      EXPECTED_SCALAR("Tensor<T, 0>::operator-=(Expression<RHS> const&)"));
+  *this = *this - scalar;
+  return *this;
+}
+
+template <typename T>
+Tensor<T, 0> &Tensor<T, 0>::operator-=(T const &scalar)
+{
+  *data_ -= scalar;
+  return *this;
+}
+
 // Directly overload operator*
 template <typename X, typename Y>
 inline Tensor<X, 0> operator*(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
@@ -2731,6 +2808,62 @@ template <typename X>
 Tensor<X, 0> operator*(X const &scalar, Tensor<X, 0> const &tensor) 
 {
   return Tensor<X, 0>(tensor() * scalar);
+}
+
+template <typename T>
+template <typename RHS>
+Tensor<T, 0> &Tensor<T, 0>::operator*=(Expression<RHS> const &rhs)
+{
+  auto scalar = rhs.self()();
+  static_assert(Rank<decltype(scalar)>::value == 0, 
+      EXPECTED_SCALAR("Tensor<T, 0>::operator*=(Expression<RHS> const&)"));
+  *this = *this * scalar;
+  return *this;
+}
+
+template <typename T>
+Tensor<T, 0> &Tensor<T, 0>::operator*=(T const &scalar)
+{
+  *data_ *= scalar;
+  return *this;
+}
+
+// Directly overload operator/
+template <typename X, typename Y>
+inline Tensor<X, 0> operator/(Tensor<X, 0> const &tensor_1, Tensor<Y, 0> const &tensor_2)
+{
+  return Tensor<X, 0>(tensor_1() / tensor_2());
+}
+
+template <typename X>
+Tensor<X, 0> operator/(Tensor<X, 0> const &tensor, X const &scalar) 
+{
+  return Tensor<X, 0>(tensor() / scalar);
+}
+
+template <typename X>
+Tensor<X, 0> operator/(X const &scalar, Tensor<X, 0> const &tensor) 
+{
+  return Tensor<X, 0>(tensor() / scalar);
+}
+
+
+template <typename T>
+template <typename RHS>
+Tensor<T, 0> &Tensor<T, 0>::operator/=(Expression<RHS> const &rhs)
+{
+  auto scalar = rhs.self()();
+  static_assert(Rank<decltype(scalar)>::value == 0, 
+      EXPECTED_SCALAR("Tensor<T, 0>::operator/=(Expression<RHS> const&)"));
+  *this = *this / scalar;
+  return *this;
+}
+
+template <typename T>
+Tensor<T, 0> &Tensor<T, 0>::operator/=(T const &scalar)
+{
+  *data_ /= scalar;
+  return *this;
 }
 
 template <typename T>
@@ -3225,6 +3358,7 @@ operator*(typename NodeType::value_type const& scalar, Expression<NodeType> cons
 #undef SLICE_INDICES_REPEATED
 #undef SLICE_INDICES_DESCENDING
 #undef RANK_MISMATCH
+#undef EXPECTED_SCALAR
 #undef DIMENSION_MISMATCH
 #undef INNER_DIMENSION_MISMATCH
 #undef ELEMENT_COUNT_MISMATCH
