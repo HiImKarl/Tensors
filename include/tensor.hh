@@ -13,6 +13,7 @@
 #include <memory>
 #include <cassert>
 #include <string>
+#include <unordered_map>
 
 /* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
@@ -495,7 +496,6 @@ public:
 
   /* ------------------ Proxy Objects ----------------- */
 
-
   class Proxy { /*@Proxy<T,N>*/
   /**
    * Proxy Tensor Object used for building tensors from reference.
@@ -953,8 +953,7 @@ public:
   template <typename X> friend Tensor<X, 2> transpose(Tensor<X, 1> &vec);
 
 private:
-
-  /* ----------------- Data ---------------- */
+  /* ----------------- data ---------------- */
 
   Shape<N> shape_;
   size_t strides_[N];
@@ -1034,8 +1033,6 @@ private:
     typename Tensor<X, N>::IndexReference &index2, 
     typename Tensor<Y, N>::IndexReference &index3);
 
-  template <size_t M>
-  size_t pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset = 0) const;
   void pMap(std::function<void(T *lhs)> const &fn);
   void pMap(std::function<void(T const &lhs)> const &fn) const;
   template <typename X>
@@ -1298,30 +1295,33 @@ bool Tensor<T, N>::operator==(Tensor<X, N> const& tensor) const
 template <typename T, size_t N>
 std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
 {
-  auto add_brackets = [&os](size_t n, bool left)
-  {
+  auto add_brackets = [&os](size_t n, bool left) -> void {
     for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
   size_t cumul_index = tensor.shape_.index_product();
   size_t dim_quotas[N];
   std::copy_n(tensor.shape_.dimensions_, N, dim_quotas);
+  size_t index = 0;
 
-  add_brackets(N, true); // opening brackets
-  os << tensor.data_[0]; // first element
+  add_brackets(N, true);
+  os << tensor.data_[0]; 
   for (size_t i = 0; i < cumul_index - 1; ++i) {
-    size_t dim_index = N, bracket_count = 0;
+    size_t bracket_count = 0;
     bool propogate = true;
+    size_t dim_index = N - 1;
     // find the correct index to "step" to
-    while (dim_index && propogate) {
-      --dim_quotas[dim_index - 1];
+    while (dim_index >= 0 && propogate) {
+      --dim_quotas[dim_index];
       ++bracket_count;
-      if (!dim_quotas[dim_index - 1])
-        dim_quotas[dim_index - 1] = tensor.shape_.dimensions_[dim_index - 1];
-      else
+      index += tensor.strides_[dim_index];
+      if (!dim_quotas[dim_index]) {
+        dim_quotas[dim_index] = tensor.shape_.dimensions_[dim_index];
+        index -= dim_quotas[dim_index] * tensor.strides_[dim_index];
+      } else {
         propogate = false;
+      }
       --dim_index;
     }
-    size_t index = tensor.pEvaluateIndex(dim_quotas);
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
@@ -1497,17 +1497,6 @@ void Tensor<T, N>::pUpdateQuotas(size_t (&dim_quotas)[M], IndexReference &index1
     }
     --dim_index;
   }
-}
-
-// Obtain absolute data offset from dim quotas
-template <typename T, size_t N>
-template <size_t M>
-size_t Tensor<T, N>::pEvaluateIndex(size_t const (&dim_quotas)[M], size_t offset) const
-{
-  size_t index = 0;
-  for (size_t i = 0; i < M; ++i)
-      index += strides_[i + offset] * (shape_.dimensions_[i + offset] - dim_quotas[i]);
-  return index;
 }
 
 template <typename T, size_t N>
@@ -1814,7 +1803,7 @@ void Fill(Tensor<U, M> &tensor, X const &value)
   tensor.pMap(allocate);
 }
 
-/** Returns a transposed Matrix, sharing the same underlying data as vec. If
+/** Returns a transposed Matrix, sharing the same underlying data as `mat`. If
  *  the dimension of `mat` is [n, m], the dimensions of the resulting matrix will be
  *  [m, n]. Note: This is only applicable to matrices and vectors
  */
@@ -2283,6 +2272,505 @@ typename Tensor<T, N - 1>::ConstReverseIterator Tensor<T, N>::crend() const
 { 
   static_assert(N == 1, BEGIN_ON_NON_VECTOR);
   return this->crend(1); 
+}
+
+template <typename T, size_t N>
+class SparseTensor: public Expression<SparseTensor<T, N>> { /*@SparseTensor<T, N>*/
+/** Any-rank sparse array of type `T`, where rank `N` is a size_t template.
+ *  The underlying data is implemented as a std::unordered_map<size_t, T>
+ *  (usually a hash_table). The default value can be provided as a value to
+ *  the constructor, if unspecified it is T().
+ */
+public:
+
+  /* -------------------- typedefs -------------------- */
+
+  using map_type = std::unordered_map<T, size_t>;
+  typedef size_t                          size_type;
+  typedef ptrdiff_t                       difference_type;
+  typedef SparseTensor<T, N>              self_type;
+  typedef T                               value_type;
+
+  /* ----------------- friend classes ----------------- */
+
+  template <typename X, size_t M> friend class SparseTensor;
+  template <typename LHSType, typename RHSType> friend class BinaryAdd;
+  template <typename LHSType, typename RHSType> friend class BinarySub;
+  template <typename LHSType, typename RHSType> friend class BinaryMul;
+
+  /* ------------------ Proxy Objects ----------------- */
+
+  class Proxy { /*@Proxy<T,N>*/
+  /**
+   * Proxy Tensor Object used for building tensors from reference.
+   * This is used to differentiate proxy construction 
+   * for move and copy construction only.
+   */
+  public:
+    template <typename U, size_t M> friend class SparseTensor;
+    Proxy() = delete;
+  private:
+    Proxy(SparseTensor<T, N> const &tensor): tensor_(tensor) {}
+    Proxy(Proxy const &proxy): tensor_(proxy.tensor_) {}
+    Tensor<T, N> const &tensor_;
+  }; 
+
+  /* ------------------ Constructors ------------------ */
+
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  Elements are zero initialized. Note: dimensions index from 1.
+   */
+  explicit SparseTensor(std::initializer_list<size_t> dimensions);
+
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  The SparseTensor default value is set to `default_value`.
+   *  Note: dimensions index from 1.
+   */
+  SparseTensor(size_t const (&dimensions)[N], T const &default_value);
+
+  /** Creates a Tensor with dimensions described by `shape`.
+   *  The SparseTensor default value is set to T().
+   *  Note: dimensions index from 1.
+   */
+  explicit SparseTensor(Shape<N> const &shape);
+
+  /** Creates a Tensor with dimensions described by `shape`.
+   *  The SparseTensor default value is set to `default_value`.
+   *  Note: dimensions index from 1.
+   */
+  SparseTensor(Shape<N> const &shape, T const &default_value)
+    : SparseTensor(shape.dimensions_, default_value) {}
+
+  /** Copy construction, allocates memory and copies from `tensor` */
+  SparseTensor(SparseTensor<T, N> const &tensor); 
+
+  /** Move construction, takes ownership of underlying data, `tensor` is destroyed */
+  SparseTensor(SparseTensor<T, N> &&tensor); 
+
+  /** Constructs a reference to the `proxy` tensor. The tensors share 
+   *  the same underyling data, so changes will affect both tensors.
+   */
+  SparseTensor(typename SparseTensor<T, N>::Proxy const &proxy); 
+
+  /** Constructs the tensor produced by the expression */
+  template <typename NodeType,
+            typename = typename std::enable_if<NodeType::rank() == N>::type>
+  SparseTensor(Expression<NodeType> const& expression);
+
+  /* ------------------- Assignment ------------------- */
+
+  /** Copy Constructs from `tensor`. Destroys itself first */
+  SparseTensor<T, N> &operator=(SparseTensor<T, N> const &tensor);
+
+  /** Evaluates `rhs` and move constructs. Destroys itself first */
+  template <typename NodeType>
+  SparseTensor<T, N> &operator=(Expression<NodeType> const &rhs);
+
+  /* ----------------- Getters ----------------- */
+
+  constexpr static size_t rank() { return N; } /**< Get `N` */
+
+  /** Get the dimension at index. Throws std::logic_error if index
+   *  is out of bounds. Note: indexing starts at 1.
+   */
+  size_t dimension(size_t index) const { return shape_[index]; }
+
+  Shape<N> shape() const noexcept { return shape_; } /**< Get the tensor shape */
+  // FIXME :: Is there a way to hide these and keep -> functional?
+  SparseTensor *operator->() { return this; } /**> used to implement iterator-> */
+  SparseTensor const *operator->() const { return this; } /**> used to implement const_iterator-> */
+
+  /* ------------------ Access To Data ----------------- */
+
+  template <typename... Indices>
+  SparseTensor<T, N - sizeof...(Indices)> at(Indices... args);
+
+  /** Returns the resulting tensor by applying left to right index expansion of
+   *  the provided arguments. I.e. calling `tensor(1, 2)` on a rank 4 tensor is
+   *  equivalent to `tensor(1, 2, :, :)`. Throws std::logic_error if any of the 
+   *  indices are out bounds. Note: indexing starts at 1.
+   */
+  template <typename... Indices,
+            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
+  SparseTensor<T, N - sizeof...(Indices)> operator()(Indices... args);
+
+  template <typename... Indices,
+            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
+  T &operator()(Indices... args);
+
+  template <typename... Indices>
+  SparseTensor<T, N - sizeof...(Indices)> const at(Indices... args) const;
+
+  /** See operator() */
+  template <typename... Indices,
+            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
+  SparseTensor<T, N - sizeof...(Indices)> const operator()(Indices... args) const;
+
+  /** See operator() */
+  template <typename... Indices,
+            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
+  T const &operator()(Indices... args) const;
+
+  /** See operator() */
+  template <size_t M>//, typename = typename std::enable_if<N != M>::type>
+  SparseTensor<T, N - M> operator[](Indices<M> const &indices);
+
+  /** Slices denotate the dimensions which are left free, while indices
+   *  fix the remaining dimensions at the specified index. I.e. calling
+   *  `tensor.slice<1, 3, 5>(1, 2)` on a rank 5 tensor is equivalent to
+   *  `tensor(:, 1, :, 2, :)` and will produce a rank 3 tensor. Throws
+   *   std::logic_error if any of the indices are out of bounds. Note:
+   *   indexing begins at 1.
+   */
+  template <size_t... Slices, typename... Indices>
+  SparseTensor<T, sizeof...(Slices)> slice(Indices... indices);
+  template <size_t... Slices, typename... Indices>
+  SparseTensor<T, sizeof...(Slices)> const slice(Indices... indices) const;
+
+  /* -------------------- Expressions ------------------- */
+
+  template <typename X, typename Y, size_t M, typename FunctionType>
+  friend SparseTensor<X, M> elem_wise(SparseTensor<X, M> const &tensor, Y const &scalar, FunctionType &&fn);
+
+  template <typename X, typename Y, size_t M, typename FunctionType>
+  friend SparseTensor<X, M> elem_wise(SparseTensor<X, M> const &tensor1, SparseTensor<Y, M> const &tensor_2, FunctionType &&fn);
+
+  template <typename X, typename Y, size_t M>
+  friend SparseTensor<X, M> add(SparseTensor<X, M> const& tensor_1, SparseTensor<Y, M> const& tensor_2);
+
+  template <typename RHS>
+  SparseTensor<T, N> &operator+=(Expression<RHS> const &rhs);
+
+  template <typename X, typename Y, size_t M>
+  friend SparseTensor<X, M> subtract(SparseTensor<X, M> const& tensor_1, SparseTensor<Y, M> const& tensor_2);
+
+  template <typename RHS>
+  SparseTensor<T, N> &operator-=(Expression<RHS> const &rhs);
+
+  template <typename X, typename Y, size_t M1, size_t M2>
+  friend SparseTensor<X, M1 + M2 - 2> multiply(SparseTensor<X, M1> const& tensor_1, SparseTensor<Y, M2> const& tensor_2);
+
+  template <typename RHS>
+  SparseTensor<T, N> &operator*=(Expression<RHS> const &rhs);
+
+  /** Allocates a SparseTensor with shape equivalent to *this, and whose
+   *  elements are equivalent to *this with operator-() applied.
+   */
+  SparseTensor<T, N> operator-() const;
+
+  /* ------------------ Print to ostream --------------- */
+
+  template <typename X, size_t M>
+  friend std::ostream &operator<<(std::ostream &os, const SparseTensor<X, M> &tensor);
+
+  /* -------------------- Equivalence ------------------ */
+
+  /** Returns true iff the tensor's dimensions and data are equivalent */
+  bool operator==(SparseTensor<T, N> const& tensor) const; 
+
+  /** Returns true iff the tensor's dimensions or data are not equivalent */
+  bool operator!=(SparseTensor<T, N> const& tensor) const { return !(*this == tensor); }
+
+  /** Returns true iff the tensor's dimensions are equal and every element satisfies e1 == e2 */
+  template <typename X>
+  bool operator==(SparseTensor<X, N> const& tensor) const;
+
+  /** Returns true iff the tensor's dimensions are different or any element satisfies e1 != e2 */
+  template <typename X>
+  bool operator!=(SparseTensor<X, N> const& tensor) const { return !(*this == tensor); }
+
+  /* -------------------- Iterators --------------------- */
+
+  class Iterator { /*@Iterator<T, N>*/
+  public:
+    /** Iterator with freedom across one dimension of a SparseTensor.
+     *  Allows access to the underlying tensor data.
+     */
+
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, size_t M> friend class SparseTensor;
+
+    /* --------------- Constructors --------------- */
+
+    /** Copy construct an iterator to the same underlying SparseTensor */
+    Iterator(Iterator const &it);  
+
+    /** Move construct an iterator to the same underlying SparseTensor. Destroys `it`. */
+    Iterator(Iterator &&it);       
+
+    SparseTensor<T, N> operator*();   /**< Create a reference to the underlying SparseTensor */
+    SparseTensor<T, N> operator->();  /**< Syntatic sugar for (*it). */
+    Iterator operator++(int);   /**< Increment (postfix). Returns a temporary before increment */
+    Iterator &operator++();     /**< Increment (prefix). Returns *this */
+    Iterator operator--(int);   /**< Decrement (postfix). Returns a temporary before decrement */
+    Iterator &operator--();     /**< Decrement (prefix). Returns *this */
+
+    /** Returns true iff the underlying pointers are identical */
+    bool operator==(Iterator const &it) const { return (it.data_ == this->data_); }
+
+    /** Returns true iff the underlying pointers are not identical */
+    bool operator!=(Iterator const &it) const { return !(it == *this); }
+
+  private:
+
+    // Direct construction
+    Iterator(SparseTensor<T, N + 1> const &tensor, size_t index);
+    Shape<N> shape_; // Data describing the underlying tensor 
+    size_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+    size_t stride_; // Step size of the underlying data pointer per increment
+  };
+
+  class ConstIterator { /*@ConstIterator<T, N>*/
+  public:
+    /** Constant iterator with freedom across one dimension of a SparseTensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
+
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, size_t M> friend class SparseTensor;
+
+    /* --------------- Constructors --------------- */
+
+    /** Copy construct an iterator to the same underlying SparseTensor */
+    ConstIterator(ConstIterator const &it);
+
+    /** Move construct an iterator to the same underlying SparseTensor. Destroys `it`. */
+    ConstIterator(ConstIterator &&it);
+
+    SparseTensor<T, N> const operator*();  /**< Create a reference to the underlying SparseTensor */
+    SparseTensor<T, N> const operator->(); /**< Syntatic sugar for (*it). */                                
+    ConstIterator operator++(int);   /**< Increment (postfix). Returns a temporary before increment */
+    ConstIterator &operator++();     /**< Increment (prefix). Returns *this */
+    ConstIterator operator--(int);   /**< Decrement (postfix). Returns a temporary before decrement */
+    ConstIterator &operator--();     /**< Decrement (prefix). Returns *this */
+    bool operator==(ConstIterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(ConstIterator const &it) const { return !(it == *this); }
+  private:
+    ConstIterator(SparseTensor<T, N + 1> const &tensor, size_t index);
+
+    /**
+     * Data describing the underlying tensor
+     */
+    Shape<N> shape_;
+    size_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+
+    /**
+     * Step size of the underlying data pointer per increment
+     */
+    size_t stride_;
+  };
+
+  class ReverseIterator { /*@ReverseIterator<T, N>*/
+  public:
+    /** Reverse iterator with freedom across one dimension of a SparseTensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
+
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, size_t M> friend class SparseTensor;
+
+    /* --------------- Constructors --------------- */
+
+    /** Copy construct an iterator to the same underlying SparseTensor */
+    ReverseIterator(ReverseIterator const &it);
+
+    /** Move construct an iterator to the same underlying SparseTensor. Destroys `it`. */
+    ReverseIterator(ReverseIterator &&it);
+
+    SparseTensor<T, N> operator*();        /**< Create a reference to the underlying SparseTensor */
+    SparseTensor<T, N> operator->();       /**< Syntatic sugar for (*it). */                                
+    ReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
+    ReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
+    ReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
+    ReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
+    bool operator==(ReverseIterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
+  private:
+    ReverseIterator (SparseTensor<T, N + 1> const &tensor, size_t index);
+
+    /**
+     * Data describing the underlying tensor
+     */
+    Shape<N> shape_;
+    size_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+
+    /**
+     * Step size of the underlying data pointer per increment
+     */
+    size_t stride_;
+  };
+
+  class ConstReverseIterator { /*@ConstReverseIterator<T, N>*/
+  public:
+    /** Constant reverse iterator with freedom across one dimension of a SparseTensor.
+     *  Does not allow write access to the underlying tensor data.
+     */
+
+    /* -------------- Friend Classes -------------- */
+
+    template <typename U, size_t M> friend class SparseTensor;
+
+    /* --------------- Constructors --------------- */
+
+    /** Copy constructs an iterator to the same underlying SparseTensor */
+    ConstReverseIterator(ConstReverseIterator const &it);
+
+    /** Move construct an iterator to the same underlying SparseTensor. Destroys `it`. */
+    ConstReverseIterator(ConstReverseIterator &&it);
+    SparseTensor<T, N> const operator*();       /**< Create a reference to the underlying SparseTensor */
+    SparseTensor<T, N> const operator->();      /**< Syntatic sugar for (*it). */                                
+    ConstReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
+    ConstReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
+    ConstReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
+    ConstReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
+    bool operator==(ConstReverseIterator const &it) const { return (it.data_ == this->data_); }
+    bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
+  private:
+    ConstReverseIterator (SparseTensor<T, N + 1> const &tensor, size_t index);
+
+    /**
+     * Data describing the underlying tensor
+     */
+    Shape<N> shape_;
+    size_t strides_[N];
+    value_type *data_;
+    std::shared_ptr<T> ref_;
+
+    /**
+     * Step size of the underlying data pointer per increment
+     */
+    size_t stride_;
+  };
+
+  /** Returns an iterator for a SparseTensor, equivalent to *this dimension
+   *  fixed at index (the iteration index). Note: indexing begins at 
+   *  1. std::logic_error will be thrown if `index` is out of bounds.
+   */
+  typename SparseTensor<T, N - 1>::Iterator begin(size_t index);
+
+  /** Returns a just-past-the-end iterator for a SparseTensor, equivalent 
+   * to *this dimension fixed at index (the iteration index). 
+   * Note: indexing begins at 1. std::logic_error will be thrown 
+   * if `index` is out of bounds.
+   */
+  typename SparseTensor<T, N - 1>::Iterator end(size_t index);
+
+  /** Equivalent to SparseTensor<T, N>::begin(1) */
+  typename SparseTensor<T, N - 1>::Iterator begin();
+  /** Equivalent to SparseTensor<T, N>::end(1) */
+  typename SparseTensor<T, N - 1>::Iterator end();
+
+  /** See SparseTensor<T, N>::begin(size_t), except returns a const iterator */
+  typename SparseTensor<T, N - 1>::ConstIterator cbegin(size_t index) const;
+  /** See SparseTensor<T, N>::end(size_t), except returns a const iterator */
+  typename SparseTensor<T, N - 1>::ConstIterator cend(size_t index) const;
+  /** See SparseTensor<T, N>::begin(), except returns a const iterator */
+  typename SparseTensor<T, N - 1>::ConstIterator cbegin() const;
+  /** See SparseTensor<T, N>::end(), except returns a const iterator */
+  typename SparseTensor<T, N - 1>::ConstIterator cend() const;
+
+  /** See SparseTensor<T, N>::begin(size_t), except returns a reverse iterator */
+  typename SparseTensor<T, N - 1>::ReverseIterator rbegin(size_t index);
+  /** See SparseTensor<T, N>::end(size_t), except returns a reverse iterator */
+  typename SparseTensor<T, N - 1>::ReverseIterator rend(size_t index);
+  /** See Tensor<T, N>::begin(), except returns a reverse iterator */
+  typename SparseTensor<T, N - 1>::ReverseIterator rbegin();
+  /** See Tensor<T, N>::end(), except returns a reverse iterator */
+  typename SparseTensor<T, N - 1>::ReverseIterator rend();
+
+  /** See SparseTensor<T, N>::begin(size_t), except returns a const reverse iterator */
+  typename SparseTensor<T, N - 1>::ConstReverseIterator crbegin(size_t index) const;
+  /** See SparseTensor<T, N>::end(size_t), except returns a const reverse iterator */
+  typename SparseTensor<T, N - 1>::ConstReverseIterator crend(size_t index) const;
+  /** See SparseTensor<T, N>::begin(), except returns a const reverse iterator */
+  typename SparseTensor<T, N - 1>::ConstReverseIterator crbegin() const;
+  /** See SparseTensor<T, N>::end(), except returns a const reverse iterator */
+  typename SparseTensor<T, N - 1>::ConstReverseIterator crend() const;
+
+  /* ----------------- Utility Functions ---------------- */
+  /** Returns a deep copy of this tensor, equivalent to calling copy constructor */
+  SparseTensor<T, N> copy() const; 
+
+  /** Returns a reference: only used to invoke reference constructor */
+  typename SparseTensor<T, N>::Proxy ref();
+
+  template <typename U, size_t M, typename RAIt>
+  friend void Fill(SparseTensor<U, M> &tensor, RAIt const &begin, RAIt const &end);
+
+  template <typename U, size_t M, typename X>
+  friend void Fill(SparseTensor<U, M> &tensor, X const &value);
+
+  /** Allocates a SparseTensor with shape `shape`, whose total number of elements 
+   *  must be equivalent to *this (or std::logic_error is thrown). The 
+   *  resulting SparseTensor is filled by iterating through *this and copying
+   *  over the values.
+   */
+  template <size_t M>
+  SparseTensor<T, M> resize(Shape<M> const &shape) const;
+
+  template <typename X> friend SparseTensor<X, 2> transpose(SparseTensor<X, 2> &mat);
+  template <typename X> friend SparseTensor<X, 2> transpose(SparseTensor<X, 1> &vec);
+
+private:
+  /* ----------------- data ---------------- */
+
+  Shape<N> shape_;
+  size_t strides_[N];
+  size_t base_offset_;
+  std::shared_ptr<map_type> ref_;
+  T default_value_;
+
+  /* -------------- Utility --------------- */
+
+  void pInitializeStrides();
+
+};
+
+/* ---------------------------- Constructors --------------------------- */
+
+template <typename T, size_t N>
+SparseTensor<T, N>::SparseTensor(std::initializer_list<size_t> dimensions)
+  : shape_(dimensions), base_offset_(0), default_value_(T{})
+{
+  pInitializeStrides();
+  ref_ = std::make_shared<map_type>();
+}
+
+template <typename T, size_t N>
+SparseTensor<T, N>::SparseTensor(size_t const (&dimensions)[N], T const &default_value)
+  : shape_(dimensions), base_offset_(0), default_value_(default_value)
+{
+  pInitializeStrides();
+  ref_ = std::make_shared<map_type>();
+}
+
+template <typename T, size_t N>
+SparseTensor<T, N>::SparseTensor(Shape<N> const &shape)
+  : shape_(shape), base_offset_(0), default_value_(T{})
+{
+  pInitializeStrides();
+  ref_ = std::make_shared<map_type>();
+}
+
+/* ------------------------------- Utility ----------------------------- */
+
+template <typename T, size_t N>
+void SparseTensor<T, N>::pInitializeStrides()
+{
+  size_t accumulator = 1;
+  for (size_t i = 0; i < N; ++i) {
+    strides_[N - i - 1] = accumulator;
+    accumulator *= shape_.dimensions_[N - i - 1];
+  }
 }
 
 /* ------------------------ Scalar Specializations ---------------------- */
