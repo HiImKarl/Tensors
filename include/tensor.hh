@@ -966,17 +966,8 @@ private:
 
   /* ------------- Expansion for operator()() ------------- */
 
-  // Expansion which returns a Tensor
-  template <size_t M>
-  Tensor<T, N - M> pTensorExpansion(size_t cumul_index);
   template <size_t M, typename... Indices>
-  Tensor<T, N - M> pTensorExpansion(size_t cumul_index, size_t next_index, Indices...);
-
-  // Expansion which returns a scalar
-  template <typename... Indices>
-  T &pElementExpansion(size_t cumul_index) { return data_[cumul_index]; }
-  template <typename... Indices>
-  T &pElementExpansion(size_t cumul_index, size_t next_index, Indices...);
+  size_t pIndicesExpansion(Indices... args);
 
   /* ------------- Expansion for slice() ------------- */
 
@@ -1190,24 +1181,27 @@ template <typename T, size_t N>
 template <typename... Indices>
 Tensor<T, N - sizeof...(Indices)> Tensor<T, N>::at(Indices... args)
 {
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-  return pTensorExpansion<sizeof...(args)>(0, args...);
+  constexpr size_t M = sizeof...(args); 
+  size_t cumul_index = pIndicesExpansion<M>(args...);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
 template <typename T, size_t N>
 template <typename... Indices, typename>
 Tensor<T, N - sizeof...(Indices)> Tensor<T, N>::operator()(Indices... args)
 {
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-  return pTensorExpansion<sizeof...(args)>(0, args...);
+  constexpr size_t M = sizeof...(args); 
+  size_t cumul_index = pIndicesExpansion<M>(args...);
+  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, std::shared_ptr<T>(ref_));
 }
 
 template <typename T, size_t N>
 template <typename... Indices, typename>
 T &Tensor<T, N>::operator()(Indices... args)
 {
-  static_assert(N >= sizeof...(args), RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-  return pElementExpansion(0, args...);
+  constexpr size_t M = sizeof...(args); 
+  size_t cumul_index = pIndicesExpansion<M>(args...);
+  return data_[cumul_index];
 }
 
 template <typename T, size_t N>
@@ -1331,37 +1325,22 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N> &tensor)
   return os;
 }
 
-// private methods
-template <typename T, size_t N>
-template <size_t M>
-Tensor<T, N - M> Tensor<T, N>::pTensorExpansion(size_t cumul_index)
-{
-  return Tensor<T, N - M>(shape_.dimensions_ + M, strides_ + M, data_ + cumul_index, std::shared_ptr<T>(ref_));
-}
+/* ----------- Expansion for operator()() ----------- */
 
 template <typename T, size_t N>
 template <size_t M, typename... Indices>
-Tensor<T, N - M> Tensor<T, N>::pTensorExpansion(
- size_t cumul_index, size_t next_index, Indices... rest)
+size_t Tensor<T, N>::pIndicesExpansion(Indices... args) 
 {
-  if (next_index > shape_.dimensions_[M - sizeof...(rest) - 1] || next_index == 0)
-    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-
-  // adjust for 1 index array access
-  cumul_index += strides_[M - sizeof...(rest) - 1] * (next_index - 1);
-  return pTensorExpansion<M>(cumul_index, rest...);
-}
-
-template <typename T, size_t N>
-template <typename... Indices>
-T &Tensor<T, N>::pElementExpansion(size_t cumul_index, size_t next_index, Indices... rest)  
-{
-  if (next_index > shape_.dimensions_[N - sizeof...(rest) - 1] || next_index == 0)
-    throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
-
-  // adjust for 1 index array access
-  cumul_index += strides_[N - sizeof...(rest) - 1] * (next_index - 1);
-  return pElementExpansion(cumul_index, rest...);
+  static_assert(N >= M, RANK_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
+  size_t index = M - 1;
+  auto index_check = [&](size_t dim) -> size_t {
+    if (dim > shape_.dimensions_[M - index - 1] || dim == 0)
+      throw std::logic_error(INDEX_OUT_OF_BOUNDS("Tensor::operator(Indices...)"));
+    return strides_[M - (index--) - 1] * (dim - 1);
+  }; 
+  size_t cumul_index = 0;
+  (void)(int[]){(cumul_index += index_check(args), 0)...};
+  return cumul_index;
 }
 
 /* ------------- Slice Expansion ------------- */
