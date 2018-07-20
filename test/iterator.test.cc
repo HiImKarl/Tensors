@@ -13,26 +13,34 @@ TEST_CASE("Iterator") {
   SECTION("Tensor") {
     auto begin = tensor.begin(1);
     auto end = tensor.end(1);
+    REQUIRE(begin == tensor.begin(1));
+    REQUIRE(begin != tensor.begin(2));
+    REQUIRE(begin != tensor.begin(3));
+    REQUIRE(begin != ++tensor.begin(1));
+
+    REQUIRE(end == tensor.end(1));
+    REQUIRE(end != --tensor.end(1));
+    REQUIRE(end != tensor.end(2));
+    REQUIRE(end != tensor.end(3));
+
     REQUIRE((*begin).rank() == 2);
     REQUIRE(begin->rank() == 2);
     REQUIRE(begin->shape()[1] == 3);
     REQUIRE(begin->shape()[2] == 4);
+
+    REQUIRE((*end).rank() == 2);
     REQUIRE(end->rank() == 2);
     REQUIRE(end->shape()[1] == 3);
     REQUIRE(end->shape()[2] == 4);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; ++it) {
-      ++i;
-      REQUIRE((*it)(1, 1) == 100 * i + 11);
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)(1, 1) == 100 * (++i) + 11);
     REQUIRE(i == 2);
 
     i = 0;
-    for (auto it = begin; it != end; it++) {
-      ++i;
-      REQUIRE((*it)(1, 1) == 100 * i + 11);
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)(1, 1) == 100 * (++i) + 11);
     REQUIRE(i == 2);
 
     REQUIRE((*++begin)(2, 2) == 222);
@@ -49,17 +57,13 @@ TEST_CASE("Iterator") {
     REQUIRE(begin->rank() == 0);
     REQUIRE(end->rank() == 0);
     int32_t i = 0;
-    for (auto it = begin; it != end; it++) {
-      ++i;
-      REQUIRE((*it)() == i + 130);
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)() == (++i) + 130);
     REQUIRE(i == 4);
 
     i = 0;
-    for (auto it = begin; it != end; ++it) {
-      ++i;
-      REQUIRE((*it)() == i + 130);
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)() == (++i) + 130);
     REQUIRE(i == 4);
   }
 
@@ -78,10 +82,8 @@ TEST_CASE("Iterator") {
 
   SECTION("Range based") {
     int32_t i = 0;
-    for (auto&& _tensor : tensor(1, 1)) {
-      ++i;
-      REQUIRE(_tensor == 110 + i);
-    }
+    for (auto&& _tensor : tensor(1, 1))
+      REQUIRE(_tensor == 110 + (++i));
     REQUIRE(i == 4);
   }
 }
@@ -112,17 +114,13 @@ TEST_CASE("Constant Iterator") {
     REQUIRE(end->shape()[2] == 4);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; ++it) {
-      ++i;
-      REQUIRE((*it)(1, 1) == 100 * i + 11);
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)(1, 1) == 100 * (++i) + 11);
     REQUIRE(i == 2);
 
     i = 0;
-    for (auto it = begin; it != end; it++) {
-      ++i;
-      REQUIRE((*it)(1, 1) == 100 * i + 11);
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)(1, 1) == 100 * (++i) + 11);
     REQUIRE(i == 2);
 
     REQUIRE((*++begin)(2, 2) == 222);
@@ -139,17 +137,13 @@ TEST_CASE("Constant Iterator") {
     REQUIRE(begin->rank() == 0);
     REQUIRE(end->rank() == 0);
     int32_t i = 0;
-    for (auto it = begin; it != end; it++) {
-      ++i;
-      REQUIRE((*it)() == i + 130);
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)() == (++i) + 130);
     REQUIRE(i == 4);
 
     i = 0;
-    for (auto it = begin; it != end; ++it) {
-      ++i;
-      REQUIRE((*it)() == i + 130);
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)() == (++i) + 130);
     REQUIRE(i == 4);
   }
 }
@@ -174,17 +168,13 @@ TEST_CASE("Reverse Iterator") {
     REQUIRE(end->shape()[2] == 4);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; ++it) {
-      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - i) + 11);
-      ++i;
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - (i++)) + 11);
     REQUIRE(i == 2);
 
     i = 0;
-    for (auto it = begin; it != end; it++) {
-      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - i) + 11);
-      ++i;
-    }
+    for (auto it = begin; it != end; it++) 
+      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - (i++)) + 11);
     REQUIRE(i == 2);
 
     REQUIRE((*++begin)(2, 2) == 122);
@@ -203,17 +193,13 @@ TEST_CASE("Reverse Iterator") {
     REQUIRE(end->rank() == 0);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; it++) {
-      REQUIRE((*it)() == ((int)tensor.dimension(3) - i) + 130);
-      ++i;
-    }
+    for (auto it = begin; it != end; it++) 
+      REQUIRE((*it)() == ((int)tensor.dimension(3) - (i++)) + 130);
     REQUIRE(i == 4);
 
     i = 0;
-    for (auto it = begin; it != end; ++it) {
-      REQUIRE((*it)() == ((int)tensor.dimension(3) - i) + 130);
-      ++i;
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)() == ((int)tensor.dimension(3) - (i++)) + 130);
     REQUIRE(i == 4);
   }
 
@@ -257,17 +243,13 @@ TEST_CASE("Reverse Const Iterator") {
     REQUIRE(end->shape()[2] == 4);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; ++it) {
-      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - i) + 11);
-      ++i;
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - (i++)) + 11);
     REQUIRE(i == 2);
 
     i = 0;
-    for (auto it = begin; it != end; it++) {
-      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - i) + 11);
-      ++i;
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)(1, 1) == 100 * ((int)tensor.dimension(1) - (i++)) + 11);
     REQUIRE(i == 2);
 
     REQUIRE((*++begin)(2, 2) == 122);
@@ -286,17 +268,13 @@ TEST_CASE("Reverse Const Iterator") {
     REQUIRE(end->rank() == 0);
 
     int32_t i = 0;
-    for (auto it = begin; it != end; it++) {
-      REQUIRE((*it)() == ((int)tensor.dimension(3) - i) + 130);
-      ++i;
-    }
+    for (auto it = begin; it != end; it++)
+      REQUIRE((*it)() == ((int)tensor.dimension(3) - (i++)) + 130);
     REQUIRE(i == 4);
 
     i = 0;
-    for (auto it = begin; it != end; ++it) {
-      REQUIRE((*it)() == ((int)tensor.dimension(3) - i) + 130);
-      ++i;
-    }
+    for (auto it = begin; it != end; ++it)
+      REQUIRE((*it)() == ((int)tensor.dimension(3) - (i++)) + 130);
     REQUIRE(i == 4);
   }
 }
