@@ -148,12 +148,12 @@ TEST_CASE("Tensor Assignment", "[int]") {
 
   SECTION("Assigning Scalar Tensors to Tensors") {
     Scalar<int32_t> scalar_1(0);
-    tensor_1(1, 1, 1, 1) = scalar_1();
+    tensor_1.at(1, 1, 1, 1) = scalar_1();
     REQUIRE(tensor_1(1, 1, 1, 1) == 0);
     REQUIRE(tensor_1(1, 1, 1, 1) == scalar_1());
 
     Scalar<double> scalar_2(-12);
-    tensor_1(1, 1, 1, 1) = scalar_2();
+    tensor_1.at(1, 1, 1, 1) = scalar_2();
     REQUIRE(tensor_1(1, 1, 1, 1) == -12);
     REQUIRE(tensor_1(1, 1, 1, 1) == scalar_2());
   }
