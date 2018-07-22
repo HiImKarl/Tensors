@@ -11,15 +11,15 @@ TEST_CASE("Shapes") {
   
   SECTION("Rank and Dimensions") {
     REQUIRE(shape.rank() == 8);
-    for (size_t i = 1; i <= 8; ++i)
-      REQUIRE(shape[i] == i);
+    for (size_t i = 0; i < 8; ++i)
+      REQUIRE(shape[i] == i + 1);
   }
 
   SECTION("Tensor Constructor") {
     Tensor<int, 8> tensor(shape);
     REQUIRE(tensor.rank() == 8);
-    for (size_t i = 1; i <= 8; ++i)
-      REQUIRE(tensor.dimension(i) == i);
+    for (size_t i = 0; i < 8; ++i)
+      REQUIRE(tensor.dimension(i) == i + 1);
   }
 
   SECTION("Scalar Constructor") {
@@ -27,5 +27,4 @@ TEST_CASE("Shapes") {
     REQUIRE(tensor.rank() == 0);
     REQUIRE(tensor() == 0);
   }
-
 }
