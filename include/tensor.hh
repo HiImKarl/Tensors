@@ -492,7 +492,6 @@ public:
   size_t &operator[](size_t index);
 
   template <size_t M> friend void Increment(Indices<M> &indices);
-
   template <size_t M> friend void Decrement(Indices<M> &indices);
 private:
   size_t indices_[N];
@@ -509,7 +508,7 @@ void Increment(Indices<M> &indices)
 {
   int dim_index = M - 1;
   bool propogate = true;
-  while (propogate) {
+  while (dim_index >= 0 && propogate) {
     ++indices[dim_index];
     if (indices[dim_index] == indices.shape_[dim_index])
       indices[dim_index] = 0;
@@ -529,7 +528,7 @@ void Decrement(Indices<M> &indices)
 {
   int dim_index = M - 1;
   bool propogate = true;
-  while (propogate) {
+  while (dim_index >= 0 && propogate) {
     if (indices[dim_index] == 0) {
       indices[dim_index] = indices.shape_[dim_index] - 1;
     } else  {
@@ -740,8 +739,20 @@ public:
   T const &operator()(Indices... args) const;
 
   /** See operator() */
-  template <size_t M>//, typename = typename std::enable_if<N != M>::type>
+  template <size_t M, typename = typename std::enable_if<N != M>::type>
   Tensor<T, N - M, ContainerType> operator[](Indices<M> const &indices);
+
+  /** See operator() */
+  template <size_t M, typename = typename std::enable_if<N == M>::type>
+  T &operator[](Indices<M> const &indices);
+
+  /** See operator() const */
+  template <size_t M, typename = typename std::enable_if<N != M>::type>
+  Tensor<T, N - M, ContainerType> const operator[](Indices<M> const &indices) const;
+
+  /** See operator() const */
+  template <size_t M, typename = typename std::enable_if<N == M>::type>
+  T const &operator[](Indices<M> const &indices) const;
 
   /** Slices denotate the dimensions which are left free, while indices
    *  fix the remaining dimensions at the specified index. I.e. calling
@@ -1045,8 +1056,8 @@ public:
    *  resulting Tensor is filled by iterating through *this and copying
    *  over the values.
    */
-  template <size_t M>
-  Tensor<T, M, ContainerType> resize(Shape<M> const &shape) const;
+  template <size_t M, typename C_ = ContainerType>
+  Tensor<T, M, C_> resize(Shape<M> const &shape) const;
 
   template <typename U, typename CType_> friend Tensor<U, 2, CType_> transpose(Tensor<U, 2, CType_> &mat);
   template <typename U, typename CType_> friend Tensor<U, 2, CType_> transpose(Tensor<U, 1, CType_> &vec);
@@ -1318,13 +1329,37 @@ T const &Tensor<T, N, ContainerType>::operator()(Indices... args) const
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t M>//, typename>
+template <size_t M, typename>
 Tensor<T, N - M, ContainerType> Tensor<T, N, ContainerType>::operator[](Indices<M> const &indices)
 {
   size_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i)
     cumul_index += strides_[N - i - 1] * indices.indices_[M - i - 1];
   return Tensor<T, N - M, ContainerType>(shape_.dimensions_ + M, strides_ + M,  offset_ + cumul_index, std::shared_ptr<ContainerType>(ref_));
+}
+
+template <typename T, size_t N, typename ContainerType>
+template <size_t M, typename>
+T& Tensor<T, N, ContainerType>::operator[](Indices<M> const &indices)
+{
+  size_t cumul_index = 0;
+  for (size_t i = 0; i < M; ++i)
+    cumul_index += strides_[N - i - 1] * indices.indices_[M - i - 1];
+	return (*ref_)[cumul_index + offset_];
+}
+
+template <typename T, size_t N, typename ContainerType>
+template <size_t M, typename>
+Tensor<T, N - M, ContainerType> const Tensor<T, N, ContainerType>::operator[](Indices<M> const &indices) const
+{
+	return (*const_cast<self_type*>(this))[indices];
+}
+
+template <typename T, size_t N, typename ContainerType>
+template <size_t M, typename>
+T const &Tensor<T, N, ContainerType>::operator[](Indices<M> const &indices) const
+{
+	return (*const_cast<self_type*>(this))[indices];
 }
 
 template <typename T, size_t N, typename ContainerType>
@@ -1392,9 +1427,9 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N, CType_> &tensor)
   for (size_t i = 0; i < cumul_index - 1; ++i) {
     size_t bracket_count = 0;
     bool propogate = true;
-    size_t dim_index = N - 1;
+    int dim_index = N - 1;
     // find the correct index to "step" to
-    while (propogate) {
+    while (dim_index >= 0 && propogate) {
       --dim_quotas[dim_index];
       ++bracket_count;
       index += tensor.strides_[dim_index];
@@ -1819,23 +1854,21 @@ Tensor<T, N, ContainerType> Tensor<T, N, ContainerType>::operator-() const
 /* --------------------------- Useful Functions ------------------------- */
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t M>
-Tensor<T, M, ContainerType> Tensor<T, N, ContainerType>::resize(Shape<M> const &shape) const
+template <size_t M, typename C_>
+Tensor<T, M, C_> Tensor<T, N, ContainerType>::resize(Shape<M> const &shape) const
 {
   size_t num_elems = shape_.index_product();
   assert(num_elems == shape.index_product() && ELEMENT_COUNT_MISMATCH);
 
-  // some compilers cannot capture stack allocated arrays by reference
-  T cbuff[num_elems];
-  T *buff = cbuff; 
-  size_t index = 0;
-  std::function<void(T const &lhs)> fill_buff = [&buff, &index](T const &lhs) ->void {
-    buff[index++] = lhs;
-  };
-  pMap(fill_buff);
-  auto tensor = Tensor<T, M, ContainerType>(shape.dimensions_, 0, 
-      std::make_shared<ContainerType>(num_elems, (T *)buff, buff + num_elems));
-  return tensor;
+	Tensor<T, M, C_> resized_tensor(shape);
+	Indices<N> indices = Indices<N>(this->shape_);
+	Indices<M> indices_resized = Indices<M>(shape);
+	for (size_t i = 0; i < num_elems; ++i) {
+		resized_tensor[indices_resized] = (*this)[indices];
+		Increment(indices);
+		Increment(indices_resized);
+	}
+  return resized_tensor;
 }
 
 template <typename T, size_t N, typename ContainerType>
@@ -1994,7 +2027,8 @@ typename Tensor<T, N, ContainerType>::Iterator &Tensor<T, N, ContainerType>::Ite
 } 
 
 template <typename T, size_t N, typename ContainerType>
-bool Tensor<T, N, ContainerType>::Iterator::operator==(Tensor<T, N, ContainerType>::Iterator const &it) const
+bool Tensor<T, N, ContainerType>::Iterator::operator==(
+	typename Tensor<T, N, ContainerType>::Iterator const &it) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -2072,7 +2106,8 @@ typename Tensor<T, N, ContainerType>::ConstIterator &Tensor<T, N, ContainerType>
 }
 
 template <typename T, size_t N, typename ContainerType>
-bool Tensor<T, N, ContainerType>::ConstIterator::operator==(Tensor<T, N, ContainerType>::ConstIterator const &it) const
+bool Tensor<T, N, ContainerType>::ConstIterator::operator==(
+	typename Tensor<T, N, ContainerType>::ConstIterator const &it) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -2151,7 +2186,8 @@ typename Tensor<T, N, ContainerType>::ReverseIterator &Tensor<T, N, ContainerTyp
 }
 
 template <typename T, size_t N, typename ContainerType>
-bool Tensor<T, N, ContainerType>::ReverseIterator::operator==(Tensor<T, N, ContainerType>::ReverseIterator const &it) const
+bool Tensor<T, N, ContainerType>::ReverseIterator::operator==(
+	typename Tensor<T, N, ContainerType>::ReverseIterator const &it) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -2232,7 +2268,7 @@ typename Tensor<T, N, ContainerType>::ConstReverseIterator &Tensor<T, N, Contain
 
 template <typename T, size_t N, typename ContainerType>
 bool Tensor<T, N, ContainerType>::ConstReverseIterator::operator==(
-    Tensor<T, N, ContainerType>::ConstReverseIterator const &it) const
+    typename Tensor<T, N, ContainerType>::ConstReverseIterator const &it) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -3053,7 +3089,8 @@ typename Tensor<T, 0, ContainerType>::Iterator &Tensor<T, 0, ContainerType>::Ite
 }
 
 template <typename T, typename ContainerType>
-bool Tensor<T, 0, ContainerType>::Iterator::operator==(Tensor<T, 0, ContainerType>::Iterator const &it) const
+bool Tensor<T, 0, ContainerType>::Iterator::operator==(
+	typename Tensor<T, 0, ContainerType>::Iterator const &it) const
 {
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
@@ -3117,7 +3154,8 @@ typename Tensor<T, 0, ContainerType>::ConstIterator &Tensor<T, 0, ContainerType>
 }
 
 template <typename T, typename ContainerType>
-bool Tensor<T, 0, ContainerType>::ConstIterator::operator==(Tensor<T, 0, ContainerType>::ConstIterator const &it) const
+bool Tensor<T, 0, ContainerType>::ConstIterator::operator==(
+	typename Tensor<T, 0, ContainerType>::ConstIterator const &it) const
 {
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
@@ -3183,7 +3221,8 @@ typename Tensor<T, 0, ContainerType>::ReverseIterator &Tensor<T, 0, ContainerTyp
 }
 
 template <typename T, typename ContainerType>
-bool Tensor<T, 0, ContainerType>::ReverseIterator::operator==(Tensor<T, 0, ContainerType>::ReverseIterator const &it) const
+bool Tensor<T, 0, ContainerType>::ReverseIterator::operator==(
+	typename Tensor<T, 0, ContainerType>::ReverseIterator const &it) const
 {
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
@@ -3249,7 +3288,8 @@ typename Tensor<T, 0, ContainerType>::ConstReverseIterator &Tensor<T, 0, Contain
 }
 
 template <typename T, typename ContainerType>
-bool Tensor<T, 0, ContainerType>::ConstReverseIterator::operator==(Tensor<T, 0, ContainerType>::ConstReverseIterator const &it) const
+bool Tensor<T, 0, ContainerType>::ConstReverseIterator::operator==(
+	typename Tensor<T, 0, ContainerType>::ConstReverseIterator const &it) const
 {
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
@@ -3275,7 +3315,7 @@ public:
 
   constexpr static size_t rank() { return LHSType::rank(); }
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
-  Shape<rank()> shape() { return lhs_.shape(); }
+  Shape<LHSType::rank()> shape() { return lhs_.shape(); }
 
   template <typename... Indices>
   auto operator()(Indices... indices) const
@@ -3351,7 +3391,7 @@ public:
 
   constexpr static size_t rank() { return LHSType::rank(); }
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
-  Shape<rank()> shape() { return lhs_.shape(); }
+  Shape<LHSType::rank()> shape() { return lhs_.shape(); }
   template <typename... Indices>
   auto operator()(Indices... indices) const
   -> typename std::remove_reference<decltype(std::declval<LHSType>()(indices...))>::type;
