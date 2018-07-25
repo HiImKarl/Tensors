@@ -28,11 +28,11 @@ TEST_CASE("Tensor Access", "[int]") {
   }
 
   SECTION("Using Indices") {
-    Indices<4> indices({0, 0, 0, 3}, tensor_1.shape());
+    Indices<4> indices({0, 0, 0, 3});
     REQUIRE(tensor_1[indices] == 3);
-    Increment(indices);
+    REQUIRE(indices.increment(tensor_1.shape()) == false);
     REQUIRE(tensor_1[indices] == 10);
-    Decrement(indices);
+    REQUIRE(indices.decrement(tensor_1.shape()) == false);
     REQUIRE(tensor_1[indices] == 3);
   }
 
