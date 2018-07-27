@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.0)
 project(Example LANGUAGES CXX)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU") 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Wall -Wextra -fmax-errors=5")
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang") 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Wall -Wextra")
 endif()
 
 find_package(benchmark QUIET)

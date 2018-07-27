@@ -20,13 +20,13 @@ using namespace tensor;
 int constructor_counter;
 int destructor_counter;
 
-TEST_STRUCT operator+(TEST_STRUCT &, TEST_STRUCT &) {
+TEST_STRUCT operator+(TEST_STRUCT const&, TEST_STRUCT const&) {
   --constructor_counter;
   destructor_counter -= 2;
   return TEST_STRUCT();
 }
 
-TEST_STRUCT operator-(TEST_STRUCT &, TEST_STRUCT &) {
+TEST_STRUCT operator-(TEST_STRUCT const&, TEST_STRUCT const&) {
   --constructor_counter;
   destructor_counter -= 2;
   return TEST_STRUCT();
@@ -154,21 +154,20 @@ TEST_CASE("Arithmetic") {
   SECTION("Template Expressions constructor") {
     RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2});
     RANK_4_TEST_TENSOR tensor_2 = tensor_1;
-    constructor_counter = 0;
-    eDebugFlag = true;
-    RANK_4_TEST_TENSOR tensor_3 = tensor_1 + tensor_2 - tensor_1 + tensor_1 + tensor_2;
-    eDebugFlag = false;
-    // FIXME 
-    //REQUIRE(constructor_counter == 16);
+    constructor_counter = 0;                        // reset alloc counter
+    RANK_4_TEST_TENSOR tensor_3 = tensor_1 - tensor_1 + tensor_1
+      + tensor_2 - tensor_1 + tensor_1 + tensor_2;  // *Only one* alloc -> 16
+    REQUIRE(constructor_counter == 16);
   }
 
   SECTION("Template Expressions desstructor") {
     {
-      RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2});
-      RANK_4_TEST_TENSOR tensor_2 = tensor_1;
-      RANK_4_TEST_TENSOR tensor_3 = tensor_1 + tensor_2 - tensor_1 + tensor_1;
+      RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2}); // One alloc -> 32
+      RANK_4_TEST_TENSOR tensor_2 = tensor_1;    // Second alloc -> 64
+      destructor_counter -= 64;                  // reset alloc counter
+      RANK_4_TEST_TENSOR tensor_3 = tensor_1 - tensor_2
+        + tensor_2 - tensor_1 + tensor_1;        // *Only one* alloc -> 32 
     }
-    // FIXME 
-    //REQUIRE(destructor_counter == 64);
+    REQUIRE(destructor_counter == 32);
   }
 }
