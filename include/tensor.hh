@@ -61,13 +61,13 @@
 
 // Slicing
 #define SLICES_EMPTY \
-  "Tensor::slice(Indices...) Failed -- At least one dimension must be sliced"
+  "Tensor::slice(Args...) Failed -- At least one dimension must be sliced"
 #define SLICES_OUT_OF_BOUNDS \
-  "Tensor::slice(Indices...) Failed -- Slices out of bounds"
+  "Tensor::slice(Args...) Failed -- Slices out of bounds"
 #define SLICE_INDICES_REPEATED \
-  "Tensor::slice(Indices...) Failed -- Repeated slice indices"
+  "Tensor::slice(Args...) Failed -- Repeated slice indices"
 #define SLICE_INDICES_DESCENDING \
-  "Tensor::slice(Indices...) Failed -- Slice indices must be listed in ascending order"
+  "Tensor::slice(Args...) Failed -- Slice indices must be listed in ascending order"
 
 // Iteration
 #define BEGIN_ON_NON_VECTOR \
@@ -249,15 +249,15 @@ struct ValueAsTensor<Tensor<T, N, ContainerType>> {
   ValueAsTensor(Tensor<T, N, ContainerType> const &val): value(val) {}
   Tensor<T, N, ContainerType> const &value;
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<T, N - sizeof...(Indices), ContainerType> const operator()(Indices... indices) 
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<T, N - sizeof...(Args), ContainerType> const operator()(Args... indices) 
   { return value(indices...); }
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  T const &operator()(Indices... indices) 
-  { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  T const &operator()(Args... args) 
+  { return value(args...); }
 
   template <size_t M, typename = typename std::enable_if<N != M>::type>
   Tensor<T, N - M, ContainerType> const operator[](Indices<M> const &indices)
@@ -287,13 +287,13 @@ struct ValueAsTensor<BinaryAdd<LHS, RHS>> {
   typedef typename LHS::container_type      container_type;
   constexpr static size_t N =               LHS::rank();
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<value_type, N - sizeof...(Indices), container_type> operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  value_type const &operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  value_type const &operator()(Args... args) { return value(args...); }
 
   template <size_t M>
   auto operator[](Indices<M> const &indices)
@@ -319,13 +319,13 @@ struct ValueAsTensor<BinarySub<LHS, RHS>> {
   typedef typename LHS::container_type      container_type;
 
   constexpr static size_t N =      LHS::rank();
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<value_type, N - sizeof...(Indices), container_type> operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  value_type const &operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  value_type const &operator()(Args... args) { return value(args...); }
 
   template <size_t M>
   auto operator[](Indices<M> const &indices)
@@ -352,13 +352,13 @@ struct ValueAsTensor<BinaryMul<LHS, RHS>> {
 
   constexpr static size_t N =      LHS::rank() + RHS::rank() - 2;
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<value_type, N - sizeof...(Indices), container_type> operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  value_type const &operator()(Indices... indices) { return value(indices...); }
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  value_type const &operator()(Args... args) { return value(args...); }
 
   template <size_t M>
   auto operator[](Indices<M> const &indices)
@@ -588,7 +588,7 @@ std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
 }
 
 template <size_t N>
-class Indices { /*@Indices*/
+class Indices { /*@Indices<N>*/
   /** Wrapper around size_t[N] and Shape<N> to provide a specialized array
    *  for accessing Tensors and convenient looping.
    */
@@ -838,34 +838,34 @@ public:
 
   /* ------------------ Access To Data ----------------- */
 
-  template <typename... Indices>
-  Tensor<T, N - sizeof...(Indices), ContainerType> at(Indices... args);
+  template <typename... Args>
+  Tensor<T, N - sizeof...(Args), ContainerType> at(Args... args);
 
   /** Returns the resulting tensor by applying left to right index expansion of
    *  the provided arguments. I.e. calling `tensor(1, 2)` on a rank() 4 tensor is
    *  equivalent to `tensor(1, 2, :, :)`. Throws std::logic_error if any of the 
    *  indices are out bounds. Note: indexing starts at 1.
    */
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<T, N - sizeof...(Indices), ContainerType> operator()(Indices... args);
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<T, N - sizeof...(Args), ContainerType> operator()(Args... args);
 
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  T &operator()(Indices... args);
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  T &operator()(Args... args);
 
-  template <typename... Indices>
-  Tensor<T, N - sizeof...(Indices), ContainerType> const at(Indices... args) const;
-
-  /** See operator() */
-  template <typename... Indices,
-            typename = typename std::enable_if<N != sizeof...(Indices)>::type>
-  Tensor<T, N - sizeof...(Indices), ContainerType> const operator()(Indices... args) const;
+  template <typename... Args>
+  Tensor<T, N - sizeof...(Args), ContainerType> const at(Args... args) const;
 
   /** See operator() */
-  template <typename... Indices,
-            typename = typename std::enable_if<N == sizeof...(Indices)>::type>
-  T const &operator()(Indices... args) const;
+  template <typename... Args,
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
+  Tensor<T, N - sizeof...(Args), ContainerType> const operator()(Args... args) const;
+
+  /** See operator() */
+  template <typename... Args,
+            typename = typename std::enable_if<N == sizeof...(Args)>::type>
+  T const &operator()(Args... args) const;
 
   /** See operator() */
   template <size_t M, 
@@ -900,10 +900,10 @@ public:
    *   std::logic_error if any of the indices are out of bounds. Note:
    *   indexing begins at 1.
    */
-  template <size_t... Slices, typename... Indices>
-  Tensor<T, sizeof...(Slices), ContainerType> slice(Indices... indices);
-  template <size_t... Slices, typename... Indices>
-  Tensor<T, sizeof...(Slices), ContainerType> const slice(Indices... indices) const;
+  template <size_t... Slices, typename... Args>
+  Tensor<T, sizeof...(Slices), ContainerType> slice(Args... args);
+  template <size_t... Slices, typename... Args>
+  Tensor<T, sizeof...(Slices), ContainerType> const slice(Args... args) const;
 
   template <size_t... Slices, size_t M>
   Tensor<T, N - M, ContainerType> slice(Indices<M> const &indices);
@@ -1230,8 +1230,8 @@ private:
 
   /* ----------- Expansion for operator()(...) ----------- */
 
-  template <typename... Indices>
-  size_t pIndicesExpansion(Indices... args);
+  template <typename... Args>
+  size_t pIndicesExpansion(Args... args);
 
   /* ------------- Expansion for slice() ------------- */
 
@@ -1273,20 +1273,19 @@ private:
 
   // Data mapping for pMap
   template <size_t M>
-  static void pUpdateIndices(size_t (&indices)[M], IndexReference &index, size_t quota_offset = 0);
+  static void pUpdateIndices(Indices<M> &indices, IndexReference &index, size_t quota_offset = 0);
 
-  // Why does this need to be overriden?
-  static void pUpdateIndices(size_t (&)[0], IndexReference &, size_t = 0) {}
+  static void pUpdateIndices(Indices<0> indices, IndexReference &, size_t = 0) {}
 
   // Data mapping for pUnaryMap -- ASSUMES EQUAL SHAPES
   template <typename U, size_t M, typename CType_> static void
-    pUpdateIndices(size_t (&indices)[M], 
+    pUpdateIndices(Indices<M> &indices, 
         typename Tensor<T, N, ContainerType>::IndexReference &index1, 
         typename Tensor<U, N, CType_>::IndexReference &index2);
 
   // Data mapping for pBinaryMap -- ASSUMES EQUAL SHAPES
   template <typename U, typename V, size_t M, typename CType1, typename CType2>
-    static void pUpdateIndices(size_t (&indices)[M], typename Tensor<T, N,
+    static void pUpdateIndices(Indices<M> &indices, typename Tensor<T, N,
         ContainerType>::IndexReference &index1, typename Tensor<U, N,
         CType1>::IndexReference &index2, typename Tensor<V, N,
         CType2>::IndexReference &index3);
@@ -1442,8 +1441,8 @@ Tensor<T, N, ContainerType> &Tensor<T, N, ContainerType>::operator=(Expression<N
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices>
-Tensor<T, N - sizeof...(Indices), ContainerType> Tensor<T, N, ContainerType>::at(Indices... args)
+template <typename... Args>
+Tensor<T, N - sizeof...(Args), ContainerType> Tensor<T, N, ContainerType>::at(Args... args)
 {
   constexpr size_t M = sizeof...(args); 
   size_t cumul_index = pIndicesExpansion(args...);
@@ -1451,8 +1450,8 @@ Tensor<T, N - sizeof...(Indices), ContainerType> Tensor<T, N, ContainerType>::at
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices, typename>
-Tensor<T, N - sizeof...(Indices), ContainerType> Tensor<T, N, ContainerType>::operator()(Indices... args)
+template <typename... Args, typename>
+Tensor<T, N - sizeof...(Args), ContainerType> Tensor<T, N, ContainerType>::operator()(Args... args)
 {
   constexpr size_t M = sizeof...(args); 
   size_t cumul_index = pIndicesExpansion(args...);
@@ -1460,30 +1459,30 @@ Tensor<T, N - sizeof...(Indices), ContainerType> Tensor<T, N, ContainerType>::op
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices, typename>
-T &Tensor<T, N, ContainerType>::operator()(Indices... args)
+template <typename... Args, typename>
+T &Tensor<T, N, ContainerType>::operator()(Args... args)
 {
   size_t cumul_index = pIndicesExpansion(args...);
   return (*ref_)[cumul_index + offset_];
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices>
-Tensor<T, N - sizeof...(Indices), ContainerType> const Tensor<T, N, ContainerType>::at(Indices... args) const
+template <typename... Args>
+Tensor<T, N - sizeof...(Args), ContainerType> const Tensor<T, N, ContainerType>::at(Args... args) const
 {
  return (*const_cast<self_type*>(this))(args...);
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices, typename>
-Tensor<T, N - sizeof...(Indices), ContainerType> const Tensor<T, N, ContainerType>::operator()(Indices... args) const
+template <typename... Args, typename>
+Tensor<T, N - sizeof...(Args), ContainerType> const Tensor<T, N, ContainerType>::operator()(Args... args) const
 {
   return (*const_cast<self_type*>(this))(args...);
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <typename... Indices, typename>
-T const &Tensor<T, N, ContainerType>::operator()(Indices... args) const
+template <typename... Args, typename>
+T const &Tensor<T, N, ContainerType>::operator()(Args... args) const
 {
   return (*const_cast<self_type*>(this))(args...);
 }
@@ -1539,14 +1538,19 @@ Tensor<T, sizeof...(Slices), ContainerType> Tensor<T, N, ContainerType>::slice(A
   auto contract_indices = [&](size_t arg) -> void {
     indices[index++] = arg;
   };
+#ifdef _MSC_VER
+  // MSVC parses {} as an initializer_list
+  (void)std::initializer_list<int>{(contract_indices(args), 0)...};
+#else
   (void)(int[]){(contract_indices(args), 0)...};
+#endif
   (void)(contract_indices);
   return pSliceExpansion<sizeof...(args)>(placed_indices, indices);
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t... Slices, typename... Indices>
-Tensor<T, sizeof...(Slices), ContainerType> const Tensor<T, N, ContainerType>::slice(Indices... indices) const
+template <size_t... Slices, typename... Args>
+Tensor<T, sizeof...(Slices), ContainerType> const Tensor<T, N, ContainerType>::slice(Args... indices) const
 {
   return const_cast<self_type*>(this)->slice<Slices...>(indices...);
 }
@@ -1732,8 +1736,9 @@ Tensor<T, N - M, ContainerType> Tensor<T, N, ContainerType>::pSliceExpansion(siz
 template <typename T, size_t N, typename ContainerType>
 template <size_t M>
 void Tensor<T, N, ContainerType>::pUpdateIndices(
-    size_t (&indices)[M], IndexReference &index, size_t quota_offset)
+    Indices<M> &indices, IndexReference &index, size_t quota_offset)
 {
+	static_assert(M, PANIC_ASSERTION);
   int dim_index = M - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
@@ -1753,10 +1758,11 @@ void Tensor<T, N, ContainerType>::pUpdateIndices(
 template <typename T, size_t N, typename ContainerType>
 template <typename U, size_t M, typename CType_>
 void Tensor<T, N, ContainerType>::pUpdateIndices(
-    size_t (&indices)[M],
+    Indices<M> &indices,
     typename Tensor<T, N, ContainerType>::IndexReference &index1, 
     typename Tensor<U, N, CType_>::IndexReference &index2)
 {
+	static_assert(M, PANIC_ASSERTION);
   int dim_index = M - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
@@ -1779,11 +1785,12 @@ void Tensor<T, N, ContainerType>::pUpdateIndices(
 template <typename T, size_t N, typename ContainerType>
 template <typename U, typename V, size_t M, typename CType1, typename CType2>
 void Tensor<T, N, ContainerType>::pUpdateIndices(
-    size_t (&indices)[M],
+    Indices<M> &indices,
     IndexReference &index1,
     typename Tensor<U, N, CType1>::IndexReference &index2, 
     typename Tensor<V, N, CType2>::IndexReference &index3)
 {
+	static_assert(M, PANIC_ASSERTION);
   int dim_index = M - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
@@ -1811,8 +1818,7 @@ void Tensor<T, N, ContainerType>::pMap(std::function<void(T *lhs)> const &fn)
 {
   // this is the index upper bound for iteration
   size_t cumul_index = shape_.index_product();
-  size_t indices[N];
-  std::fill_n(indices, N, 0);
+	Indices<N> indices{};
   typename Tensor<T, N, ContainerType>::IndexReference index{*this};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn(&(*ref_)[offset_ + index.index]);
@@ -1825,8 +1831,7 @@ void Tensor<T, N, ContainerType>::pMap(std::function<void(T const &lhs)> const &
 {
   // this is the index upper bound for iteration
   size_t cumul_index = shape_.index_product();
-  size_t indices[N];
-  std::fill_n(indices, N, 0);
+	Indices<N> indices{};
   typename Tensor<T, N, ContainerType>::IndexReference index{*this};
   for (size_t i = 0; i < cumul_index; ++i) {
     fn((*ref_)[offset_ + index.index]);
@@ -1841,8 +1846,7 @@ void Tensor<T, N, ContainerType>::pUnaryMap(Tensor<U, N, CType_> const &tensor,
 {
   // this is the index upper bound for iteration
   size_t cumul_index = shape_.index_product();
-  size_t indices[N];
-  std::fill_n(indices, N, 0); 
+	Indices<N> indices{};
   typename Tensor<T, N, ContainerType>::IndexReference index{*this};
   typename Tensor<U, N, CType_>::IndexReference t_index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
@@ -1858,8 +1862,7 @@ void Tensor<T, N, ContainerType>::pUnaryMap(Tensor<U, N, CType_> const &tensor,
 {
   // this is the index upper bound for iteration
   size_t cumul_index = shape_.index_product();
-  size_t indices[N];
-  std::fill_n(indices, N, 0); 
+	Indices<N> indices{};
   typename Tensor<T, N, ContainerType>::IndexReference index{*this};
   typename Tensor<U, N, CType_>::IndexReference t_index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
@@ -1875,8 +1878,7 @@ void Tensor<T, N, ContainerType>::pBinaryMap(Tensor<U, N, C1> const &tensor_1,
     std::function<void(T *lhs, U *rhs1, V *rhs2)> const &fn)
 {
   size_t cumul_index = shape_.index_product();
-  size_t indices[N];
-  std::fill_n(indices, N, 0); 
+	Indices<N> indices{};
   typename Tensor<T, N, ContainerType>::IndexReference index{*this};
   typename Tensor<U, N, C1>::IndexReference t1_index{tensor_1};
   typename Tensor<V, N, C2>::IndexReference t2_index{tensor_2};
@@ -2022,9 +2024,8 @@ Tensor<X, M1 + M2 - 2, CType1> multiply(Tensor<X, M1, CType1> const& tensor_1, T
   Tensor<X, M1 + M2 - 2, CType1> prod_tensor(shape);
   size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[M1 - 1];
   size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[0];
-  size_t indices_1[M1 - 1], indices_2[M2 - 1];
-  std::fill_n(indices_1, M1 - 1, 0); 
-  std::fill_n(indices_2, M2 - 1, 0); 
+	Indices<M1 - 1> indices_1{};
+	Indices<M2 - 1> indices_2{};
   size_t index = 0;
   typename Tensor<X, M1, CType1>::IndexReference t1_index{tensor_1};
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
@@ -2639,7 +2640,7 @@ class Shape<0> { /*@Shape<0>*/
 public:
   /** Scalar specialization of Shape. This is an empty structure 
    *  (sizeof(Shape<0>) will return 1 byte). This is specialized
-   *  solely to provide convience for scalar specializing Tensor
+   *  to resolve compiler issues with handling 0-length arrays.
    */
 
   /* -------------------- typedefs -------------------- */
@@ -2685,6 +2686,22 @@ public:
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M, CType_> &tensor);
 
 private:
+};
+
+template <>
+class Indices<0> { /*@Indices<0>*/
+  /** Scalar specialized 0-length Indices. This is an empty object
+	 *  (sizeof(Indices<0>) will return 1) to resolve compiler issues with
+	 *  0-length arrays.
+   */
+public:
+  template <typename U, size_t M, typename C_> friend class Tensor;
+	Indices() {}
+	Indices(size_t const (&indices)[0]) {}
+	size_t const &operator[](size_t index) const { assert(0 && PANIC_ASSERTION); return *(size_t *)this; }
+	size_t &operator[](size_t index) { assert(0 && PANIC_ASSERTION); return *(size_t *)this;  }
+	bool increment(Shape<0> const &shape) { return true;  }
+	bool decrement(Shape<0> const &shape) { return true;  }
 };
 
 // Scalar specialization
@@ -3557,9 +3574,9 @@ public:
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
 
-  template <typename... Indices>
-  auto operator()(Indices... indices) const
-    -> typename std::remove_reference<decltype(std::declval<LHSType>()(indices...))>::type;
+  template <typename... Args>
+  auto operator()(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type;
 
   template <size_t M>
   auto operator[](Indices<M> const &indices) const 
@@ -3575,13 +3592,13 @@ BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
   : lhs_(lhs), rhs_(rhs) {}
 
 template <typename LHSType, typename RHSType>
-template <typename... Indices>
-auto BinaryAdd<LHSType, RHSType>::operator()(Indices... indices) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(indices...))>::type
+template <typename... Args>
+auto BinaryAdd<LHSType, RHSType>::operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type
 {
-  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS);
-  return add(ValueAsTensor<LHSType>(lhs_)(indices...),
-             ValueAsTensor<RHSType>(rhs_)(indices...));
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return add(ValueAsTensor<LHSType>(lhs_)(args...),
+             ValueAsTensor<RHSType>(rhs_)(args...));
 }
 
 template <typename LHSType, typename RHSType>
@@ -3590,9 +3607,8 @@ auto BinaryAdd<LHSType, RHSType>::operator[](Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
-  auto res = add(ValueAsTensor<LHSType>(lhs_)[indices],
+  return add(ValueAsTensor<LHSType>(lhs_)[indices],
              ValueAsTensor<RHSType>(rhs_)[indices]);
-  return res;
 }
 
 template <typename LHSType, typename RHSType>
@@ -3648,9 +3664,9 @@ public:
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHSType::rank()> const &shape() const { return lhs_.shape(); }
 
-  template <typename... Indices>
-  auto operator()(Indices... indices) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(indices...))>::type;
+  template <typename... Args>
+  auto operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type;
 
   template <size_t M>
   auto operator[](Indices<M> const &indices) const 
@@ -3668,14 +3684,14 @@ BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
   : lhs_(lhs), rhs_(rhs) {}
 
 template <typename LHSType, typename RHSType>
-template <typename... Indices>
-auto BinarySub<LHSType, RHSType>::operator()(Indices... indices) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(indices...))>::type
+template <typename... Args>
+auto BinarySub<LHSType, RHSType>::operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type
 {
-  static_assert(rank() >= sizeof...(Indices), RANK_OUT_OF_BOUNDS);
+  static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   return subtract(
-      ValueAsTensor<LHSType>(lhs_)(indices...),
-      ValueAsTensor<RHSType>(rhs_)(indices...));
+      ValueAsTensor<LHSType>(lhs_)(args...),
+      ValueAsTensor<RHSType>(rhs_)(args...));
 }
 
 template <typename LHSType, typename RHSType>
@@ -3744,10 +3760,10 @@ public:
   /* ---------------- Getters ----------------- */
 
   constexpr static size_t rank() { return LHSType::rank() + RHSType::rank() - 2; }
-  Shape<rank()> const &shape() const { return shape_; }
+  Shape<self_type::rank()> const &shape() const { return shape_; }
   size_t dimension(size_t index) const; 
-  template <typename... Indices>
-  auto operator()(Indices... indices) const
+  template <typename... Args>
+  auto operator()(Args... indices) const
     -> typename std::remove_reference<decltype(std::declval<return_type>()(indices...))>::type;
   
   template <size_t M>
@@ -3759,7 +3775,7 @@ public:
 
 private:
   // cache so that `shape()` can return a const reference
-  Shape<rank()> shape_;
+  Shape<self_type::rank()> shape_;
   LHSType const &lhs_;
   RHSType const &rhs_;
 };
