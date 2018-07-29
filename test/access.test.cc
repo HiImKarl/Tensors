@@ -4,7 +4,7 @@
 
 using namespace tensor;
 
-TEST_CASE("Tensor Access", "[int]") {
+TEST_CASE("Tensor Access", "operator()") {
 
   //     -- Tensor Initialization --   
   auto tensor_1 = Tensor<int32_t, 4>{1, 2, 3, 4};
@@ -28,7 +28,7 @@ TEST_CASE("Tensor Access", "[int]") {
   }
 
   SECTION("Using Indices") {
-    Indices<4> indices({0, 0, 0, 3});
+    Indices<4> indices{0, 0, 0, 3};
     REQUIRE(tensor_1[indices] == 3);
     REQUIRE(indices.increment(tensor_1.shape()) == false);
     REQUIRE(tensor_1[indices] == 10);

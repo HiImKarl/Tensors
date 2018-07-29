@@ -21,15 +21,42 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
     Tensor<int32_t, 3> tensor_3 = tensor_1 + tensor_2;
     Tensor<int32_t, 3> tensor_4 = tensor_3 - tensor_1;
 
+    REQUIRE(typeid(tensor_3) != typeid(tensor_1 + tensor_2));
+    REQUIRE(typeid(tensor_4) != typeid(tensor_3 - tensor_1));
+
     for (size_t i = 0; i < tensor_3.dimension(0); ++i)
       for (size_t j = 0; j < tensor_3.dimension(1); ++j)
         for (size_t k = 0; k < tensor_3.dimension(2); ++k)
           REQUIRE(tensor_3(i, j, k) == (int)(100100 * i + 10010 * j + 1001 * k));
 
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k)
+          REQUIRE((tensor_1 + tensor_2)(i, j, k) == (int)(100100 * i + 10010 * j + 1001 * k));
+
+    Shape<3> shape_1 = (tensor_1 + tensor_2).shape();
+    Indices<3> indices{};
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) {
+          REQUIRE((tensor_1 + tensor_2)[indices] == (int)(100100 * i + 10010 * j + 1001 * k));
+          indices.increment(shape_1);
+        }
+
     for (size_t i = 0; i < tensor_4.dimension(0); ++i)
       for (size_t j = 0; j < tensor_4.dimension(1); ++j)
         for (size_t k = 0; k < tensor_4.dimension(2); ++k)
           REQUIRE(tensor_4(i, j, k) == (int)(100 * i + 10 * j + 1 * k));
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k)
+          REQUIRE((tensor_3 - tensor_1)(i, j, k) == (int)(100 * i + 10 * j + 1 * k));
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k)
+          REQUIRE((tensor_3 - tensor_1)[Indices<3>{i, j, k}] == (int)(100 * i + 10 * j + 1 * k));
   }
 
   SECTION("Multi-Term Addition/Subtract") {
@@ -40,12 +67,37 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
         for (size_t k = 0; k < tensor_3.dimension(2); ++k)
           REQUIRE(tensor_3(i, j, k) == (int)(100200 * i + 10020 * j + 1002 * k));
 
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k)
+          REQUIRE((tensor_2 + tensor_1 + tensor_2)(i, j, k) == (int)(100200 * i + 10020 * j + 1002 * k));
+
+    Shape<3> shape_1 = (tensor_2 + tensor_1 + tensor_2).shape();
+    Indices<3> indices{};
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) {
+          REQUIRE((tensor_2 + tensor_1 + tensor_2)[indices] == (int)(100200 * i + 10020 * j + 1002 * k));
+          indices.increment(shape_1);
+        }
+
     Tensor<int32_t, 3> tensor_4 = tensor_3 - tensor_2 + tensor_1;
 
     for (size_t i = 0; i < tensor_4.dimension(0); ++i)
       for (size_t j = 0; j < tensor_4.dimension(1); ++j)
         for (size_t k = 0; k < tensor_4.dimension(2); ++k)
           REQUIRE(tensor_4(i, j, k) == (int)(200100 * i + 20010 * j + 2001 * k));
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k)
+          REQUIRE((tensor_3 - tensor_2 + tensor_1)(i, j, k) == (int)(200100 * i + 20010 * j + 2001 * k));
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k)
+          REQUIRE((tensor_3 - tensor_2 + tensor_1)[Indices<3>{i, j, k}] == (int)(200100 * i + 20010 * j + 2001 * k));
   }
 
   SECTION("Negation") {
@@ -56,8 +108,9 @@ TEST_CASE("Basic Tensor Arithmetic, Non-scalar") {
           REQUIRE(tensor_3(i, j, k) == (int)(-100000 * i + -10000 * j + -1000 * k));
   }
 
-  SECTION("Assignment Arithmetic:") {
+  SECTION("Assignment Arithmetic") {
     tensor_1 = tensor_1 + tensor_2;
+
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
@@ -139,8 +192,8 @@ TEST_CASE("Scalar Arithmatic") {
 
 TEST_CASE("Elementwise Arithmatic") {
   auto tensor_1 = Tensor<int32_t, 3>({2, 3, 4}, 1);
-  SECTION("Scalar Tensor") {
 
+  SECTION("Scalar Tensor") {
     Tensor<int32_t, 3> tensor_2 = elem_wise(tensor_1, 4, 
         [](int x, int y) -> int { return x + y; });
     for (size_t i = 0; i < tensor_2.dimension(0); ++i)
@@ -174,6 +227,7 @@ TEST_CASE("Elementwise Arithmatic") {
 TEST_CASE("Tensor Multplication") {
   auto tensor_1 = Tensor<int32_t, 3>{2, 3, 4};
   auto tensor_2 = Tensor<int32_t, 3>{4, 3, 2};
+
   for (size_t i = 0; i < tensor_1.dimension(0); ++i)
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
@@ -185,42 +239,112 @@ TEST_CASE("Tensor Multplication") {
         tensor_2(i, j, k) = 1;
 
   SECTION("Binary Multiplication") {
+
     Tensor<int32_t, 4> tensor_3 = tensor_1 * tensor_2;
+
+    REQUIRE(typeid(tensor_3) != typeid(tensor_1 * tensor_2));
+    REQUIRE((tensor_1 * tensor_2).rank() == 4);
+    REQUIRE((tensor_1 * tensor_2).dimension(0) == 2);
+    REQUIRE((tensor_1 * tensor_2).dimension(1) == 3);
+    REQUIRE((tensor_1 * tensor_2).dimension(2) == 3);
+    REQUIRE((tensor_1 * tensor_2).dimension(3) == 2);
     REQUIRE(tensor_3.rank() == 4);
     REQUIRE(tensor_3.dimension(0) == 2);
     REQUIRE(tensor_3.dimension(1) == 3);
     REQUIRE(tensor_3.dimension(2) == 3);
     REQUIRE(tensor_3.dimension(3) == 2);
+
     for (size_t i = 0; i < tensor_3.dimension(0); ++i)
       for (size_t j = 0; j < tensor_3.dimension(1); ++j)
         for (size_t k = 0; k < tensor_3.dimension(2); ++k)
           for (size_t l = 0; l < tensor_3.dimension(3); ++l)
             REQUIRE(tensor_3(i, j, k, l) == 4);
 
+    Shape<4> shape_1 = (tensor_1 * tensor_2).shape();
+    Indices<4> indices_1{};
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_3.dimension(3); ++l) {
+            REQUIRE((tensor_1 * tensor_2)[indices_1] == 4);
+            indices_1.increment(shape_1);
+          }
+
     Tensor<int32_t, 2> tensor_4 = tensor_1.slice<0, 1>(1) * tensor_2(1);
+
+    REQUIRE(typeid(tensor_4) != typeid((tensor_1.slice<0, 1>(1) * tensor_2(1))));
+    REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1)).rank() == 2);
+    REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1)).dimension(0) == 2);
+    REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1)).dimension(1) == 2);
     REQUIRE(tensor_4.rank() == 2);
     REQUIRE(tensor_4.dimension(0) == 2);
     REQUIRE(tensor_4.dimension(1) == 2);
+
     for (size_t i = 0; i < tensor_4.dimension(0); ++i)
       for (size_t j = 0; j < tensor_4.dimension(1); ++j)
         REQUIRE(tensor_4(i, j) == 3);
 
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j)
+        REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1))(i, j) == 3);
+
+    Shape<2> shape_2 = (tensor_1.slice<0, 1>(1) * tensor_2(1)).shape();
+    Indices<2> indices_2{};
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j) {
+        REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1))[indices_2] == 3);
+        indices_2.increment(shape_2);
+      }
+
+    // every element should be 144
     Tensor<int32_t, 4> tensor_5 = tensor_4 * tensor_3 * tensor_4;
+
     REQUIRE(tensor_5.rank() == 4);
     REQUIRE(tensor_5.dimension(0) == 2);
     REQUIRE(tensor_5.dimension(1) == 3);
     REQUIRE(tensor_5.dimension(2) == 3);
     REQUIRE(tensor_5.dimension(3) == 2);
+    REQUIRE((tensor_4 * tensor_3 * tensor_4).rank() == 4);
+    REQUIRE((tensor_4 * tensor_3 * tensor_4).dimension(0) == 2);
+    REQUIRE((tensor_4 * tensor_3 * tensor_4).dimension(1) == 3);
+    REQUIRE((tensor_4 * tensor_3 * tensor_4).dimension(2) == 3);
+    REQUIRE((tensor_4 * tensor_3 * tensor_4).dimension(3) == 2);
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_5.dimension(3); ++l)
+            REQUIRE(tensor_5(i, j, k, l) == 144);
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_5.dimension(3); ++l)
+            REQUIRE((tensor_4 * tensor_3 * tensor_4)(i, j, k, l) == 144);
+
+    Shape<4> shape_3 = (tensor_4 * tensor_3 * tensor_4).shape();
+    Indices<4> indices_3 {};
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_5.dimension(3); ++l) {
+            REQUIRE((tensor_4 * tensor_3 * tensor_4)[indices_3] == 144);
+            indices_3.increment(shape_3);
+          }
+
 
     Tensor<int32_t, 2> tensor_6{2, 2};
+
     tensor_6(0, 0) = 2;
     tensor_6(0, 1) = 1;
     tensor_6(1, 0) = 3;
     tensor_6(1, 1) = 2;
-
  
     Tensor<int32_t, 2> tensor_7 = tensor_6 * tensor_6;
 
+    REQUIRE((tensor_6 * tensor_6).rank() == 2);
+    REQUIRE((tensor_6 * tensor_6).dimension(0) == 2);
+    REQUIRE((tensor_6 * tensor_6).dimension(1) == 2);
     REQUIRE(tensor_7.rank() == 2);
     REQUIRE(tensor_7.dimension(0) == 2);
     REQUIRE(tensor_7.dimension(1) == 2);
@@ -229,17 +353,34 @@ TEST_CASE("Tensor Multplication") {
     REQUIRE(tensor_7(0, 1) == 4);
     REQUIRE(tensor_7(1, 0) == 12);
     REQUIRE(tensor_7(1, 1) == 7);
+    REQUIRE((tensor_6 * tensor_6)(0, 0) == 7);
+    REQUIRE((tensor_6 * tensor_6)(0, 1) == 4);
+    REQUIRE((tensor_6 * tensor_6)(1, 0) == 12);
+    REQUIRE((tensor_6 * tensor_6)(1, 1) == 7);
+    REQUIRE((tensor_6 * tensor_6)[Indices<2>{0, 0}] == 7);
+    REQUIRE((tensor_6 * tensor_6)[Indices<2>{0, 1}] == 4);
+    REQUIRE((tensor_6 * tensor_6)[Indices<2>{1, 0}] == 12);
+    REQUIRE((tensor_6 * tensor_6)[Indices<2>{1, 1}] == 7);
   }
 
   SECTION("Combined Multiplication and Addition/Subtraction") {
-    Tensor<int32_t, 4> tensor_3 = tensor_1 * tensor_2 + tensor_1 * tensor_2;
+
+    Tensor<int32_t, 4> tensor_3 = (tensor_1 * tensor_2 + tensor_1 * tensor_2);
+
     for (size_t i = 0; i < tensor_3.dimension(0); ++i)
       for (size_t j = 0; j < tensor_3.dimension(1); ++j)
         for (size_t k = 0; k < tensor_3.dimension(2); ++k)
           for (size_t l = 0; l < tensor_3.dimension(3); ++l)
             REQUIRE(tensor_3(i, j, k, l) == 8);
 
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_3.dimension(3); ++l)
+            REQUIRE((tensor_1 * tensor_2 + tensor_1 * tensor_2)(i, j, k, l) == 8);
+
     Tensor<int32_t, 2> tensor_4 = (tensor_1.slice<0, 1>(1) - tensor_1.slice<0, 1>(1)) * tensor_2(1);
+
     for (size_t i = 0; i < tensor_4.dimension(0); ++i)
       for (size_t j = 0; j < tensor_4.dimension(1); ++j)
         REQUIRE(tensor_4(i, j) == 0);

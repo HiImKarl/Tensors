@@ -4,10 +4,15 @@
 template <int *ConstructorCounter, int *DestructorCounter>
 struct TestStruct {
   TestStruct() { *ConstructorCounter += 1; }
-  ~TestStruct() { *DestructorCounter += 2; }
+  ~TestStruct() { *DestructorCounter += 1; }
 };
 
-#define TEST_STRUCT TestStruct<&constructor_counter, &destructor_counter>
+#define TEST_STRUCT \
+  TestStruct<&constructor_counter, &destructor_counter>
+#define TEST_STRUCT_4 \
+  Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4>
+#define TEST_SCALAR \
+  Scalar<TestStruct<&constructor_counter, &destructor_counter>>
 
 template <int *i1, int *i2>
 std::ostream& operator<<(std::ostream &os, TestStruct<i1, i2> const &)
@@ -22,19 +27,19 @@ int destructor_counter;
 
 TEST_STRUCT operator+(TEST_STRUCT const&, TEST_STRUCT const&) {
   --constructor_counter;
-  destructor_counter -= 2;
+  --destructor_counter; 
   return TEST_STRUCT();
 }
 
 TEST_STRUCT operator-(TEST_STRUCT const&, TEST_STRUCT const&) {
   --constructor_counter;
-  destructor_counter -= 2;
+  --destructor_counter;
   return TEST_STRUCT();
 }
 
 static Tensor<TEST_STRUCT, 4> test_func()
 {
-  Tensor<TEST_STRUCT, 4> tensor({2, 2, 2, 2});
+  TEST_STRUCT_4 tensor({2, 2, 2, 2});
   return tensor;
 }
 
@@ -53,12 +58,12 @@ TEST_CASE("Single Tensor") {
   }
 
   SECTION("Single Tensor Desctructor") {
-    { Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor({2, 2, 2, 2}); }
-    REQUIRE(destructor_counter == 32);
+    { TEST_STRUCT_4 tensor({2, 2, 2, 2}); }
+    REQUIRE(destructor_counter == 16);
   }
 
   SECTION("Single Scalar Constructor") {
-    Scalar<TestStruct<&constructor_counter, &destructor_counter>> scalar{};
+    TEST_SCALAR scalar{};
     REQUIRE(constructor_counter == 1);
   }
 }
@@ -68,45 +73,45 @@ TEST_CASE("Multiple Tensors") {
   destructor_counter = 0;
 
   SECTION("Copy Constructor") {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = tensor_1;
     REQUIRE(constructor_counter == 32);
   }
 
   SECTION("Move Constructor") {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = std::move(tensor_1);
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = std::move(tensor_1);
     REQUIRE(constructor_counter == 16);
   }
 
   SECTION("Copy Destructor") {
     {
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1;
-    }
-    REQUIRE(destructor_counter == 64);
-  }
-
-  SECTION("Move Destruction") {
-    {
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = std::move(tensor_1);
+      TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+      TEST_STRUCT_4 tensor_2 = tensor_1;
     }
     REQUIRE(destructor_counter == 32);
   }
 
+  SECTION("Move Destruction") {
+    {
+      TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+      TEST_STRUCT_4 tensor_2 = std::move(tensor_1);
+    }
+    REQUIRE(destructor_counter == 16);
+  }
+
   SECTION("Ref Constructor") {
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-    Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.ref();
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = tensor_1.ref();
     REQUIRE(constructor_counter == 16);
   }
 
   SECTION("Move Destruction") {
     {
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_1({2, 2, 2, 2});
-      Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4> tensor_2 = tensor_1.ref();
+      TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+      TEST_STRUCT_4 tensor_2 = tensor_1.ref();
     }
-    REQUIRE(destructor_counter == 32);
+    REQUIRE(destructor_counter == 16);
   }
 
   SECTION("Functional Constructor") {
@@ -118,32 +123,28 @@ TEST_CASE("Multiple Tensors") {
 
   SECTION("Functional Destructor") {
     { test_func(); }
-    REQUIRE(destructor_counter == 32);
+    REQUIRE(destructor_counter == 16);
     { auto tensor = test_func(); }
-    REQUIRE(destructor_counter == 64);
+    REQUIRE(destructor_counter == 32);
   }
 }
-
-#define RANK_4_TEST_TENSOR \
-  Tensor<TestStruct<&constructor_counter, &destructor_counter>, 4>
-
 
 TEST_CASE("Explicit Copy Method") {
   constructor_counter = 0;
   destructor_counter = 0;
 
   SECTION("Constructor") {
-    RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2});
-    RANK_4_TEST_TENSOR tensor_2 = tensor_1.copy();
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = tensor_1.copy();
     REQUIRE(constructor_counter == 32);
   }
 
   SECTION("Destructor") {
     {
-      RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2});
-      RANK_4_TEST_TENSOR tensor_2 = tensor_1.copy();
+      TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+      TEST_STRUCT_4 tensor_2 = tensor_1.copy();
     }
-    REQUIRE(destructor_counter == 64);
+    REQUIRE(destructor_counter == 32);
   }
 }
 
@@ -152,22 +153,46 @@ TEST_CASE("Arithmetic") {
   destructor_counter = 0;
 
   SECTION("Template Expressions constructor") {
-    RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2});
-    RANK_4_TEST_TENSOR tensor_2 = tensor_1;
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = tensor_1;
     constructor_counter = 0;                        // reset alloc counter
-    RANK_4_TEST_TENSOR tensor_3 = tensor_1 - tensor_1 + tensor_1
+    TEST_STRUCT_4 tensor_3 = 
+      tensor_1 - tensor_1 + tensor_1
       + tensor_2 - tensor_1 + tensor_1 + tensor_2;  // *Only one* alloc -> 16
     REQUIRE(constructor_counter == 16);
   }
 
   SECTION("Template Expressions desstructor") {
     {
-      RANK_4_TEST_TENSOR tensor_1({2, 2, 2, 2}); // One alloc -> 32
-      RANK_4_TEST_TENSOR tensor_2 = tensor_1;    // Second alloc -> 64
-      destructor_counter -= 64;                  // reset alloc counter
-      RANK_4_TEST_TENSOR tensor_3 = tensor_1 - tensor_2
-        + tensor_2 - tensor_1 + tensor_1;        // *Only one* alloc -> 32 
+      TEST_STRUCT_4 tensor_1({2, 2, 2, 2}); // One alloc -> 16
+      TEST_STRUCT_4 tensor_2 = tensor_1;    // Second alloc -> 32 
+      destructor_counter -= 32;                  // reset alloc counter
+      TEST_STRUCT_4 tensor_3 = 
+        tensor_1 - tensor_2
+        + tensor_2 - tensor_1 + tensor_1;        // *Only one* alloc -> 16 
     }
-    REQUIRE(destructor_counter == 32);
+    REQUIRE(destructor_counter == 16);
+  }
+}
+
+TEST_CASE("Tensor Constructions/Destructions") {
+  eDebugConstructorCounter = 0; 
+
+  SECTION("Template Expressions Constructor") {
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2});
+    TEST_STRUCT_4 tensor_2 = tensor_1;
+    eDebugConstructorCounter = 0;                   // reset alloc counter
+    TEST_STRUCT_4 tensor_3 = tensor_1 - tensor_1 + tensor_1
+      + tensor_2 - tensor_1 + tensor_1 + tensor_2;  // *Only one* alloc -> 1
+    REQUIRE(eDebugConstructorCounter == 1);
+  }
+
+  SECTION("Template Expressions Assignment") {
+    TEST_STRUCT_4 tensor_1({2, 2, 2, 2}); 
+    TEST_STRUCT_4 tensor_2 = tensor_1;   
+    eDebugConstructorCounter = 0;                    // reset alloc counter
+    tensor_2 = tensor_1 - tensor_2 - tensor_2 
+      + tensor_1 + tensor_2 - tensor_1 + tensor_1;   // *Only one* alloc -> 1
+    REQUIRE(eDebugConstructorCounter == 1);
   }
 }

@@ -1,6 +1,7 @@
 /* ---------------------------------- CATCH MAIN DRIVER FILE ---------------------------- */
 
-bool eDebugFlag = false;
+int eDebugConstructorCounter = 0; 
+
 #define CATCH_CONFIG_MAIN
 #include "catch.hh"
 
