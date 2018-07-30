@@ -16,27 +16,27 @@
 #include <unordered_map>
 
 #ifdef _TEST
+
 extern int eDebugConstructorCounter; 
+
 #endif
 
+/* FIXME -- Remove debug macros */
 #ifndef _NDEBUG
 
-/* FIXME -- Remove debug macros */
-#define GET_MACRO(_1,_2,_3,NAME,...) NAME
-
-#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
 #define PRINT(x) std::cout << x << '\n';
 #define PRINTV(x) std::cout << #x << ": " << x << '\n';
+
+#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
+#define GET_MACRO(_1,_2,_3,NAME,...) NAME
 #define PRINT_ARRAY1(x) \
   std::cout << #x << ": "; \
   for (size_t i = 0; i < ARRAY_SIZE(x); ++i) std::cout << x[i] << ' '; \
   std::cout << '\n';
-
 #define PRINT_ARRAY2(x, n) \
   std::cout << #x << ": "; \
   for (size_t i = 0; i < n; ++i) std::cout << x[i] << ' '; \
   std::cout << '\n';
-
 #define PRINT_ARRAY(...) \
   GET_MACRO(__VA_ARGS__, PRINT_ARRAY1, PRINT_ARRAY2)(__VA_ARGS__)
 
@@ -108,23 +108,29 @@ namespace tensor {
 
 /* --------------- Forward Declerations --------------- */
 
+namespace data {
+
 template <typename T> class Array;
+
+} // namespace data
+
+
 template <size_t N> class Shape;
 template <> class Shape<0>;
 template <size_t N> class Indices;
 template <> class Indices<0>;
-template <typename T, size_t N, typename ContainerType = Array<T>> class Tensor;
+template <typename T, size_t N, typename ContainerType = data::Array<T>> class Tensor;
 template <typename LHS, typename RHS> class BinaryAdd;
 template <typename LHS, typename RHS> class BinarySub;
 template <typename LHS, typename RHS> class BinaryMul;
 
 /* ----------------- Type Definitions ---------------- */
 
-template <typename T, typename ContainerType = Array<T>> 
+template <typename T, typename ContainerType = data::Array<T>> 
 using Scalar = Tensor<T, 0, ContainerType>;
-template <typename T, typename ContainerType = Array<T>> 
+template <typename T, typename ContainerType = data::Array<T>> 
 using Vector = Tensor<T, 1, ContainerType>;
-template <typename T, typename ContainerType = Array<T>> 
+template <typename T, typename ContainerType = data::Array<T>> 
 using Matrix = Tensor<T, 2, ContainerType>;
 
 /* ------------- Template Meta-Patterns -------------- */
@@ -288,7 +294,7 @@ struct ValueAsTensor<Tensor<T, N, ContainerType>> {
 
   template <size_t... Slices, size_t M>
   Tensor<T, N - M, ContainerType> slice(Indices<M> const &indices)
-        { return value.slice<Slices...>(indices); }
+        { return value.template slice<Slices...>(indices); }
 
   auto operator[](Indices<0> const &indices)
     -> decltype(std::declval<Tensor<T, N, ContainerType>>()[indices])
@@ -393,18 +399,49 @@ struct ValueAsTensor<BinaryMul<LHS, RHS>> {
 
 /* -------------------- Data Containers --------------------- */
 
+namespace data {
+
 template <typename T>
 class Array { /*@Array<T>*/
+/** Data container that allocates data in a single contiguous
+ *  array. Thus indexing and iterating is very fast, but resizing
+ *  any dimension will require reallocating and copying the 
+ *  the entire array.
+ */
 public:
+
+  /** Allocates an array of size `capacity`, with `operator new[]`. 
+   *  Initializes every element to `T{}`, 
+   */
   explicit Array(size_t capacity);
+
+  /** Allocates an array of size `capacity`, with `operator new[]`. 
+   *  Initialize every element to `value`, 
+   */
   Array(size_t capacity, T const &value);
+
+  /** Alloates an array of size `capacity` with `operator new[]`.
+   *  Fills the array with  the elements between [`first`, `end`). 
+   *  `std::distance(first, end)` must be equivalent to `capacity`.
+   */
   template <typename It>
   Array(size_t capacity, It const &first, It const &end);
+
+  /** Calls `operator delete[]` on the underlying data */
   ~Array();
+
+  /** Reference to the element at `index` offset of the 
+   *  underlying array. `index` must be less than `capacity`.
+   */
   T &operator[](size_t index) { return data_[index]; };
+
+  /** Const-reference to the element at `index` offset of the 
+   *  underlying array. `index` must be less than `capacity`.
+   */
   T const &operator[](size_t index) const { return data_[index]; }
+
 private:
-  T *data_;
+  T *data_; /**< Contiguously allocated array of `T` */
 };
 
 template <typename T>
@@ -432,8 +469,96 @@ Array<T>::~Array()
   delete[] data_;
 }
 
+template <typename T>
+class HashMap { /*@HashMap<T>*/
+/** Data container that allocates data in a hash map 
+ *  (STL unordered_map). The map only stores non-zero 
+ *  entries (configurable zero-entry). Memory efficiency 
+ *  for sparse tensors is good, but quickly degrades 
+ *  as density increases. Index and iterating is fast,
+ *  O(1), but resizing will require destroying and 
+ *  rehashing larger dimensions.
+ */
+public:
 
-/* ---------------------------------------------------------- */
+  /** Creates a HashMap with initial capacity `capacity`,
+   *  and sets the zero-element `T{}`.
+   */
+  explicit HashMap(size_t capacity);
+
+  /** Creates a HashMap with initial capacity `capacity`,
+   *  and sets the zero-element `value`.
+   */
+  HashMap(size_t capacity, T const &value);
+
+  /** Creates a HashMap with initial capacity `capacity`. 
+   *  Fills the array with  the elements between [`first`, `end`). 
+   *  `std::distance(first, end)` must be equivalent to `capacity`.
+   *  The zero-element is set to `T{}`.
+   */
+  template <typename It>
+  HashMap(size_t capacity, It const &first, It const &end);
+
+  /** Invokes STL unordered_map destructor */
+  ~HashMap() = default;
+
+  /** Reference to the element at `index` offset of the 
+   *  underlying array. `index` must be less than `capacity`.
+   */
+  T &operator[](size_t index);
+
+  /** Const-reference to the element at `index` offset of the 
+   *  underlying array. `index` must be less than `capacity`.
+   */
+  T const &operator[](size_t index) const;
+
+private:
+  std::unordered_map<size_t, T> data_; /**< underlying STL hash map */
+  T zero_elem_;
+};
+
+template <typename T>
+HashMap<T>::HashMap(size_t)
+  : data_({}), zero_elem_(T{})
+{}
+
+template <typename T>
+HashMap<T>::HashMap(size_t, T const &value)
+  : data_({}), zero_elem_(value)
+{}
+
+template <typename T>
+HashMap<T>::HashMap(size_t capacity, It const &first, It const &end)
+  : data_({}), zero_elem_(T{})
+{
+  assert(capacity == std::distance(first, end), PANIC_ASSERTION);
+  (void)capacity;
+  size_t index = 0;
+  for (auto it = first; it != end; ++it) {
+    if (*it != zero_elem_) data_.insert({index, *it});
+    ++index;
+  }
+}
+
+template <typename T>
+T &HashMaph<T>::operator[](size_t index)
+{
+  auto it = data_.find(index);
+  if (it != data_.end()) return it->second;
+  return (data_[index] = zero_elem_);
+}
+
+template <typename T>
+T const &HashMaph<T>::operator[](size_t index) const
+{
+  auto it = data_.find(index);
+  if (it != data_.end()) return it->second;
+  return zero_elem_;
+}
+
+} // namespace data
+
+/* ----------------------- Core Data Structures ----------------------- */
 
 /** CRTP base for Tensor expressions */
 template <typename NodeType>
@@ -474,13 +599,13 @@ public:
 
   constexpr static size_t rank() { return N; } /**< `N` */
 
-  /** Get dimension reference at `index`. Throws a std::logic_error 
-   * exception if index is out of bounds. Note: 1-based indexing.
+  /** Get dimension reference at `index`. If debugging, fails an assertion 
+   * if index is out of bounds. Note: 0-based indexing.
    */
   size_t &operator[](size_t index);            
 
-  /** Get dimension at `index`. Throws a std::logic_error 
-   * exception if index is out of bounds. Note: 1-based indexing.
+  /** Get dimension at `index`. If debugging, fails an assertion
+   * if index is out of bounds. Note: 0-based indexing.
    */
   size_t operator[](size_t index) const;
 
@@ -859,8 +984,8 @@ public:
 
   constexpr static size_t rank() { return N; } /**< Get `N` */
 
-  /** Get the dimension at index. Throws std::logic_error if index
-   *  is out of bounds. Note: indexing starts at 1.
+  /** Get the dimension at index. If debugging, fails an assertion
+   *  if is out of bounds. Note: indexing starts at 0.
    */
   size_t dimension(size_t index) const { return shape_[index]; }
 
@@ -876,8 +1001,8 @@ public:
 
   /** Returns the resulting tensor by applying left to right index expansion of
    *  the provided arguments. I.e. calling `tensor(1, 2)` on a rank() 4 tensor is
-   *  equivalent to `tensor(1, 2, :, :)`. Throws std::logic_error if any of the 
-   *  indices are out bounds. Note: indexing starts at 1.
+   *  equivalent to `tensor(1, 2, :, :)`. If debugging, fails an assertion if
+   *  any of the indices are out bounds. Note: indexing starts at 0.
    */
   template <typename... Args,
             typename = typename std::enable_if<N != sizeof...(Args)>::type>
@@ -929,9 +1054,9 @@ public:
   /** Slices denotate the dimensions which are left free, while indices
    *  fix the remaining dimensions at the specified index. I.e. calling
    *  `tensor.slice<1, 3, 5>(1, 2)` on a rank() 5 tensor is equivalent to
-   *  `tensor(:, 1, :, 2, :)` and will produce a rank() 3 tensor. Throws
-   *   std::logic_error if any of the indices are out of bounds. Note:
-   *   indexing begins at 1.
+   *  `tensor(:, 1, :, 2, :)` and produces a rank() 3 tensor. If debugging,
+   *   fails an assertion if any of the indices are out of bounds. Note:
+   *   indexing begins at 0.
    */
   template <size_t... Slices, typename... Args>
   Tensor<T, sizeof...(Slices), ContainerType> slice(Args... args);
@@ -1172,15 +1297,15 @@ public:
   };
 
   /** Returns an iterator for a Tensor, equivalent to *this dimension
-   *  fixed at index (the iteration index). Note: indexing begins at 
-   *  1. std::logic_error will be thrown if `index` is out of bounds.
+   *  fixed at index (the iteration index). If debugging, an assertion
+   *  will fail if index is out of bounds. Note: indexing begins at 0. 
    */
   typename Tensor<T, N - 1, ContainerType>::Iterator begin(size_t index);
 
   /** Returns a just-past-the-end iterator for a Tensor, equivalent 
-   * to *this dimension fixed at index (the iteration index). 
-   * Note: indexing begins at 1. std::logic_error will be thrown 
-   * if `index` is out of bounds.
+   *  to *this dimension fixed at index (the iteration index). 
+   *  If debugging, and assertion will fail if `index` is out of 
+   *  bounds. Note: indexing begins at 0.
    */
   typename Tensor<T, N - 1, ContainerType>::Iterator end(size_t index);
 
@@ -1231,8 +1356,8 @@ public:
   friend void Fill(Tensor<U, M, CType_> &tensor, X const &value);
 
   /** Allocates a Tensor with shape `shape`, whose total number of elements 
-   *  must be equivalent to *this (or std::logic_error is thrown). The 
-   *  resulting Tensor is filled by iterating through *this and copying
+   *  must be equivalent to *this (or an assertion will fail during debug).
+   *  The resulting Tensor is filled by iterating through *this and copying
    *  over the values.
    */
   template <size_t M, typename C_ = ContainerType>
@@ -2032,7 +2157,7 @@ Tensor<X, M, CType_> elem_wise(Tensor<X, M, CType_> const &tensor1, Tensor<Y, M,
 
 /** Creates a Tensor whose elements are the elementwise sum of `tensor1` 
  *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
- *  a std::logic_error is thrown. 
+ *  an assertion will fail during debug.
  */
 template <typename X, typename Y, size_t M, typename C1, typename C2>
 Tensor<X, M, C1> add(
@@ -2061,7 +2186,7 @@ Tensor<T, N, ContainerType> &Tensor<T, N, ContainerType>::operator+=(Expression<
 
 /** Creates a Tensor whose elements are the elementwise difference of `tensor1` 
  *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
- *  a std::logic_error is thrown. 
+ *  an assertion will fail during debug.
  */
 template <typename X, typename Y, size_t M, typename CType_>
 Tensor<X, M, CType_> subtract(Tensor<X, M, CType_> const& tensor_1, Tensor<Y, M, CType_> const& tensor_2)
@@ -2189,7 +2314,7 @@ typename Tensor<T, N, ContainerType>::Proxy Tensor<T, N, ContainerType>::ref()
 /** Fills the elements of `tensor` with the elements between.
  *  `begin` and `end`, which must be random access iterators. The number 
  *  elements between `begin` and `end` must be equivalent to the capacity of
- *  `tensor`, otherwise std::logic_error is thrown.
+ *  `tensor`, otherwise an assertion will fail during debug.
  */
 template <typename U, size_t M, typename CType_, typename RAIt>
 void Fill(Tensor<U, M, CType_> &tensor, RAIt const &begin, RAIt const &end)
