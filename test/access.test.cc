@@ -95,8 +95,8 @@ using namespace tensor;
         REQUIRE(tensor_2.dimension(i) == i + 2); \
       for (size_t i = 0; i < tensor_2.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_2.dimension(1); ++j) \
-      	for (size_t k = 0; k < tensor_2.dimension(2); ++k) \
-  	  REQUIRE(tensor_2(i, j, k) == 100 * i + 10 * j + k); \
+        for (size_t k = 0; k < tensor_2.dimension(2); ++k) \
+      REQUIRE(tensor_2(i, j, k) == 100 * i + 10 * j + k); \
  \
       auto const tensor_3 = tensor_2(1); \
       REQUIRE(tensor_3.rank() == 2); \
@@ -104,7 +104,7 @@ using namespace tensor;
         REQUIRE(tensor_3.dimension(i) == i + 3); \
       for (size_t i = 0; i < tensor_3.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_3.dimension(1); ++j) \
-  	  REQUIRE(tensor_3(i, j) == 100 + 10 * i + j); \
+      REQUIRE(tensor_3(i, j) == 100 + 10 * i + j); \
  \
       auto const tensor_4 = tensor_1[Indices<1>{0}]; \
       REQUIRE(tensor_4.rank() == 3); \
@@ -112,8 +112,8 @@ using namespace tensor;
         REQUIRE(tensor_4.dimension(i) == i + 2); \
       for (size_t i = 0; i < tensor_4.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_4.dimension(1); ++j) \
-      	for (size_t k = 0; k < tensor_4.dimension(2); ++k) \
-  	  REQUIRE(tensor_4[Indices<3>{i, j, k}] == 100 * i + 10 * j + k); \
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k) \
+      REQUIRE(tensor_4[Indices<3>{i, j, k}] == 100 * i + 10 * j + k); \
  \
       auto const tensor_5 = tensor_4[Indices<1>{1}]; \
       REQUIRE(tensor_5.rank() == 2); \
@@ -121,7 +121,7 @@ using namespace tensor;
         REQUIRE(tensor_5.dimension(i) == i + 3); \
       for (size_t i = 0; i < tensor_5.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_5.dimension(1); ++j) \
-  	  REQUIRE(tensor_5[Indices<2>{i, j}] == 100 + 10 * i + j); \
+      REQUIRE(tensor_5[Indices<2>{i, j}] == 100 + 10 * i + j); \
     } \
   } \
 
