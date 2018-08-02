@@ -153,6 +153,12 @@ constexpr size_t Min(size_t x, size_t y)
   return x < y ? x : y;
 }
 
+/** Returns 1 if x < y, 0 o.w. */
+constexpr bool LessThan(size_t x, size_t y)
+{
+  return x < y;
+}
+
 /** template && */
 template <bool B1, bool B2>
 struct LogicalAnd { static constexpr bool value = B1 && B2; };
@@ -210,6 +216,109 @@ struct FillArgs {
     FillFirst<0, Middle, Middle + meta::NonZeroDifference(End, Middle)>(
         array1, array2, args...);
   }
+};
+
+/** Member enum `count` contains the number of elements
+ *  in `I...` strictly less than `Max`
+ */
+template <size_t Max, size_t... I>
+struct CountLTMax;
+
+/** Member enum `count` contains the number of elements
+ *  in `I...` strictly less than `Max`. Recursive case.
+ */
+template <size_t Max, size_t Index, size_t... I>
+struct CountLTMax<Max, Index, I...> {
+  enum: size_t { count = LessThan(Index, Max) + CountLTMax<Max, I...>::count };
+};
+
+/** Member enum `count` contains the number of elements
+ *  in `I...` strictly less than `Max`. Base case.
+ */
+template <size_t Max>
+struct CountLTMax<Max> {
+  enum: size_t { count = 0 }; 
+};
+
+/** Wrapper around a vardiac size_t pack */
+template <size_t... I> 
+struct Sequence {};
+
+/** Extends `Sequence<I...>` by placing `Index` in front */
+template <size_t Index, typename>
+struct Append;
+
+/** Extends `Sequence<I...>` by placing `Index` in front */
+template <size_t Index, size_t... I> 
+struct Append<Index, Sequence<I...>> {
+  using sequence = Sequence<Index, I...>;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the first `ThreshHold` elements of `I...` 
+ */
+template <size_t ThreshHold, size_t... I>
+struct MakeSequence1;
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the first `ThreshHold` elements of `I...` 
+ *  Recursive case.
+ */
+template <size_t ThreshHold, size_t Index, size_t... I>
+struct MakeSequence1<ThreshHold, Index, I...> {
+  using sequence = typename Append<Index, typename MakeSequence1<ThreshHold - 1, I...>::sequence>::sequence;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the first `ThreshHold` elements of `I...` 
+ *  Base case.
+ */
+template <size_t Index, size_t... I>
+struct MakeSequence1<0, Index, I...> {
+  using sequence = Sequence<>;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the first `ThreshHold` elements of `I...` 
+ *  Base case.
+ */
+template <>
+struct MakeSequence1<0> {
+  using sequence = Sequence<>;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the  elements of `I...` after the first 
+ *  `ThreshHold` elements. 
+ */
+template <size_t ThreshHold, size_t... I>
+struct MakeSequence2;
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the  elements of `I...` after the first 
+ *  `ThreshHold` elements. Recursive Case.
+ */
+template <size_t ThreshHold, size_t Index, size_t... I>
+struct MakeSequence2<ThreshHold, Index, I...> {
+    using sequence = typename MakeSequence2<ThreshHold - 1, I...>::sequence;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the  elements of `I...` after the first 
+ *  `ThreshHold` elements. Recursive Case.
+ */
+template <size_t Index, size_t... I>
+struct MakeSequence2<0, Index, I...> {
+    using sequence = typename Append<Index, typename MakeSequence2<0, I...>::sequence>::sequence;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where 
+ *  `X...` are the  elements of `I...` after the first 
+ *  `ThreshHold` elements. Base Case.
+ */
+template <>
+struct MakeSequence2<0> {
+    using sequence = Sequence<>;
 };
 
 } // namespace meta
@@ -1092,16 +1201,47 @@ public:
    *   fails an assertion if any of the indices are out of bounds. Note:
    *   indexing begins at 0.
    */
-  template <size_t... Slices, typename... Args>
+  template <size_t... Slices, typename... Args,
+            typename = typename std::enable_if<N != sizeof(Args)>::type>
   Tensor<T, sizeof...(Slices), ContainerType> slice(Args... args);
-  template <size_t... Slices, typename... Args>
+
+  /** Const version of slice<Slices...>(Args.. args) */
+  template <size_t... Slices, typename... Args
+            typename = typename std::enable_if<N != sizeof(Args)>::type>
   Tensor<T, sizeof...(Slices), ContainerType> const slice(Args... args) const;
 
+  /** Indentical to operator()(Args...) && `sizeof...(Args) == N` 
+   *  with a static check to verify `sizeof...(Slices) == 0`.
+   */
+  template <size_t... Slices, typename... Args,
+            typename = typename std::enable_if<N != sizeof(Args)>::type>
+  T &slice(Args... args);
+
+  /** Const version of slice<>(Args...) && `sizeof...(Args) == N` */
+  template <size_t... Slices, typename... Args,
+            typename = typename std::enable_if<N != sizeof(Args)>::type>
+  T const &slice(Args... args) const;
+
+  /** See slice<Slices...>(Args..); */
   template <size_t... Slices, size_t M>
   Tensor<T, N - M, ContainerType> slice(Indices<M> const &indices);
   
+  /** See slice<Slices...>(Args..); */
   template <size_t... Slices, size_t M>
+            typename = typename std::enable_if<N != M>::type>
   Tensor<T, N - M, ContainerType> const slice(Indices<M> const &indices) const;
+
+  /** Indentical to operator[](Indices<M> const&) && `M == N` 
+   *  with a static check to verify `sizeof...(Slices) == 0`.
+   */
+  template <size_t... Slices, size_t M,
+            typename = typename std::enable_if<N != M>::type>
+  T &slice(Indices<M> const&);
+
+  /** Const version of slice<>(Indices<M> const&) && `M == N` */
+  template <size_t... Slices, size_t M,
+            typename = typename std::enable_if<N != sizeof(Args)>::type>
+  T const &slice(Indices<M> const&) const;
 
   /* -------------------- Expressions ------------------- */
 
@@ -1403,30 +1543,33 @@ public:
   template <typename U, typename CType_> 
   friend Tensor<U, 2, CType_> transpose(Tensor<U, 1, CType_> &vec);
 
-  template <typename U, typename V, size_t M, typename CType1, 
-           typename CType2, typename FunctionType> 
-  friend U reduce(Tensor<U, M, CType1> const &tensor1, Tensor<V, M, CType2> const &tensor2, 
-      FunctionType&& fun, U initial_value);
+  template <typename FunctionType, typename U> 
+  U reduce(FunctionType&& fun, U&& initial_value) const;
 
-  template <typename FunctionType>
-  void map(FunctionType &&fn);
+  template <typename U, typename C_, typename FunctionType, typename V> 
+  V reduce(Tensor<U, N, C_> const &tensor2, FunctionType&& fun, V&& initial_value) const;
 
-  template <typename FunctionType>
-  void map(FunctionType &&fn) const;
+  template <typename U, size_t M, typename C_, typename FunctionType>
+  friend void Map(Tensor<U, M, C_> &tensor, FunctionType &&fn);
 
-  template <typename U, typename C_, typename FunctionType> 
-  void unary_map(Tensor<U, N, C_> const &tensor, FunctionType &&fn);
+  template <typename U, size_t M, typename C_, typename FunctionType>
+  friend void Map(Tensor<U, M, C_> const &tensor, FunctionType &&fn);
 
-  template <typename U, typename C_, typename FunctionType> 
-  void unary_map(Tensor<U, N, C_> const &tensor, FunctionType &&fn) const;
+  template <typename U, typename V, size_t M, typename C1, typename C2, typename FunctionType> 
+  friend void Map(Tensor<U, M, C1> &tensor_1, Tensor<V, M, C2> const &tensor_2, FunctionType &&fn);
 
-  template <typename U, typename V, typename C1, typename C2, typename FunctionType> 
-  void binary_map(Tensor<U, N, C1> const &tensor_1, Tensor<V, N, C2> const &tensor_2, 
-      FunctionType &&fn);
+  template <typename U, typename V, size_t M, typename C1, typename C2, typename FunctionType> 
+  friend void Map(Tensor<U, M, C1> const &tensor_1, Tensor<V, M, C2> const &tensor_2, FunctionType &&fn);
+
+  template <typename U, typename V, typename W, size_t M, typename C1, typename C2, 
+	    typename C3, typename FunctionType> 
+  friend void Map(Tensor<U, M, C1> &tensor_1, Tensor<V, M, C2> const &tensor_2, 
+	Tensor<W, M, C3> const &tensor_3, FunctionType &&fn);
   
-  template <typename U, typename V, typename C1, typename C2, typename FunctionType> 
-  void binary_map(Tensor<U, N, C1> const &tensor_1, Tensor<V, N, C2> const &tensor_2, 
-      FunctionType &&fn) const;
+  template <typename U, typename V, typename W, size_t M, typename C1, typename C2, 
+	    typename C3, typename FunctionType> 
+  friend void Map(Tensor<U, M, C1> const &tensor_1, Tensor<V, M, C2> const &tensor_2, 
+	Tensor<W, M, C3> const &tensor_3, FunctionType &&fn);
 
 
 private:
@@ -1484,18 +1627,18 @@ private:
     Tensor<T, N, ContainerType> const &tensor;
   };
 
-  // Increment indices, used in map()
+  // Increment indices, used in Map()
   template <size_t M>
   static void pUpdateIndices(Indices<M> &indices, IndexReference &index, size_t quota_offset = 0);
   static void pUpdateIndices(Indices<0> &, IndexReference &, size_t = 0) {}
 
-  // Increment indices, used in unary_map() -- REQUIRES EQUAL SHAPES
+  // Increment indices, used in Map() -- REQUIRES EQUAL SHAPES
   template <typename U, size_t M, typename CType_> static void
     pUpdateIndices(Indices<M> &indices, 
         typename Tensor<T, N, ContainerType>::IndexReference &index1, 
         typename Tensor<U, N, CType_>::IndexReference &index2);
 
-  // Increment indices, used in binary_map() -- REQUIRES EQUAL SHAPES
+  // Increment indices, used in Map() -- REQUIRES EQUAL SHAPES
   template <typename U, typename V, size_t M, typename CType1, typename CType2>
     static void pUpdateIndices(Indices<M> &indices, typename Tensor<T, N,
         ContainerType>::IndexReference &index1, typename Tensor<U, N,
@@ -1558,7 +1701,7 @@ Tensor<T, N, ContainerType>::Tensor(size_t const (&dimensions)[N],
   auto value_setter = 
     [&f, &args...](T &lhs) -> void { lhs = f(args...); }; 
   ref_ = std::make_shared<ContainerType>(shape_.index_product());
-  map(value_setter); 
+  Map(*this, value_setter); 
 }
 
 template <typename T, size_t N, typename ContainerType> 
@@ -1792,8 +1935,7 @@ template <typename T, size_t N, typename ContainerType>
 template <size_t... Slices, typename... Args>
 Tensor<T, sizeof...(Slices), ContainerType> Tensor<T, N, ContainerType>::slice(Args... args)
 {
-  static_assert(sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
-  static_assert(N == sizeof...(Slices) + sizeof...(args), SLICES_OUT_OF_BOUNDS);
+  static_assert(N > sizeof...(Slices) + sizeof...(args), SLICES_OUT_OF_BOUNDS);
   size_t placed_indices[N];
   // Initially fill the array with 1s
   // place 0s where the indices are sliced
@@ -1815,19 +1957,18 @@ Tensor<T, sizeof...(Slices), ContainerType> Tensor<T, N, ContainerType>::slice(A
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t... Slices, typename... Args>
+template <size_t... Slices, typename... Args, typename>
 Tensor<T, sizeof...(Slices), ContainerType> const Tensor<T, N, ContainerType>::slice(Args... indices) const
 {
   return const_cast<self_type*>(this)->slice<Slices...>(indices...);
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t... Slices, size_t M>
+template <size_t... Slices, size_t M, typename>
 Tensor<T, N - M, ContainerType>
     Tensor<T, N, ContainerType>::slice(Indices<M> const &indices)
 {
-  static_assert(sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
-  static_assert(N >= M, SLICES_OUT_OF_BOUNDS);
+  static_assert(N > M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
   size_t placed_indices[N];
   // Initially fill the array with 1s
   // place 0s where the indices are sliced
@@ -1839,15 +1980,15 @@ Tensor<T, N - M, ContainerType>
   for (size_t i = 0; i < N; ++i) {
     if (!unfilled_dimensions) break;
     if (placed_indices[N - i - 1]) {
-  placed_indices[N - i - 1] = 0;
-  --unfilled_dimensions;
+      placed_indices[N - i - 1] = 0;
+      --unfilled_dimensions;
     }
   }
   return pSliceExpansion<M>(placed_indices, indices);
 }
 
 template <typename T, size_t N, typename ContainerType>
-template <size_t... Slices, size_t M>
+template <size_t... Slices, size_t M, typename>
 Tensor<T, N - M, ContainerType> const 
     Tensor<T, N, ContainerType>::slice(Indices<M> const &indices) const
 {
@@ -2126,7 +2267,7 @@ Tensor<X, M, CType_> elem_wise(Tensor<X, M, CType_> const &tensor, Y const &scal
   auto set_vals = [&scalar, &fn](X &lhs, X const &rhs) -> void {
     lhs = fn(rhs, scalar);
   };
-  result.unary_map(tensor, set_vals);
+  Map(result, tensor, set_vals);
   return result;
 }
 
@@ -2138,7 +2279,7 @@ Tensor<X, M, CType_> elem_wise(Tensor<X, M, CType_> const &tensor1, Tensor<Y, M,
   auto set_vals = [&fn](X &lhs, X const &rhs1, Y const &rhs2) -> void {
     lhs = fn(rhs1, rhs2);
   };
-  result.binary_map(tensor1, tensor2, set_vals);
+  Map(result, tensor1, tensor2, set_vals);
   return result;
 }
 
@@ -2157,7 +2298,7 @@ Tensor<X, M, C1> add(
   {
     x = y + z;
   };
-  sum_tensor.binary_map(tensor_1, tensor_2, add);
+  Map(sum_tensor, tensor_1, tensor_2, add);
   return sum_tensor;
 }
 
@@ -2184,7 +2325,7 @@ Tensor<X, M, CType_> subtract(Tensor<X, M, CType_> const& tensor_1, Tensor<Y, M,
   {
     x = y - z;
   };
-  diff_tensor.binary_map(tensor_1, tensor_2, sub);
+  Map(diff_tensor, tensor_1, tensor_2, sub);
   return diff_tensor;
 }
 
@@ -2244,8 +2385,8 @@ X multiply(Tensor<X, 1, CType1> const& tensor_1, Tensor<Y, 1, CType2> const& ten
 {
   assert((tensor_1.shape() == tensor_2.shape()) && INNER_DIMENSION_MISMATCH);
   auto set_val = [](X &accum, X const& x, Y const& y) 
-      { return accum = accum + x * y; };
-  return reduce(tensor_1, tensor_2, set_val, X{});
+      { return accum + x * y; };
+  return tensor_1.reduce(tensor_2, set_val, X{});
 }
 
 template <typename T, size_t N, typename ContainerType>
@@ -2265,7 +2406,7 @@ Tensor<T, N, ContainerType> Tensor<T, N, ContainerType>::operator-() const
   {
     x = -y;
   };
-  neg_tensor.unary_map(*this, neg);
+  Map(neg_tensor, *this, neg);
   return neg_tensor;
 }
 
@@ -2315,7 +2456,7 @@ void Fill(Tensor<U, M, CType_> &tensor, RAIt const &begin, RAIt const &end)
     x = *it;
     ++it;
   };
-  tensor.map(allocate);
+  Map(tensor, allocate);
 }
 
 /** Assigns to each element in Tensor the value `value`
@@ -2327,7 +2468,7 @@ void Fill(Tensor<U, M, CType_> &tensor, X const &value)
   {
     x = value;
   };
-  tensor.map(allocate);
+  Map(tensor, allocate);
 }
 
 /** Returns a transposed Matrix, sharing the same underlying data as `mat`. If
@@ -2372,114 +2513,125 @@ Tensor<T, 2, ContainerType> transpose(Tensor<T, 1, ContainerType> &vec)
       vec.offset_, std::shared_ptr<ContainerType>(vec.ref_));
 }
 
-template <typename U, typename V, size_t M, typename CType1, 
-          typename CType2, typename FunctionType> 
-U reduce(Tensor<U, M, CType1> const &tensor1, Tensor<V, M, CType2> const &tensor2, 
-    FunctionType&& fun, U initial_value = U{})
+template <typename T, size_t N, typename C>
+template <typename FunctionType, typename U> 
+U Tensor<T, N, C>::reduce(FunctionType&& fun, U&& initial_value) const
 {
-  assert(tensor1.shape() == tensor2.shape() && SHAPE_MISMATCH);
-  auto accum = [&](U const &x, V const &y) {
-    fun(initial_value, x, y);
+  U ret_val = std::forward<U>(initial_value);
+  auto accum = [&](T const &x) {
+    ret_val = fun(ret_val, x);
   };
-  tensor1.unary_map(tensor2, accum);
-  return initial_value;
+  Map(*this, accum);
+  return ret_val;
 }
 
 template <typename T, size_t N, typename C>
-template <typename FunctionType>
-void Tensor<T, N, C>::map(FunctionType &&fn)
+template <typename U, typename C_, typename FunctionType, typename V> 
+V Tensor<T, N, C>::reduce(
+    Tensor<U, N, C_> const &tensor, FunctionType&& fun, V&& initial_value) const
+{
+  assert(shape_ == tensor.shape() && SHAPE_MISMATCH);
+  V ret_val = std::forward<V>(initial_value);
+  auto accum = [&](T const &x, U const &y) {
+    ret_val = fun(ret_val, x, y);
+  };
+  Map(*this, tensor, accum);
+  return ret_val;
+}
+
+template <typename U, size_t M, typename C_, typename FunctionType>
+void Map(Tensor<U, M, C_> &tensor, FunctionType &&fn)
 {
   // this is the index upper bound for iteration
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, C>::IndexReference index{*this};
+  size_t cumul_index = tensor.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C_>::IndexReference index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((*ref_)[offset_ + index.index]);
-    pUpdateIndices(indices, index);
+    fn((*tensor.ref_)[tensor.offset_ + index.index]);
+    tensor.pUpdateIndices(indices, index);
   }
 }
 
-template <typename T, size_t N, typename C>
-template <typename FunctionType>
-void Tensor<T, N, C>::map(FunctionType &&fn) const
+
+template <typename U, size_t M, typename C_, typename FunctionType>
+void Map(Tensor<U, M, C_> const &tensor, FunctionType &&fn)
 {
-  // this is the index upper bound for iteration
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, C>::IndexReference index{*this};
+  size_t cumul_index = tensor.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C_>::IndexReference index{tensor};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((static_cast<C const&>(*ref_))[offset_ + index.index]);
-    pUpdateIndices(indices, index);
+    fn((static_cast<C_ const&>(*tensor.ref_))[tensor.offset_ + index.index]);
+    tensor.pUpdateIndices(indices, index);
   }
 }
 
-template <typename T, size_t N, typename ContainerType>
-template <typename U, typename CType_, typename FunctionType>
-void Tensor<T, N, ContainerType>::unary_map(Tensor<U, N, CType_> const &tensor,
-    FunctionType &&fn)
+template <typename U, typename V, size_t M, typename C1, typename C2, typename FunctionType> 
+void Map(Tensor<U, M, C1> &tensor_1, Tensor<V, M, C2> const &tensor_2, FunctionType &&fn)
 {
-  // this is the index upper bound for iteration
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, ContainerType>::IndexReference index{*this};
-  typename Tensor<U, N, CType_>::IndexReference t_index{tensor};
+  assert(tensor_1.shape() == tensor_2.shape() && SHAPE_MISMATCH);
+  size_t cumul_index = tensor_1.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C1>::IndexReference index_1{tensor_1};
+  typename Tensor<V, M, C2>::IndexReference index_2{tensor_2};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((*ref_)[offset_ + index.index], 
-       (static_cast<CType_ const&>(*tensor.ref_))[tensor.offset_ + t_index.index]);
-    pUpdateIndices<U, N, CType_>(indices, index, t_index);
+    fn((*tensor_1.ref_)[tensor_1.offset_ + index_1.index], 
+       (static_cast<C1 const&>(*tensor_2.ref_))[tensor_2.offset_ + index_2.index]);
+    tensor_1.template pUpdateIndices<V, M, C2>(indices, index_1, index_2);
   }
 }
 
-template <typename T, size_t N, typename C>
-template <typename U, typename C_, typename FunctionType>
-void Tensor<T, N, C>::unary_map(Tensor<U, N, C_> const &tensor,
-    FunctionType &&fn) const
+template <typename U, typename V, size_t M, typename C1, typename C2, typename FunctionType> 
+void Map(Tensor<U, M, C1> const &tensor_1, Tensor<V, M, C2> const &tensor_2, FunctionType &&fn)
 {
-  // this is the index upper bound for iteration
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, C>::IndexReference index{*this};
-  typename Tensor<U, N, C_>::IndexReference t_index{tensor};
+  assert(tensor_1.shape() == tensor_2.shape() && SHAPE_MISMATCH);
+  size_t cumul_index = tensor_1.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C1>::IndexReference index_1{tensor_1};
+  typename Tensor<V, M, C2>::IndexReference index_2{tensor_2};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((static_cast<C  const&>(*ref_))[offset_ + index.index], 
-       (static_cast<C_ const&>(*tensor.ref_))[tensor.offset_ + t_index.index]);
-    pUpdateIndices<U, N, C_>(indices, index, t_index);
+    fn((static_cast<C2 const&>(*tensor_1.ref_))[tensor_1.offset_ + index_1.index], 
+       (static_cast<C1 const&>(*tensor_2.ref_))[tensor_2.offset_ + index_2.index]);
+    tensor_1.template pUpdateIndices<V, M, C2>(indices, index_1, index_2);
   }
 }
 
-template <typename T, size_t N, typename ContainerType>
-template <typename U, typename V, typename C1, typename C2, typename FunctionType>
-void Tensor<T, N, ContainerType>::binary_map(Tensor<U, N, C1> const &tensor_1, 
-    Tensor<V, N, C2> const &tensor_2, FunctionType &&fn)
+template <typename U, typename V, typename W, size_t M, typename C1, typename C2, 
+          typename C3, typename FunctionType> 
+void Map(Tensor<U, M, C1> &tensor_1, Tensor<V, M, C2> const &tensor_2, 
+	 Tensor<W, M, C3> const &tensor_3, FunctionType &&fn)
 {
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, ContainerType>::IndexReference index{*this};
-  typename Tensor<U, N, C1>::IndexReference t1_index{tensor_1};
-  typename Tensor<V, N, C2>::IndexReference t2_index{tensor_2};
+  assert(tensor_1.shape() == tensor_2.shape() && SHAPE_MISMATCH);
+  assert(tensor_2.shape() == tensor_3.shape() && SHAPE_MISMATCH);
+  size_t cumul_index = tensor_1.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C1>::IndexReference index_1{tensor_1};
+  typename Tensor<V, M, C2>::IndexReference index_2{tensor_2};
+  typename Tensor<W, M, C3>::IndexReference index_3{tensor_3};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((*ref_)[offset_ + index.index], 
-        (static_cast<C1 const&>(*tensor_1.ref_))[tensor_1.offset_ + t1_index.index], 
-        (static_cast<C2 const&>(*tensor_2.ref_))[tensor_2.offset_ + t2_index.index]);
-    pUpdateIndices<U, V, N, C1, C2>(indices, index, t1_index, t2_index);
+    fn((*tensor_1.ref_)[tensor_1.offset_ + index_1.index], 
+       (static_cast<C2 const&>(*tensor_2.ref_))[tensor_2.offset_ + index_2.index], 
+       (static_cast<C3 const&>(*tensor_3.ref_))[tensor_3.offset_ + index_3.index]);
+    tensor_1.template pUpdateIndices<V, W, M, C2, C3>(indices, index_1, index_2, index_3);
   }
 }
 
-template <typename T, size_t N, typename C>
-template <typename U, typename V, typename C1, typename C2, typename FunctionType>
-void Tensor<T, N, C>::binary_map(Tensor<U, N, C1> const &tensor_1, 
-    Tensor<V, N, C2> const &tensor_2, FunctionType &&fn) const
+template <typename U, typename V, typename W, size_t M, typename C1, typename C2, 
+          typename C3, typename FunctionType> 
+void Map(Tensor<U, M, C1> const &tensor_1, Tensor<V, M, C2> const &tensor_2, 
+	 Tensor<W, M, C3> const &tensor_3, FunctionType &&fn)
 {
-  size_t cumul_index = shape_.index_product();
-  Indices<N> indices{};
-  typename Tensor<T, N, C>::IndexReference index{*this};
-  typename Tensor<U, N, C1>::IndexReference t1_index{tensor_1};
-  typename Tensor<V, N, C2>::IndexReference t2_index{tensor_2};
+  assert(tensor_1.shape() == tensor_2.shape() && SHAPE_MISMATCH);
+  assert(tensor_2.shape() == tensor_3.shape() && SHAPE_MISMATCH);
+  size_t cumul_index = tensor_1.shape_.index_product();
+  Indices<M> indices{};
+  typename Tensor<U, M, C1>::IndexReference index_1{tensor_1};
+  typename Tensor<V, M, C2>::IndexReference index_2{tensor_2};
+  typename Tensor<W, M, C3>::IndexReference index_3{tensor_3};
   for (size_t i = 0; i < cumul_index; ++i) {
-    fn((static_cast<C  const&>(*ref_))[offset_ + index.index], 
-       (static_cast<C1 const&>(*tensor_1.ref_))[tensor_1.offset_ + t1_index.index], 
-       (static_cast<C2 const&>(*tensor_2.ref_))[tensor_2.offset_ + t2_index.index]);
-    pUpdateIndices<U, V, N, C1, C2>(indices, index, t1_index, t2_index);
+    fn((static_cast<C1 const&>(*tensor_1.ref_))[tensor_1.offset_ + index_1.index], 
+       (static_cast<C2 const&>(*tensor_2.ref_))[tensor_2.offset_ + index_2.index], 
+       (static_cast<C3 const&>(*tensor_3.ref_))[tensor_3.offset_ + index_3.index]);
+    tensor_1.template pUpdateIndices<V, W, M, C2, C3>(indices, index_1, index_2, index_3);
   }
 }
 
@@ -3929,6 +4081,18 @@ public:
   template <size_t M>
   auto operator[](Indices<M> const &indices) const 
     -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type;
+
+  template <size_t... Slices, typename... Args>
+  Tensor<T, sizeof...(Slices), ContainerType> slice(Args... args);
+
+  template <size_t... Slices, typename... Args>
+  Tensor<T, sizeof...(Slices), ContainerType> const slice(Args... args) const;
+
+  template <size_t... Slices, size_t M>
+  Tensor<T, N - M, ContainerType> slice(Indices<M> const &indices);
+  
+  template <size_t... Slices, size_t M>
+  Tensor<T, N - M, ContainerType> const slice(Indices<M> const &indices) const;
 
 private:
 
