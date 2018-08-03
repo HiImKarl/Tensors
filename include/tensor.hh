@@ -100,10 +100,6 @@ extern int eDebugConstructorCounter;
 #define PANIC_ASSERTION \
   "This assertion should never fire -> the developer messed up"
 
-/* ------------------ Lambdas -------------------- */
-
-/* ----------------------------------------------- */
-
 namespace tensor {
 
 /* --------------- Forward Declerations --------------- */
@@ -218,31 +214,100 @@ struct FillArgs {
   }
 };
 
-/** Member enum `count` contains the number of elements
- *  in `I...` strictly less than `Max`
+/** Member enum `value` is `true` iff `I...` is a 
+ *  strictly increasing sequence of unsigned integers.
  */
-template <size_t Max, size_t... I>
+template <size_t...>
+struct IsIncreasingSequence;
+
+/** Member enum `value` is `true` iff `I...` is a 
+ *  strictly increasing sequence of unsigned integers.
+ *  Recursive case.
+ */
+template <size_t I1, size_t I2, size_t... I>
+struct IsIncreasingSequence<I1, I2, I...> {
+  enum: bool { value = (I1 < I2) && IsIncreasingSequence<I2, I...> };
+};
+
+/** Member enum `value` is `true` iff `I...` is a 
+ *  strictly increasing sequence of unsigned integers.
+ *  Single value base case.
+ */
+template <size_t Index>
+struct IsIncreasingSequence<Index> {
+  enum: bool { value = true; };
+};
+
+/** Member enum `value` is `true` iff `I...` is a 
+ *  strictly increasing sequence of unsigned integers.
+ *  Empty sequence base case.
+ */
+template <>
+struct IsIncreasingSequence<> {
+  enum: bool { value = true; };
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t, size_t...>
 struct CountLTMax;
 
-/** Member enum `count` contains the number of elements
+/** Member enum `value` contains the number of elements
  *  in `I...` strictly less than `Max`. Recursive case.
  */
 template <size_t Max, size_t Index, size_t... I>
 struct CountLTMax<Max, Index, I...> {
-  enum: size_t { count = LessThan(Index, Max) + CountLTMax<Max, I...>::count };
+  enum: size_t { value = LessThan(Index, Max) + CountLTMax<Max, I...>::value };
 };
 
-/** Member enum `count` contains the number of elements
+/** Member enum `value` contains the number of elements
  *  in `I...` strictly less than `Max`. Base case.
  */
 template <size_t Max>
 struct CountLTMax<Max> {
-  enum: size_t { count = 0 }; 
+  enum: size_t { value = 0 }; 
 };
 
 /** Wrapper around a vardiac size_t pack */
-template <size_t... I> 
+template <size_t...> 
 struct Sequence {};
+
+/** Transform Sequence */
+template <typename, template <size_t...> class, size_t...>
+struct SequenceTransformer;
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element offset by `offset`.
+ */
+template <size_t...>
+struct SequenceOffset;
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element offset by `offset`. Recursive case.
+ */
+template <size_t Offset, size_t Index, size_t... I>
+struct SequenceOffset<Offset, Index, I...> {
+    using sequence = typename Append<Index - Offset, 
+                     typename SequenceOffset<Offset, I...>::sequence>::sequence;
+};
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element offset by `offset`. Base case.
+ */
+template <size_t Offset>
+struct SequenceOffset<Offset> {
+    using sequence = Sequence<>;
+};
+
+
+/** Provides typedef `sequence` which is 
+ *  `sequence` transformed with `transformer` 
+ */ 
+template <size_t... I, template <size_t...> class Transformer, size_t... Initial>
+struct SequenceTransformer<Sequence<I...>, Transformer, Initial...> {
+    using sequence = typename Transformer<Initial..., I...>::sequence;
+};
 
 /** Extends `Sequence<I...>` by placing `Index` in front */
 template <size_t Index, typename>
@@ -416,27 +481,31 @@ struct ValueAsTensor<Tensor<T, N, ContainerType>> {
   ValueAsTensor(Tensor<T, N, ContainerType> const &val): value(val) {}
   Tensor<T, N, ContainerType> const &value;
 
-  template <typename... Args,
-            typename = typename std::enable_if<N != sizeof...(Args)>::type>
-  Tensor<T, N - sizeof...(Args), ContainerType> const operator()(Args... indices) 
-  { return value(indices...); }
+  template <typename... Args>
+  auto operator()(Args... args) const
+    -> decltype(std::declval<Tensor<T, N, ContainerType> const>()(args...))
+    { return value(args...); }
 
-  template <typename... Args,
-            typename = typename std::enable_if<N == sizeof...(Args)>::type>
-  T const &operator()(Args... args) 
-  { return value(args...); }
+  template <typename... Args>
+  auto at(Args... args) const
+    -> decltype(std::declval<Tensor<T, N, ContainerType> const>().at(args...))
+    { return value.at(args...); }
 
-  template <size_t M, typename = typename std::enable_if<N != M>::type>
-  Tensor<T, N - M, ContainerType> const operator[](Indices<M> const &indices)
-  { return value[indices]; }
+  template <size_t M> 
+  auto operator[](Indices<M> const &indices) const
+    -> decltype(std::declval<Tensor<T, N, ContainerType> const>()[indices])
+    { return value[indices]; }
 
-  template <size_t M, typename = typename std::enable_if<N == M>::type>
-  T const &operator[](Indices<M> const &indices)
-  { return value[indices]; } 
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> decltype(std::declval<Tensor<T, N, ContainerType> const>().slice(args...))
+    { return value.template slice<Slices...>(args...); }
 
   template <size_t... Slices, size_t M>
-  Tensor<T, N - M, ContainerType> slice(Indices<M> const &indices)
-        { return value.template slice<Slices...>(indices); }
+  auto slice(Indices<M> const &indices) const
+    -> decltype(std::declval<Tensor<T, N, ContainerType> const>().slice(indices))
+    { return value.template slice<Slices...>(indices); }
+
 };
 
 /** BinaryAdd specialization of ValueAsTensor, `value` is a 
@@ -448,21 +517,37 @@ struct ValueAsTensor<BinaryAdd<LHS, RHS>> {
   BinaryAdd<LHS, RHS> const &value;
   typedef typename LHS::value_type          value_type;
   typedef typename LHS::container_type      container_type;
-  constexpr static size_t N =               LHS::rank();
+  constexpr static size_t rank()            { return LHS::rank(); }
 
-  template <typename... Args,
-            typename = typename std::enable_if<N != sizeof...(Args)>::type>
-  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
-
-  template <typename... Args,
-            typename = typename std::enable_if<N == sizeof...(Args)>::type>
-  value_type operator()(Args... args) { return value(args...); }
-
-  template <size_t M>
-  auto operator[](Indices<M> const &indices)
+  template <typename... Args>
+  auto operator()(Args... args) const
     -> typename std::remove_reference<
-       decltype(std::declval<Tensor<value_type, N, container_type>>()[indices])>::type
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()(args...))>::type
+    { return value(args...); }
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().at(args...))>::type
+    { return value.at(args...); }
+
+  template <size_t M> 
+  auto operator[](Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()[indices])>::type
     { return value[indices]; }
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(args...))>::type
+    { return value.template slice<Slices...>(args...); }
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(indices))>::type
+    { return value.template slice<Slices...>(indices); }
 };
 
 /** BinarySub specialization of ValueAsTensor, `value` is a 
@@ -472,24 +557,39 @@ template <typename LHS, typename RHS>
 struct ValueAsTensor<BinarySub<LHS, RHS>> {
   ValueAsTensor(BinarySub<LHS, RHS> const &val): value(val) {}
   BinarySub<LHS, RHS> const &value;
-
   typedef typename LHS::value_type          value_type;
   typedef typename LHS::container_type      container_type;
+  constexpr static size_t rank()            { return LHS::rank(); }
 
-  constexpr static size_t N =      LHS::rank();
-  template <typename... Args,
-            typename = typename std::enable_if<N != sizeof...(Args)>::type>
-  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
-
-  template <typename... Args,
-            typename = typename std::enable_if<N == sizeof...(Args)>::type>
-  value_type operator()(Args... args) { return value(args...); }
-
-  template <size_t M>
-  auto operator[](Indices<M> const &indices)
+  template <typename... Args>
+  auto operator()(Args... args) const
     -> typename std::remove_reference<
-       decltype(std::declval<Tensor<value_type, N, container_type>>()[indices])>::type
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()(args...))>::type
+    { return value(args...); }
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().at(args...))>::type
+    { return value.at(args...); }
+
+  template <size_t M> 
+  auto operator[](Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()[indices])>::type
     { return value[indices]; }
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(args...))>::type
+    { return value.template slice<Slices...>(args...); }
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(indices))>::type
+    { return value.template slice<Slices...>(indices); }
 };
 
 /** BinaryMul specialization of ValueAsTensor, `value` is a 
@@ -499,25 +599,39 @@ template <typename LHS, typename RHS>
 struct ValueAsTensor<BinaryMul<LHS, RHS>> {
   ValueAsTensor(BinaryMul<LHS, RHS> const &val): value(val) {}
   BinaryMul<LHS, RHS> const &value;
-
   typedef typename LHS::value_type          value_type;
   typedef typename LHS::container_type      container_type;
+  constexpr static size_t rank()            { return LHS::rank() + RHS::rank() - 2; }
 
-  constexpr static size_t N =      LHS::rank() + RHS::rank() - 2;
-
-  template <typename... Args,
-            typename = typename std::enable_if<N != sizeof...(Args)>::type>
-  Tensor<value_type, N - sizeof...(Args), container_type> operator()(Args... args) { return value(args...); }
-
-  template <typename... Args,
-            typename = typename std::enable_if<N == sizeof...(Args)>::type>
-  value_type operator()(Args... args) { return value(args...); }
-
-  template <size_t M>
-  auto operator[](Indices<M> const &indices)
+  template <typename... Args>
+  auto operator()(Args... args) const
     -> typename std::remove_reference<
-       decltype(std::declval<Tensor<value_type, N, container_type>>()[indices])>::type
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()(args...))>::type
+    { return value(args...); }
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().at(args...))>::type
+    { return value.at(args...); }
+
+  template <size_t M> 
+  auto operator[](Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>()[indices])>::type
     { return value[indices]; }
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(args...))>::type
+    { return value.template slice<Slices...>(args...); }
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<
+       decltype(std::declval<Tensor<value_type, rank(), container_type> const>().slice(indices))>::type
+    { return value.template slice<Slices...>(indices); }
 };
 
 /* -------------------- Data Containers --------------------- */
@@ -2408,6 +2522,19 @@ Tensor<X, M1 + M2 - 2, CType1> multiply(Tensor<X, M1, CType1> const& tensor_1, T
   return prod_tensor;
 }
 
+/** FIXME -- Vector-Vector multiplication is usually left undefined by literature:
+ *  for now define it as the hadamard product.
+ */ 
+template <typename X, typename Y, typename CType1, typename CType2>
+X multiply(Tensor<X, 1, CType1> const& tensor_1, Tensor<Y, 1, CType2> const& tensor_2)
+{
+  assert(tensor_1.shape() == tensor_2.shape() && SHAPE_MISMATCH);
+  auto mul_vals = [](X &accum, X const &x, Y const &y) {
+    return accum + x * y; 
+  };
+  return tensor_1.reduce(tensor_2, mul_vals, X{});
+}
+
 template <typename T, size_t N, typename ContainerType>
 template <typename RHS>
 Tensor<T, N, ContainerType> &Tensor<T, N, ContainerType>::operator*=(Expression<RHS> const &rhs)
@@ -3189,12 +3316,13 @@ public:
 
 // Scalar specialization
 template <typename T, typename ContainerType>
-class Tensor<T, 0, ContainerType>: public Expression<Tensor<T, 0, ContainerType>> { /*@Tensor<T, 0, ContainerType>*/
-public:
+class Tensor<T, 0, ContainerType>: public Expression<Tensor<T, 0, ContainerType>> { 
+  /*@Tensor<T, 0, ContainerType>*/
   /** Scalar specialization of Tensor object. The major motivation is
    *  the ability to implicitly convert to the underlying data type,
    *  allowing the Scalar to effectively be used as an ordinary value.
    */
+public:
   typedef T                                value_type;
   typedef ContainerType                    container_type;
   typedef T&                               reference_type;
@@ -3252,14 +3380,24 @@ public:
 
   /* -------------- Getters -------------- */
 
-  constexpr static size_t rank() { return 0; }  /**< 0 */
-  Shape<0> shape() const noexcept { return shape_; } /**< Returns a scalar shape */
-  value_type &operator()() { return (*ref_)[offset_]; } /**< Returns the data as a reference */
-  /**< Returns the data as a const reference */
+  constexpr static size_t rank() { return 0; }  
+  Shape<0> shape() const noexcept { return shape_; } 
+  /** Returns the data as a reference */
+  value_type &operator()() { return (*ref_)[offset_]; } 
+  /** Returns the data as a const reference */
   value_type const &operator()() const { return (*ref_)[offset_]; }
-  /**< Used to implement iterator->, should not be used explicitly */
+  /** Creates a Scalar with the same underlying data */
+  Tensor<T, 0, ContainerType> at() { return Tensor<T, 0, ContainerType>(this->ref()); }
+  /** Creates a const Scalar with the same underlying data */
+  Tensor<T, 0, ContainerType> const at() const { return Tensor<T, 0, ContainerType>(this->ref()); }
+  /** Creates a Scalar with the same underlying data */
+  Tensor<T, 0, ContainerType> slice() { return Tensor<T, 0, ContainerType>(this->ref()); }
+  /** Creates a const Scalar with the same underlying data */
+  Tensor<T, 0, ContainerType> const slice() const { return Tensor<T, 0, ContainerType>(this->ref()); }
+
+  /** Used to implement iterator->, should not be used explicitly */
   Tensor *operator->() { return this; } 
-  /**< Used to implement const_iterator->, should not be used explicitly */
+  /** Used to implement const_iterator->, should not be used explicitly */
   Tensor const *operator->() const { return this; }
 
   /* -------------- Setters -------------- */
@@ -4089,13 +4227,23 @@ public:
 
   template <typename... Args>
   auto operator()(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type;
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>()(args...))>::type;
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().at(args...))>::type;
 
   template <size_t M>
   auto operator[](Indices<M> const &indices) const 
-    -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type;
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>()[indices])>::type;
 
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(args...))>::type;
 
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(indices))>::type;
 
 private:
 
@@ -4103,7 +4251,6 @@ private:
 
   BinaryAdd(LHSType const &lhs, RHSType const &rhs);
   BinaryAdd(BinaryAdd<LHSType, RHSType> const&) = default;
-
 
   /* ------------------ Data ------------------ */
 
@@ -4118,7 +4265,7 @@ BinaryAdd<LHSType, RHSType>::BinaryAdd(LHSType const &lhs, RHSType const &rhs)
 template <typename LHSType, typename RHSType>
 template <typename... Args>
 auto BinaryAdd<LHSType, RHSType>::operator()(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>()(args...))>::type
 {
   static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
   return add(ValueAsTensor<LHSType>(lhs_)(args...),
@@ -4126,13 +4273,44 @@ auto BinaryAdd<LHSType, RHSType>::operator()(Args... args) const
 }
 
 template <typename LHSType, typename RHSType>
+template <typename... Args>
+auto BinaryAdd<LHSType, RHSType>::at(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().at(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return Tensor<value_type, rank() - sizeof...(args), container_type>(
+            add(ValueAsTensor<LHSType>(lhs_)(args...),
+                ValueAsTensor<RHSType>(rhs_)(args...)));
+}
+
+template <typename LHSType, typename RHSType>
 template <size_t M>
 auto BinaryAdd<LHSType, RHSType>::operator[](Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>()[indices])>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   return add(ValueAsTensor<LHSType>(lhs_)[indices],
              ValueAsTensor<RHSType>(rhs_)[indices]);
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t... Slices, typename... Args>
+auto BinaryAdd<LHSType, RHSType>::slice(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return add(ValueAsTensor<LHSType>(lhs_).template slice<Slices...>(args...),
+             ValueAsTensor<RHSType>(rhs_).template slice<Slices...>(args...));
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t... Slices, size_t M>
+auto BinaryAdd<LHSType, RHSType>::slice(Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(indices))>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  return add(ValueAsTensor<LHSType>(lhs_).template slice<Slices...>(indices),
+             ValueAsTensor<RHSType>(rhs_).template slice<Slices...>(indices));
 }
 
 template <typename LHSType, typename RHSType>
@@ -4192,13 +4370,23 @@ public:
 
   template <typename... Args>
   auto operator()(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type;
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>()(args...))>::type;
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().at(args...))>::type;
 
   template <size_t M>
   auto operator[](Indices<M> const &indices) const 
-    -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type;
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>()[indices])>::type;
 
-  /* ------------------------------------------ */
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(args...))>::type;
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(indices))>::type;
 
 private:
 
@@ -4220,7 +4408,7 @@ BinarySub<LHSType, RHSType>::BinarySub(LHSType const &lhs, RHSType const &rhs)
 template <typename LHSType, typename RHSType>
 template <typename... Args>
 auto BinarySub<LHSType, RHSType>::operator()(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()(args...))>::type
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>()(args...))>::type
 {
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   return subtract(
@@ -4231,11 +4419,42 @@ auto BinarySub<LHSType, RHSType>::operator()(Args... args) const
 template <typename LHSType, typename RHSType>
 template <size_t M>
 auto BinarySub<LHSType, RHSType>::operator[](Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<LHSType>()[indices])>::type
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>()[indices])>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   return subtract(ValueAsTensor<LHSType>(lhs_)[indices],
-             ValueAsTensor<RHSType>(rhs_)[indices]);
+                  ValueAsTensor<RHSType>(rhs_)[indices]);
+}
+
+template <typename LHSType, typename RHSType>
+template <typename... Args>
+auto BinarySub<LHSType, RHSType>::at(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().at(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return Tensor<value_type, rank() - sizeof...(args), container_type>(
+            subtract(ValueAsTensor<LHSType>(lhs_)(args...),
+                     ValueAsTensor<RHSType>(rhs_)(args...)));
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t... Slices, typename... Args>
+auto BinarySub<LHSType, RHSType>::slice(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return subtract(ValueAsTensor<LHSType>(lhs_).template slice<Slices...>(args...),
+                  ValueAsTensor<RHSType>(rhs_).template slice<Slices...>(args...));
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t... Slices, size_t M>
+auto BinarySub<LHSType, RHSType>::slice(Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<LHSType const>().slice(indices))>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  return subtract(ValueAsTensor<LHSType>(lhs_).template slice<Slices...>(indices),
+                   ValueAsTensor<RHSType>(rhs_).template slice<Slices...>(indices));
 }
 
 template <typename LHSType, typename RHSType>
@@ -4299,23 +4518,25 @@ public:
   Shape<self_type::rank()> const &shape() const { return shape_; }
   size_t dimension(size_t index) const; 
 
-  template <typename... Args, 
-            typename = typename std::enable_if<self_type::rank() != sizeof...(Args)>::type>
+  template <typename... Args>
   auto operator()(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<return_type>()(args...))>::type;
-  
-  template <size_t M,
-            typename = typename std::enable_if<self_type::rank() != M>::type>
-  auto operator[](Indices<M> const &indices) const
-    -> typename std::remove_reference<decltype(std::declval<return_type>()[indices])>::type;
+    -> typename std::remove_reference<decltype(std::declval<return_type const>()(args...))>::type;
 
-  template <typename... Args, 
-            typename = typename std::enable_if<self_type::rank() == sizeof...(Args)>::type>
-  value_type operator()(Args... args) const;
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<return_type const>().at(args...))>::type;
   
-  template <size_t M,
-            typename = typename std::enable_if<self_type::rank() == M>::type>
-  value_type operator[](Indices<M> const &indices) const;
+  template <size_t M>
+  auto operator[](Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<return_type const>()[indices])>::type;
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(args...))>::type;
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(indices))>::type;
 
 private:
 
@@ -4355,9 +4576,9 @@ size_t BinaryMul<LHSType, RHSType>::dimension(size_t index) const
 }
 
 template <typename LHSType, typename RHSType>
-template <typename... Args, typename>
+template <typename... Args>
 auto BinaryMul<LHSType, RHSType>::operator()(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_type>()(args...))>::type
+  -> typename std::remove_reference<decltype(std::declval<return_type const>()(args...))>::type
 {
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHSType::rank() - 1, sizeof...(args));
@@ -4368,9 +4589,23 @@ auto BinaryMul<LHSType, RHSType>::operator()(Args... args) const
 }
 
 template <typename LHSType, typename RHSType>
-template <size_t M, typename>
+template <typename... Args>
+auto BinaryMul<LHSType, RHSType>::at(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<return_type const>().at(args...))>::type
+{
+  static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
+  constexpr size_t left = meta::Min(LHSType::rank() - 1, sizeof...(args));
+  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHSType::rank() - 1);
+  meta::FillArgs<left, right + left> seperate_args(args...);
+  return Tensor<value_type, self_type.rank() - sizeof...(args), container_type>(
+      multiply(ValueAsTensor<LHSType>(lhs_)[Indices<left>(seperate_args.array1)],
+               ValueAsTensor<RHSType>(rhs_).template slice<0>(Indices<right>(seperate_args.array2))));
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t M>
 auto BinaryMul<LHSType, RHSType>::operator[](Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_type>()[indices])>::type
+  -> typename std::remove_reference<decltype(std::declval<return_type const>()[indices])>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHSType::rank() - 1, M);
@@ -4383,39 +4618,32 @@ auto BinaryMul<LHSType, RHSType>::operator[](Indices<M> const &indices) const
 }
 
 template <typename LHSType, typename RHSType>
-template <typename... Args, typename>
-typename LHSType::value_type BinaryMul<LHSType, RHSType>::operator()(Args... args) const
+template <size_t... Slices, typename... Args>
+auto BinaryMul<LHSType, RHSType>::slice(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(args...))>::type
 {
-  constexpr size_t left = meta::Min(LHSType::rank() - 1, sizeof...(Args));
-  constexpr size_t right = meta::NonZeroDifference(sizeof...(Args), LHSType::rank() - 1);
-  meta::FillArgs<left, right + left> seperate_args(args...);
-  using X = typename LHSType::value_type;
-  using Y = typename RHSType::value_type;
-  auto tensor_1 = lhs_[Indices<left>(seperate_args.array1)];
-  auto tensor_2 = rhs_.template slice<0>(Indices<right>(seperate_args.array2));
-  auto mul_vals = [](X &accum, X const &x, Y const &y) {
-    return accum + x * y; 
-  };
-  return tensor_1.reduce(tensor_2, mul_vals, X{});
-}
-  
-template <typename LHSType, typename RHSType>
-template <size_t M, typename>
-typename LHSType::value_type BinaryMul<LHSType, RHSType>::operator[](Indices<M> const &indices) const
-{
+  static_assert(meta::IsIncreasingSequence<Slices...>::value, SLICE_INDICES_DESCENDING);
+  constexpr size_t thresh_hold = meta::CountLTMax<LHSType.rank(), Slices...>::value;
   constexpr size_t left = meta::Min(LHSType::rank() - 1, M);
   constexpr size_t right = meta::NonZeroDifference(M, LHSType::rank() - 1);
   size_t array1[left], array2[right];
-  for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
-  for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  using X = typename LHSType::value_type;
-  using Y = typename RHSType::value_type;
-  auto tensor_1 = lhs_[Indices<left>(array1)];
-  auto tensor_2 = rhs_.template slice<0>(Indices<right>(array2));
-  auto mul_vals = [](X &accum, X const &x, Y const &y) {
-    return accum + x * y; 
-  };
-  return tensor_1.reduce(tensor_2, mul_vals, X{});
+  meta::FillArgs<left, right + left> seperate_args(args...);
+
+  auto sequence1 = MakeSequence1<thresh_hold, Slices...>::sequence{};
+  // FIXME -- Very difficult to read
+  auto sequence2 = Append<0, SequenceTransformer<MakeSequence1<
+        typename thresh_hold, Slices...>::sequence,
+        SequenceOffset, LHSType::rank() - 1>::sequence{};
+  return multiply(ValueAsTensor<LHSType>(lhs_)[Indices<left>(array1)],
+                  ValueAsTensor<RHSType>(rhs_).template slice<0>(Indices<right>(array2)));
+}
+
+template <typename LHSType, typename RHSType>
+template <size_t... Slices, size_t M>
+auto BinaryMul<LHSType, RHSType>::slice(Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(indices))>::type
+{
+
 }
 
 template <typename LHSType, typename RHSType>
