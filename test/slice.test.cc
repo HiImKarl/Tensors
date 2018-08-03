@@ -5,7 +5,7 @@ using namespace tensor;
 
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER " Slicing Tensors with Args...") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_1({2, 4, 6}); \
+    Tensor<int32_t, 3, CONTAINER> tensor_1({2, 4, 6}); \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) \
@@ -99,7 +99,7 @@ using namespace tensor;
   } \
   \
   TEST_CASE(#CONTAINER " Slicing Tensors with Indices") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_1({2, 4, 6}); \
+    Tensor<int32_t, 3, CONTAINER> tensor_1({2, 4, 6}); \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) \

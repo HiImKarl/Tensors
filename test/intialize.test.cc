@@ -7,7 +7,7 @@ using namespace tensor;
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER " Intializing Tensors", "[int]") { \
    \
-    auto tensor_1 = Tensor<int32_t, 4, CONTAINER<int32_t>>{1, 2, 3, 4}; \
+    auto tensor_1 = Tensor<int32_t, 4, CONTAINER>{1, 2, 3, 4}; \
    \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
@@ -67,12 +67,12 @@ using namespace tensor;
    } \
    \
    SECTION("Value Constructor") { \
-      auto ones = Tensor<int32_t, 3, CONTAINER<int32_t>>({2, 3, 4}, 1); \
+      auto ones = Tensor<int32_t, 3, CONTAINER>({2, 3, 4}, 1); \
       for (size_t i = 0; i < ones.dimension(0); ++i) \
         for (size_t j = 0; j < ones.dimension(1); ++j) \
           for (size_t k = 0; k < ones.dimension(2); ++k) \
             REQUIRE(ones(i, j, k) == 1); \
-      auto twos = Tensor<int32_t, 3, CONTAINER<int32_t>>({2, 3, 4}, 2.3f); \
+      auto twos = Tensor<int32_t, 3, CONTAINER>({2, 3, 4}, 2.3f); \
       for (size_t i = 0; i < twos.dimension(0); ++i) \
         for (size_t j = 0; j < twos.dimension(1); ++j) \
           for (size_t k = 0; k < twos.dimension(2); ++k) \
@@ -80,7 +80,7 @@ using namespace tensor;
    } \
    \
    SECTION("C Multi-dimensional arrays") { \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> naturals = _A<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); \
+      Tensor<int32_t, 3, CONTAINER> naturals = _A<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); \
       REQUIRE(naturals.rank() == 3); \
       REQUIRE(naturals.dimension(0) == 1); \
       REQUIRE(naturals.dimension(1) == 6); \
@@ -93,7 +93,7 @@ using namespace tensor;
    } \
    \
    SECTION("Fill Method") { \
-      auto naturals = Tensor<int32_t, 3, CONTAINER<int32_t>>{2, 3, 4}; \
+      auto naturals = Tensor<int32_t, 3, CONTAINER>{2, 3, 4}; \
       std::deque<int32_t> container{}; \
       for (int i = 0; i < 24; ++i) container.push_back(i); \
       Fill(naturals, container.begin(), container.end()); \
@@ -116,7 +116,7 @@ using namespace tensor;
         return count - x; \
       }; \
    \
-      auto naturals = Tensor<int32_t, 3, CONTAINER<int32_t>>(Shape<3>{2, 3, 4}, factory, 1); \
+      auto naturals = Tensor<int32_t, 3, CONTAINER>(Shape<3>{2, 3, 4}, factory, 1); \
       for (size_t i = 0; i < naturals.dimension(0); ++i) \
         for (size_t j = 0; j < naturals.dimension(1); ++j) \
           for (size_t k = 0; k < naturals.dimension(2); ++k) \
@@ -126,8 +126,8 @@ using namespace tensor;
    \
   TEST_CASE(#CONTAINER " Initializing Scalars") { \
    \
-    Scalar<int32_t, CONTAINER<int32_t>> scalar_1{}; \
-    Scalar<int32_t, CONTAINER<int32_t>> scalar_2(0); \
+    Scalar<int32_t, CONTAINER> scalar_1{}; \
+    Scalar<int32_t, CONTAINER> scalar_2(0); \
    \
     SECTION("Rank and Dimensions") { \
       REQUIRE(scalar_1.rank() == 0); \

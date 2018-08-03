@@ -6,7 +6,7 @@ using namespace tensor;
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER ": Tensor Assignment", "[int]") { \
  \
-    auto tensor_1 = Tensor<int32_t, 4, CONTAINER<int32_t>>({1, 2, 3, 4}); \
+    auto tensor_1 = Tensor<int32_t, 4, CONTAINER>({1, 2, 3, 4}); \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) \
@@ -15,7 +15,7 @@ using namespace tensor;
  \
     SECTION("Assigning Tensors to Tensors") { \
  \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> t2({3, 4}); \
+      Tensor<int32_t, 2, CONTAINER> t2({3, 4}); \
       for (size_t i = 0; i < t2.dimension(0); ++i) \
         for (size_t j = 0; j < t2.dimension(1); ++j) \
           t2(i, j) = tensor_1(0, 0, i, j); \
@@ -34,7 +34,7 @@ using namespace tensor;
         for (size_t j = 0; j < tensor_1.dimension(3); ++j) \
           REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); \
  \
-      Tensor<double, 4, CONTAINER<double>> t3({1, 2, 3, 4}); \
+      Tensor<double, 4, CONTAINER> t3({1, 2, 3, 4}); \
       for (size_t i = 0; i < t3.dimension(0); ++i) \
         for (size_t j = 0; j < t3.dimension(1); ++j) \
           for (size_t k = 0; k < t3.dimension(2); ++k) \
@@ -51,7 +51,7 @@ using namespace tensor;
     } \
  \
     SECTION("Assigning Integral Different-Typed Tensors to Tensors") { \
-      Tensor<long double, 2, CONTAINER<long double>> t2({3, 4}); \
+      Tensor<long double, 2, CONTAINER> t2({3, 4}); \
       for (size_t i = 0; i < t2.dimension(0); ++i) \
         for (size_t j = 0; j < t2.dimension(1); ++j) \
           t2(i, j) = tensor_1(0, 0, i, j); \
@@ -71,7 +71,7 @@ using namespace tensor;
         for (size_t j = 0; j < tensor_1.dimension(3); ++j) \
           REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); \
  \
-      Tensor<int64_t, 4, CONTAINER<int64_t>> t3({1, 2, 3, 4}); \
+      Tensor<int64_t, 4, CONTAINER> t3({1, 2, 3, 4}); \
       for (size_t i = 0; i < t3.dimension(0); ++i) \
         for (size_t j = 0; j < t3.dimension(1); ++j) \
           for (size_t k = 0; k < t3.dimension(2); ++k) \
@@ -88,8 +88,8 @@ using namespace tensor;
  \
     SECTION("Assigning Tensors to Reference Tensors") { \
  \
-      Tensor<int32_t, 4, CONTAINER<int32_t>> tensor_1_ref = tensor_1.ref(); \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> t2({3, 4}); \
+      Tensor<int32_t, 4, CONTAINER> tensor_1_ref = tensor_1.ref(); \
+      Tensor<int32_t, 2, CONTAINER> t2({3, 4}); \
       for (size_t i = 0; i < t2.dimension(0); ++i) \
         for (size_t j = 0; j < t2.dimension(1); ++j) \
           t2(i, j) = tensor_1(0, 0, i, j); \
@@ -104,7 +104,7 @@ using namespace tensor;
         for (size_t j = 0; j < tensor_1.dimension(3); ++j) \
           REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); \
  \
-      Tensor<double, 4, CONTAINER<double>> t3({1, 2, 3, 4}); \
+      Tensor<double, 4, CONTAINER> t3({1, 2, 3, 4}); \
       for (size_t i = 0; i < t3.dimension(0); ++i) \
         for (size_t j = 0; j < t3.dimension(1); ++j) \
           for (size_t k = 0; k < t3.dimension(2); ++k) \
@@ -139,12 +139,12 @@ using namespace tensor;
     } \
  \
     SECTION("Assigning Scalar Tensors to Tensors") { \
-      Scalar<int32_t, CONTAINER<int32_t>> scalar_1(0); \
+      Scalar<int32_t, CONTAINER> scalar_1(0); \
       tensor_1.at(0, 0, 0, 0) = scalar_1(); \
       REQUIRE(tensor_1(0, 0, 0, 0) == 0); \
       REQUIRE(tensor_1(0, 0, 0, 0) == scalar_1()); \
  \
-      Scalar<double, CONTAINER<double>> scalar_2(-12); \
+      Scalar<double, CONTAINER> scalar_2(-12); \
       tensor_1.at(0, 0, 0, 0) = scalar_2(); \
       REQUIRE(tensor_1(0, 0, 0, 0) == -12); \
       REQUIRE(tensor_1(0, 0, 0, 0) == scalar_2()); \
@@ -161,9 +161,9 @@ using namespace tensor;
  \
   TEST_CASE(#CONTAINER ": Scalar Assignment", "[int]") { \
  \
-    auto tensor_1 = Tensor<int32_t, 4, CONTAINER<int32_t>>({1, 2, 3, 4}); \
+    auto tensor_1 = Tensor<int32_t, 4, CONTAINER>({1, 2, 3, 4}); \
  \
-    Scalar<int32_t, CONTAINER<int32_t>> scalar_1{}; \
+    Scalar<int32_t, CONTAINER> scalar_1{}; \
  \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
@@ -175,7 +175,7 @@ using namespace tensor;
     scalar_1 = 0; \
  \
     SECTION("Assigning Tensors to Tensors") { \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> t2({3, 4}); \
+      Tensor<int32_t, 2, CONTAINER> t2({3, 4}); \
       for (size_t i = 0; i < t2.dimension(0); ++i) \
         for (size_t j = 0; j < t2.dimension(1); ++j) \
           t2(i, j) = tensor_1(0, 1, i, j); \
@@ -195,7 +195,7 @@ using namespace tensor;
         for (size_t j = 0; j < tensor_1.dimension(3); ++j) \
           REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); \
  \
-      Tensor<int32_t, 4, CONTAINER<int32_t>> t3({1, 2, 3, 4}); \
+      Tensor<int32_t, 4, CONTAINER> t3({1, 2, 3, 4}); \
  \
       for (size_t i = 0; i < t3.dimension(0); ++i) \
         for (size_t j = 0; j < t3.dimension(1); ++j) \
@@ -212,7 +212,7 @@ using namespace tensor;
     } \
  \
     SECTION("Assigning Integral Different-Typed Tensors to Tensors") { \
-      Tensor<long double, 2, CONTAINER<long double>> t2({3, 4}); \
+      Tensor<long double, 2, CONTAINER> t2({3, 4}); \
       for (size_t i = 0; i < t2.dimension(0); ++i) \
         for (size_t j = 0; j < t2.dimension(1); ++j) \
           t2(i, j) = tensor_1(0, 0, i, j); \
@@ -232,7 +232,7 @@ using namespace tensor;
         for (size_t j = 0; j < tensor_1.dimension(3); ++j) \
           REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); \
  \
-      Tensor<int64_t, 4, CONTAINER<int64_t>> t3({1, 2, 3, 4}); \
+      Tensor<int64_t, 4, CONTAINER> t3({1, 2, 3, 4}); \
       for (size_t i = 0; i < t3.dimension(0); ++i) \
         for (size_t j = 0; j < t3.dimension(1); ++j) \
           for (size_t k = 0; k < t3.dimension(2); ++k) \

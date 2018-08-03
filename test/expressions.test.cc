@@ -5,8 +5,8 @@ using namespace tensor;
 
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER " Basic Tensor Arithmetic, Non-scalar") { \
-    auto tensor_1 = Tensor<int32_t, 3, CONTAINER<int32_t>>{2, 3, 4}; \
-    auto tensor_2 = Tensor<int32_t, 3, CONTAINER<int32_t>>{2, 3, 4}; \
+    auto tensor_1 = Tensor<int32_t, 3, CONTAINER>{2, 3, 4}; \
+    auto tensor_2 = Tensor<int32_t, 3, CONTAINER>{2, 3, 4}; \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) \
@@ -19,8 +19,8 @@ using namespace tensor;
    \
    \
     SECTION("Two Term Addition/Subtract") { \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_3 = tensor_1 + tensor_2; \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_4 = tensor_3 - tensor_1; \
+      Tensor<int32_t, 3, CONTAINER> tensor_3 = tensor_1 + tensor_2; \
+      Tensor<int32_t, 3, CONTAINER> tensor_4 = tensor_3 - tensor_1; \
    \
       REQUIRE(typeid(tensor_3) != typeid(tensor_1 + tensor_2)); \
       REQUIRE(typeid(tensor_4) != typeid(tensor_3 - tensor_1)); \
@@ -61,7 +61,7 @@ using namespace tensor;
     } \
    \
     SECTION("Multi-Term Addition/Subtract") { \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_3 = tensor_2 + tensor_1 + tensor_2; \
+      Tensor<int32_t, 3, CONTAINER> tensor_3 = tensor_2 + tensor_1 + tensor_2; \
    \
       for (size_t i = 0; i < tensor_3.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_3.dimension(1); ++j) \
@@ -83,7 +83,7 @@ using namespace tensor;
             indices.increment(shape_1); \
           } \
    \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_4 = tensor_3 - tensor_2 + tensor_1; \
+      Tensor<int32_t, 3, CONTAINER> tensor_4 = tensor_3 - tensor_2 + tensor_1; \
    \
       for (size_t i = 0; i < tensor_4.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_4.dimension(1); ++j) \
@@ -127,8 +127,8 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER " Scalar Arithmatic") { \
-    auto tensor_1 = Scalar<int32_t, CONTAINER<int32_t>>(10); \
-    auto tensor_2 = Scalar<int32_t, CONTAINER<int32_t>>(-10); \
+    auto tensor_1 = Scalar<int32_t, CONTAINER>(10); \
+    auto tensor_2 = Scalar<int32_t, CONTAINER>(-10); \
    \
     SECTION("Binary Addition/Subtract") { \
       REQUIRE(tensor_1() + tensor_2() == 0); \
@@ -139,10 +139,10 @@ using namespace tensor;
       REQUIRE(10 + tensor_1 == 20); \
       REQUIRE(tensor_1 - 10 == 0); \
    \
-      Scalar<int32_t, CONTAINER<int32_t>> tensor_3 = tensor_1 + tensor_2; \
+      Scalar<int32_t, CONTAINER> tensor_3 = tensor_1 + tensor_2; \
       REQUIRE(tensor_3 == 0); \
    \
-      Scalar<int32_t, CONTAINER<int32_t>> tensor_4 = tensor_1 - tensor_2; \
+      Scalar<int32_t, CONTAINER> tensor_4 = tensor_1 - tensor_2; \
       REQUIRE(tensor_4 == 20); \
     } \
    \
@@ -158,7 +158,7 @@ using namespace tensor;
       REQUIRE((tensor_1 * tensor_2)() == -100); \
       REQUIRE(tensor_1 * 4 == 40); \
    \
-      Scalar<int32_t, CONTAINER<int32_t>> tensor_3 = tensor_1 * tensor_2; \
+      Scalar<int32_t, CONTAINER> tensor_3 = tensor_1 * tensor_2; \
       REQUIRE(tensor_3 == -100); \
     } \
    \
@@ -192,10 +192,10 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER " Elementwise Arithmatic") { \
-    auto tensor_1 = Tensor<int32_t, 3, CONTAINER<int32_t>>({2, 3, 4}, 1); \
+    auto tensor_1 = Tensor<int32_t, 3, CONTAINER>({2, 3, 4}, 1); \
    \
     SECTION("Scalar Tensor") { \
-      Tensor<int32_t, 3, CONTAINER<int32_t>> tensor_2 = elem_wise(tensor_1, 4, \
+      Tensor<int32_t, 3, CONTAINER> tensor_2 = elem_wise(tensor_1, 4, \
           [](int x, int y) -> int { return x + y; }); \
   \
       for (size_t i = 0; i < tensor_2.dimension(0); ++i) \
@@ -227,8 +227,8 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER " Tensor Multplication") { \
-    auto tensor_1 = Tensor<int32_t, 3, CONTAINER<int32_t>>{2, 3, 4}; \
-    auto tensor_2 = Tensor<int32_t, 3, CONTAINER<int32_t>>{4, 3, 2}; \
+    auto tensor_1 = Tensor<int32_t, 3, CONTAINER>{2, 3, 4}; \
+    auto tensor_2 = Tensor<int32_t, 3, CONTAINER>{4, 3, 2}; \
    \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \
@@ -242,7 +242,7 @@ using namespace tensor;
    \
     SECTION("Binary Multiplication") { \
    \
-      Tensor<int32_t, 4, CONTAINER<int32_t>> tensor_3 = tensor_1 * tensor_2; \
+      Tensor<int32_t, 4, CONTAINER> tensor_3 = tensor_1 * tensor_2; \
    \
       REQUIRE(typeid(tensor_3) != typeid(tensor_1 * tensor_2)); \
       REQUIRE((tensor_1 * tensor_2).rank() == 4); \
@@ -272,7 +272,7 @@ using namespace tensor;
               indices_1.increment(shape_1); \
             } \
    \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_4 = tensor_1.slice<0, 1>(1) * tensor_2(1); \
+      Tensor<int32_t, 2, CONTAINER> tensor_4 = tensor_1.slice<0, 1>(1) * tensor_2(1); \
    \
       REQUIRE(typeid(tensor_4) != typeid((tensor_1.slice<0, 1>(1) * tensor_2(1)))); \
       REQUIRE((tensor_1.slice<0, 1>(1) * tensor_2(1)).rank() == 2); \
@@ -298,7 +298,7 @@ using namespace tensor;
           indices_2.increment(shape_2); \
         } \
    \
-      Tensor<int32_t, 4, CONTAINER<int32_t>> tensor_5 = tensor_4 * tensor_3 * tensor_4; \
+      Tensor<int32_t, 4, CONTAINER> tensor_5 = tensor_4 * tensor_3 * tensor_4; \
    \
       REQUIRE(tensor_5.rank() == 4); \
       REQUIRE(tensor_5.dimension(0) == 2); \
@@ -334,14 +334,14 @@ using namespace tensor;
             } \
    \
    \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_6{2, 2}; \
+      Tensor<int32_t, 2, CONTAINER> tensor_6{2, 2}; \
    \
       tensor_6(0, 0) = 2; \
       tensor_6(0, 1) = 1; \
       tensor_6(1, 0) = 3; \
       tensor_6(1, 1) = 2; \
    \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_7 = tensor_6 * tensor_6; \
+      Tensor<int32_t, 2, CONTAINER> tensor_7 = tensor_6 * tensor_6; \
    \
       REQUIRE((tensor_6 * tensor_6).rank() == 2); \
       REQUIRE((tensor_6 * tensor_6).dimension(0) == 2); \
@@ -366,7 +366,7 @@ using namespace tensor;
    \
     SECTION("Combined Multiplication and Addition/Subtraction") { \
    \
-      Tensor<int32_t, 4, CONTAINER<int32_t>> tensor_3 = (tensor_1 * tensor_2 + tensor_1 * tensor_2); \
+      Tensor<int32_t, 4, CONTAINER> tensor_3 = (tensor_1 * tensor_2 + tensor_1 * tensor_2); \
    \
       for (size_t i = 0; i < tensor_3.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_3.dimension(1); ++j) \
@@ -380,7 +380,7 @@ using namespace tensor;
             for (size_t l = 0; l < tensor_3.dimension(3); ++l) \
               REQUIRE((tensor_1 * tensor_2 + tensor_1 * tensor_2)(i, j, k, l) == 8); \
    \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_4 = (tensor_1.slice<0, 1>(1) - tensor_1.slice<0, 1>(1)) * tensor_2(1); \
+      Tensor<int32_t, 2, CONTAINER> tensor_4 = (tensor_1.slice<0, 1>(1) - tensor_1.slice<0, 1>(1)) * tensor_2(1); \
    \
       for (size_t i = 0; i < tensor_4.dimension(0); ++i) \
         for (size_t j = 0; j < tensor_4.dimension(1); ++j) \
@@ -388,8 +388,8 @@ using namespace tensor;
     } \
    \
     SECTION("Assignment Arithmetic") { \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_3 = _A<int[2][2]>({{2, 3}, {4, 5}}); \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> tensor_4 = _A<int[2][2]>({{6, 7}, {8, 9}}); \
+      Tensor<int32_t, 2, CONTAINER> tensor_3 = _A<int[2][2]>({{2, 3}, {4, 5}}); \
+      Tensor<int32_t, 2, CONTAINER> tensor_4 = _A<int[2][2]>({{6, 7}, {8, 9}}); \
       tensor_3 = tensor_3 * tensor_4 + tensor_4; \
       int correct_vals[2][2] = {{42, 48}, {72, 82}}; \
       for (size_t i = 0; i < tensor_3.dimension(0); ++i) \

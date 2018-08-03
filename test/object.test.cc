@@ -43,9 +43,9 @@ bool operator==(TEST_STRUCT const&, TEST_STRUCT const&) {
  */
 
 template <template <typename> class Container>
-Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
+Tensor<TEST_STRUCT, 4, Container> test_func()
 { 
-  Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> tensor({2, 2, 2, 2}); \
+  Tensor<TEST_STRUCT, 4, Container> tensor({2, 2, 2, 2}); \
   return tensor; 
 } 
 
@@ -57,24 +57,24 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
     destructor_counter = 0; \
  \
     SECTION("Single Tensor Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor({2, 2, 2, 2}); \
       REQUIRE(constructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Single Tensor Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2({2, 2, 2, 2}); \
       tensor_1 = tensor_2; \
       REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
     } \
  \
     SECTION("Single Tensor Desctructor") { \
-      { Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor({2, 2, 2, 2}); } \
+      { Tensor<TEST_STRUCT, 4, CONTAINER> tensor({2, 2, 2, 2}); } \
       REQUIRE(destructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Single Scalar Constructor") { \
-      Scalar<TEST_STRUCT, CONTAINER<TEST_STRUCT>> scalar{}; \
+      Scalar<TEST_STRUCT, CONTAINER> scalar{}; \
       REQUIRE(constructor_counter == 1); \
     } \
   } \
@@ -84,50 +84,50 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
     destructor_counter = 0; \
  \
     SECTION("Copy Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
       REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
     } \
  \
     SECTION("Copy Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2({2, 2, 2, 2}); \
       tensor_2 = tensor_1; \
       REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
     } \
  \
     SECTION("Move Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = std::move(tensor_1); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = std::move(tensor_1); \
       REQUIRE(constructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Copy Destructor") { \
       { \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
       } \
       REQUIRE(destructor_counter == 2 * ALLOC_SIZE); \
     } \
  \
     SECTION("Move Destruction") { \
       { \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = std::move(tensor_1); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = std::move(tensor_1); \
       } \
       REQUIRE(destructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Ref Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1.ref(); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.ref(); \
       REQUIRE(constructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Move Destruction") { \
       { \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1.ref(); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.ref(); \
       } \
       REQUIRE(destructor_counter == ALLOC_SIZE); \
     } \
@@ -152,15 +152,15 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
     destructor_counter = 0; \
  \
     SECTION("Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1.copy(); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.copy(); \
       REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
     } \
  \
     SECTION("Destructor") { \
       { \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1.copy(); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.copy(); \
       } \
       REQUIRE(destructor_counter == 2 * ALLOC_SIZE); \
     } \
@@ -171,20 +171,20 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
     destructor_counter = 0; \
  \
     SECTION("Template Expressions constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
       constructor_counter = 0; \
       /* *Only one* alloc */ \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_3 = \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = \
         tensor_1 - tensor_1 + tensor_1 \
         + tensor_2 - tensor_1 + tensor_1 + tensor_2; \
       REQUIRE(constructor_counter == ALLOC_SIZE); \
     } \
  \
     SECTION("Template Expressions Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_3({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3({2, 2, 2, 2}); \
       constructor_counter = 0; \
       /* *Only one* alloc */ \
       tensor_3 = tensor_1 - tensor_1 + tensor_1 \
@@ -194,11 +194,11 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
  \
     SECTION("Template Expressions desstructor") { \
       { \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
         destructor_counter -= 2 * ALLOC_SIZE; \
         /* *Only one* alloc */ \
-        Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_3 = \
+        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = \
           tensor_1 - tensor_2 \
           + tensor_2 - tensor_1 + tensor_1; \
       } \
@@ -210,18 +210,18 @@ Tensor<TEST_STRUCT, 4, Container<TEST_STRUCT>> test_func()
     eDebugConstructorCounter = 0; \
  \
     SECTION("Template Expressions Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
       eDebugConstructorCounter = 0; \
       /* *Only one* alloc */ \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_3 = tensor_1 - tensor_1 + tensor_1 \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = tensor_1 - tensor_1 + tensor_1 \
         + tensor_2 - tensor_1 + tensor_1 + tensor_2; \
       REQUIRE(eDebugConstructorCounter == 1); \
     } \
  \
     SECTION("Template Expressions Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER<TEST_STRUCT>> tensor_2 = tensor_1; \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
+      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
       eDebugConstructorCounter = 0; \
       /* *Only one* alloc */ \
       tensor_2 = tensor_1 - tensor_2 - tensor_2 \

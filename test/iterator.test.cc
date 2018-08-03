@@ -5,7 +5,7 @@ using namespace tensor;
 
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER "Iterator") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor({2, 3, 4}); \
+    Tensor<int32_t, 3, CONTAINER> tensor({2, 3, 4}); \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \
@@ -89,7 +89,7 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER "Constant Iterator") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor({2, 3, 4}); \
+    Tensor<int32_t, 3, CONTAINER> tensor({2, 3, 4}); \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \
@@ -149,7 +149,7 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER "Reverse Iterator") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor({2, 3, 4}); \
+    Tensor<int32_t, 3, CONTAINER> tensor({2, 3, 4}); \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \
@@ -217,7 +217,7 @@ using namespace tensor;
   } \
    \
   TEST_CASE(#CONTAINER "Reverse Const Iterator") { \
-    Tensor<int32_t, 3, CONTAINER<int32_t>> tensor({2, 3, 4}); \
+    Tensor<int32_t, 3, CONTAINER> tensor({2, 3, 4}); \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \

@@ -5,7 +5,7 @@ using namespace tensor;
 
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER ": methods") { \
-    auto tensor = Tensor<int32_t, 4, CONTAINER<int32_t>>{2, 4, 6, 8}; \
+    auto tensor = Tensor<int32_t, 4, CONTAINER>{2, 4, 6, 8}; \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \
@@ -13,7 +13,7 @@ using namespace tensor;
             tensor(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; \
  \
     SECTION("Tranpose") { \
-      Matrix<int32_t, CONTAINER<int32_t>> mat = tensor.slice<1, 3>(1, 1); \
+      Matrix<int32_t, CONTAINER> mat = tensor.slice<1, 3>(1, 1); \
       auto mat_t = transpose(mat); \
       REQUIRE(mat_t.rank() == 2); \
       REQUIRE(mat_t.dimension(0) == 8); \
@@ -22,8 +22,8 @@ using namespace tensor;
         for (size_t j = 0; j < mat.dimension(1); ++j) \
             REQUIRE(mat(i, j) == mat_t(j, i)); \
  \
-      Tensor<int32_t, 1, CONTAINER<int32_t>> vec = mat.slice<1>(3); \
-      Tensor<int32_t, 2, CONTAINER<int32_t>> vec_t = transpose(vec); \
+      Tensor<int32_t, 1, CONTAINER> vec = mat.slice<1>(3); \
+      Tensor<int32_t, 2, CONTAINER> vec_t = transpose(vec); \
       REQUIRE(vec_t.rank() == 2); \
       REQUIRE(vec_t.dimension(0) == 1); \
       REQUIRE(vec_t.dimension(1) == 8); \
@@ -62,7 +62,7 @@ using namespace tensor;
   } \
  \
   TEST_CASE(#CONTAINER ": const methods") { \
-    auto tensor = Tensor<int32_t, 4, CONTAINER<int32_t>>{2, 4, 6, 8}; \
+    auto tensor = Tensor<int32_t, 4, CONTAINER>{2, 4, 6, 8}; \
     for (size_t i = 0; i < tensor.dimension(0); ++i) \
       for (size_t j = 0; j < tensor.dimension(1); ++j) \
         for (size_t k = 0; k < tensor.dimension(2); ++k) \
@@ -70,8 +70,8 @@ using namespace tensor;
             tensor(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; \
  \
     SECTION("resize") { \
-      Matrix<int32_t, CONTAINER<int32_t>> mat = tensor.slice<1, 3>(1, 2); \
-      Vector<int32_t, CONTAINER<int32_t>> vec = mat.resize(Shape<1>({32})); \
+      Matrix<int32_t, CONTAINER> mat = tensor.slice<1, 3>(1, 2); \
+      Vector<int32_t, CONTAINER> vec = mat.resize(Shape<1>({32})); \
       REQUIRE(vec.rank() == 1); \
       REQUIRE(vec.dimension(0) == 32); \
       int32_t correct_number = 1020; \

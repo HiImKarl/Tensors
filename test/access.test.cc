@@ -7,7 +7,7 @@ using namespace tensor;
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER "Tensor Access") { \
  \
-    auto tensor_1 = Tensor<int32_t, 4, CONTAINER<int32_t>>{1, 2, 3, 4}; \
+    auto tensor_1 = Tensor<int32_t, 4, CONTAINER>{1, 2, 3, 4}; \
  \
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) \
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) \

@@ -11,7 +11,7 @@ using namespace std;
 
 #define TEST_CASES(CONTAINER) \
   TEST_CASE(#CONTAINER " Tensor") { \
-    Tensor<int, 4, CONTAINER<int>> tensor({1, 3, 4, 2}, -1); \
+    Tensor<int, 4, CONTAINER> tensor({1, 3, 4, 2}, -1); \
     SECTION("stringstream") { \
       stringstream sstream {}; \
       sstream << tensor; \
@@ -20,7 +20,7 @@ using namespace std;
   } \
  \
   TEST_CASE(#CONTAINER " Scalar") { \
-    Scalar<int, CONTAINER<int>> scalar {-1}; \
+    Scalar<int, CONTAINER> scalar {-1}; \
     SECTION("stringstream") { \
       stringstream sstream {}; \
       sstream << scalar; \
