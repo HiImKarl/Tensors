@@ -1,5 +1,6 @@
 #include <tensor.hh>
 #include <catch.hh>
+#include "test.hh"
 
 template <int *ConstructorCounter, int *DestructorCounter>
 struct TestStruct {
@@ -51,185 +52,225 @@ Tensor<TEST_STRUCT, 4, Container> test_func()
 
 // compile time exponent 
 
-#define TEST_CASES(CONTAINER, ALLOC_SIZE) \
-  TEST_CASE(#CONTAINER ": Single Tensor") { \
-    constructor_counter = 0; \
-    destructor_counter = 0; \
- \
-    SECTION("Single Tensor Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor({2, 2, 2, 2}); \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Single Tensor Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2({2, 2, 2, 2}); \
-      tensor_1 = tensor_2; \
-      REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Single Tensor Desctructor") { \
-      { Tensor<TEST_STRUCT, 4, CONTAINER> tensor({2, 2, 2, 2}); } \
-      REQUIRE(destructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Single Scalar Constructor") { \
-      Scalar<TEST_STRUCT, CONTAINER> scalar{}; \
-      REQUIRE(constructor_counter == 1); \
-    } \
-  } \
- \
-  TEST_CASE(#CONTAINER ": Multiple Tensors") { \
-    constructor_counter = 0; \
-    destructor_counter = 0; \
- \
-    SECTION("Copy Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Copy Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2({2, 2, 2, 2}); \
-      tensor_2 = tensor_1; \
-      REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Move Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = std::move(tensor_1); \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Copy Destructor") { \
-      { \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      } \
-      REQUIRE(destructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Move Destruction") { \
-      { \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = std::move(tensor_1); \
-      } \
-      REQUIRE(destructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Ref Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.ref(); \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Move Destruction") { \
-      { \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.ref(); \
-      } \
-      REQUIRE(destructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Functional Constructor") { \
-      test_func<CONTAINER>(); \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-      auto tensor = test_func<CONTAINER>(); \
-      REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Functional Destructor") { \
-      { test_func<CONTAINER>(); } \
-      REQUIRE(destructor_counter == ALLOC_SIZE); \
-      { auto tensor = test_func<CONTAINER>(); } \
-      REQUIRE(destructor_counter == 2 * ALLOC_SIZE); \
-    } \
-  } \
- \
-  TEST_CASE(#CONTAINER ": Explicit Copy Method") { \
-    constructor_counter = 0; \
-    destructor_counter = 0; \
- \
-    SECTION("Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.copy(); \
-      REQUIRE(constructor_counter == 2 * ALLOC_SIZE); \
-    } \
- \
-    SECTION("Destructor") { \
-      { \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1.copy(); \
-      } \
-      REQUIRE(destructor_counter == 2 * ALLOC_SIZE); \
-    } \
-  } \
- \
-  TEST_CASE(#CONTAINER ": Arithmetic") { \
-    constructor_counter = 0; \
-    destructor_counter = 0; \
- \
-    SECTION("Template Expressions constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      constructor_counter = 0; \
-      /* *Only one* alloc */ \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = \
-        tensor_1 - tensor_1 + tensor_1 \
-        + tensor_2 - tensor_1 + tensor_1 + tensor_2; \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Template Expressions Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3({2, 2, 2, 2}); \
-      constructor_counter = 0; \
-      /* *Only one* alloc */ \
-      tensor_3 = tensor_1 - tensor_1 + tensor_1 \
-        + tensor_2 - tensor_1 + tensor_1 + tensor_2; \
-      REQUIRE(constructor_counter == ALLOC_SIZE); \
-    } \
- \
-    SECTION("Template Expressions desstructor") { \
-      { \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-        destructor_counter -= 2 * ALLOC_SIZE; \
-        /* *Only one* alloc */ \
-        Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = \
-          tensor_1 - tensor_2 \
-          + tensor_2 - tensor_1 + tensor_1; \
-      } \
-      REQUIRE(destructor_counter == ALLOC_SIZE); \
-    } \
-  } \
- \
-  TEST_CASE(#CONTAINER ": Tensor Constructions/Destructions") { \
-    eDebugConstructorCounter = 0; \
- \
-    SECTION("Template Expressions Constructor") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      eDebugConstructorCounter = 0; \
-      /* *Only one* alloc */ \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_3 = tensor_1 - tensor_1 + tensor_1 \
-        + tensor_2 - tensor_1 + tensor_1 + tensor_2; \
-      REQUIRE(eDebugConstructorCounter == 1); \
-    } \
- \
-    SECTION("Template Expressions Assignment") { \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_1({2, 2, 2, 2}); \
-      Tensor<TEST_STRUCT, 4, CONTAINER> tensor_2 = tensor_1; \
-      eDebugConstructorCounter = 0; \
-      /* *Only one* alloc */ \
-      tensor_2 = tensor_1 - tensor_2 - tensor_2 \
-        + tensor_1 + tensor_2 - tensor_1 + tensor_1; \
-      REQUIRE(eDebugConstructorCounter == 1); \
-    } \
-  }
+template <template <class> class Container>
+void SingleTensorTest(int AllocSize) {
+  constructor_counter = 0; 
+  destructor_counter = 0; 
 
-// instantiate test cases
-TEST_CASES(data::Array, 16);
-TEST_CASES(data::HashMap, 1);
+  SECTION("Single Tensor Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor({2, 2, 2, 2}); 
+    REQUIRE(constructor_counter == AllocSize); 
+  } 
+
+  SECTION("Single Tensor Assignment") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2({2, 2, 2, 2}); 
+    tensor_1 = tensor_2; 
+    REQUIRE(constructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Single Tensor Desctructor") { 
+    { Tensor<TEST_STRUCT, 4, Container> tensor({2, 2, 2, 2}); } 
+    REQUIRE(destructor_counter == AllocSize); 
+  } 
+
+  SECTION("Single Scalar Constructor") { 
+    Scalar<TEST_STRUCT, Container> scalar{}; 
+    REQUIRE(constructor_counter == 1); 
+  } 
+} 
+
+template <template <class> class Container>
+void MultipleTensorTest(int AllocSize) {
+  constructor_counter = 0; 
+  destructor_counter = 0; 
+
+  SECTION("Copy Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    REQUIRE(constructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Copy Assignment") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2({2, 2, 2, 2}); 
+    tensor_2 = tensor_1; 
+    REQUIRE(constructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Move Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = std::move(tensor_1); 
+    REQUIRE(constructor_counter == AllocSize); 
+  } 
+
+  SECTION("Copy Destructor") { 
+    { 
+      Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+      Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    } 
+    REQUIRE(destructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Move Destruction") { 
+    { 
+      Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+      Tensor<TEST_STRUCT, 4, Container> tensor_2 = std::move(tensor_1); 
+    } 
+    REQUIRE(destructor_counter == AllocSize); 
+  } 
+
+  SECTION("Ref Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1.ref(); 
+    REQUIRE(constructor_counter == AllocSize); 
+  } 
+
+  SECTION("Move Destruction") { 
+    { 
+      Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+      Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1.ref(); 
+    } 
+    REQUIRE(destructor_counter == AllocSize); 
+  } 
+
+  SECTION("Functional Constructor") { 
+    test_func<Container>(); 
+    REQUIRE(constructor_counter == AllocSize); 
+    auto tensor = test_func<Container>(); 
+    REQUIRE(constructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Functional Destructor") { 
+    { test_func<Container>(); } 
+    REQUIRE(destructor_counter == AllocSize); 
+    { auto tensor = test_func<Container>(); } 
+    REQUIRE(destructor_counter == 2 * AllocSize); 
+  } 
+} 
+
+template <template <class> class Container>
+void ExplicitCopyTest(int AllocSize) {
+  constructor_counter = 0; 
+  destructor_counter = 0; 
+
+  SECTION("Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1.copy(); 
+    REQUIRE(constructor_counter == 2 * AllocSize); 
+  } 
+
+  SECTION("Destructor") { 
+    { 
+      Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+      Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1.copy(); 
+    } 
+    REQUIRE(destructor_counter == 2 * AllocSize); 
+  } 
+} 
+
+template <template <class> class Container>
+void ArithmeticTest(int AllocSize) {
+  constructor_counter = 0; 
+  destructor_counter = 0; 
+
+  SECTION("Template Expressions constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    constructor_counter = 0; 
+    /* *Only one* alloc */ 
+    Tensor<TEST_STRUCT, 4, Container> tensor_3 = 
+      tensor_1 - tensor_1 + tensor_1 
+      + tensor_2 - tensor_1 + tensor_1 + tensor_2; 
+    REQUIRE(constructor_counter == AllocSize); 
+  } 
+
+  SECTION("Template Expressions Assignment") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    Tensor<TEST_STRUCT, 4, Container> tensor_3({2, 2, 2, 2}); 
+    constructor_counter = 0; 
+    /* *Only one* alloc */ 
+    tensor_3 = tensor_1 - tensor_1 + tensor_1 
+      + tensor_2 - tensor_1 + tensor_1 + tensor_2; 
+    REQUIRE(constructor_counter == AllocSize); 
+  } 
+
+  SECTION("Template Expressions desstructor") { 
+    { 
+      Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+      Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+      destructor_counter -= 2 * AllocSize; 
+      /* *Only one* alloc */ 
+      Tensor<TEST_STRUCT, 4, Container> tensor_3 = 
+        tensor_1 - tensor_2 
+        + tensor_2 - tensor_1 + tensor_1; 
+    } 
+    REQUIRE(destructor_counter == AllocSize); 
+  } 
+} 
+
+template <template <class> class Container>
+void TensorConstructionDestructionTests() {
+  eDebugConstructorCounter = 0; 
+
+  SECTION("Template Expressions Constructor") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    eDebugConstructorCounter = 0; 
+    /* *Only one* alloc */ 
+    Tensor<TEST_STRUCT, 4, Container> tensor_3 = tensor_1 - tensor_1 + tensor_1 
+      + tensor_2 - tensor_1 + tensor_1 + tensor_2; 
+    REQUIRE(eDebugConstructorCounter == 1); 
+  } 
+
+  SECTION("Template Expressions Assignment") { 
+    Tensor<TEST_STRUCT, 4, Container> tensor_1({2, 2, 2, 2}); 
+    Tensor<TEST_STRUCT, 4, Container> tensor_2 = tensor_1; 
+    eDebugConstructorCounter = 0; 
+    /* *Only one* alloc */ 
+    tensor_2 = tensor_1 - tensor_2 - tensor_2 
+      + tensor_1 + tensor_2 - tensor_1 + tensor_1; 
+    REQUIRE(eDebugConstructorCounter == 1); 
+  } 
+}
+
+TEST_CASE(BeginTest("Single Tensor", "Array")) { 
+  SingleTensorTest<data::Array>(16);
+}
+
+TEST_CASE(BeginTest("Single Tensor", "HashMap")) { 
+  SingleTensorTest<data::HashMap>(1);
+}
+
+TEST_CASE(BeginTest("Multiple Tensors", "Array")) { 
+  MultipleTensorTest<data::Array>(16);
+}
+
+TEST_CASE(BeginTest("Multiple Tensors", "HashMap")) { 
+  MultipleTensorTest<data::HashMap>(1);
+}
+
+TEST_CASE(BeginTest("Explicit Copy Method", "Array")) { 
+  ExplicitCopyTest<data::Array>(16);
+}
+
+TEST_CASE(BeginTest("Explicit Copy Method", "HashMap")) { 
+  ExplicitCopyTest<data::HashMap>(1);
+}
+
+TEST_CASE(BeginTest("Arithmetic", "Array")) { 
+  ArithmeticTest<data::Array>(16); 
+}
+
+TEST_CASE(BeginTest("Arithmetic", "HashMap")) { 
+  ArithmeticTest<data::HashMap>(1);
+}
+
+TEST_CASE(BeginTest("Tensor Constructions/Destructions", "Array")) { 
+  TensorConstructionDestructionTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Tensor Constructions/Destructions", "HashMap")) { 
+  TensorConstructionDestructionTests<data::HashMap>();
+}

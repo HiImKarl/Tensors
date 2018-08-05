@@ -1,10 +1,10 @@
 #include <tensor.hh>
-#include "catch.hh"
+#include <catch.hh>
+#include "test.hh"
 
 using namespace tensor;
 
-TEST_CASE("Shapes") {
-
+void ShapeTests() {
   auto shape = Shape<8>({1, 2, 3, 4, 5, 6, 7, 8});
   auto scalar_shape = Shape<0>();
   
@@ -28,7 +28,7 @@ TEST_CASE("Shapes") {
   }
 }
 
-TEST_CASE("Tensor Shapes") {
+void TensorShapeTests() {
   Tensor<int, 3> tensor_1{2, 3, 4};
   Tensor<int, 2> tensor_2{4, 2};
   Tensor<int, 3> tensor_3{2, 3, 4};
@@ -68,4 +68,12 @@ TEST_CASE("Tensor Shapes") {
     REQUIRE(shape[2] == 3);
     REQUIRE(shape[3] == 4);
   }
+}
+
+TEST_CASE(BeginTest("Shapes")) {
+  ShapeTests();
+}
+
+TEST_CASE(BeginTest("Tensor Shapes")) {
+  TensorShapeTests();
 }

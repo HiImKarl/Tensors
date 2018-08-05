@@ -2,6 +2,7 @@
 #include <catch.hh>
 #include <iostream>
 #include <sstream>
+#include "test.hh"
 
 using namespace tensor;
 using namespace std;
@@ -9,25 +10,40 @@ using namespace std;
 #define TENSOR_STRINGSTREAM_CORRECT_0 \
   "[[[[-1, -1], [-1, -1], [-1, -1], [-1, -1]], [[-1, -1], [-1, -1], [-1, -1], [-1, -1]], [[-1, -1], [-1, -1], [-1, -1], [-1, -1]]]]"
 
-#define TEST_CASES(CONTAINER) \
-  TEST_CASE(#CONTAINER " Tensor") { \
-    Tensor<int, 4, CONTAINER> tensor({1, 3, 4, 2}, -1); \
-    SECTION("stringstream") { \
-      stringstream sstream {}; \
-      sstream << tensor; \
-      REQUIRE(sstream.str() == TENSOR_STRINGSTREAM_CORRECT_0); \
-    } \
-  } \
- \
-  TEST_CASE(#CONTAINER " Scalar") { \
-    Scalar<int, CONTAINER> scalar {-1}; \
-    SECTION("stringstream") { \
-      stringstream sstream {}; \
-      sstream << scalar; \
-      REQUIRE(sstream.str() == "-1"); \
-    } \
-  }
+template <template <class> class Container>
+void TensorTests() {
+  Tensor<int, 4, Container> tensor({1, 3, 4, 2}, -1); 
+  SECTION("stringstream") { 
+    stringstream sstream {}; 
+    sstream << tensor; 
+    REQUIRE(sstream.str() == TENSOR_STRINGSTREAM_CORRECT_0); 
+  } 
+} 
+
+template <template <class> class Container>
+void ScalarTests() {
+  Scalar<int, Container> scalar {-1}; 
+  SECTION("stringstream") { 
+    stringstream sstream {}; 
+    sstream << scalar; 
+    REQUIRE(sstream.str() == "-1"); 
+  } 
+}
 
 // Instantiate Tests
-TEST_CASES(data::Array);
-TEST_CASES(data::HashMap);
+
+TEST_CASE(BeginTest("Tensor", "Array")) { 
+  TensorTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Tensor", "HashMap")) { 
+  TensorTests<data::HashMap>();
+}
+
+TEST_CASE(BeginTest("Scalar", "Array")) { 
+  ScalarTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Scalar", "HashMap")) { 
+  ScalarTests<data::HashMap>();
+}
