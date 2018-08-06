@@ -22,6 +22,8 @@ extern int eDebugConstructorCounter;
 #endif
 
 /* FIXME -- Remove debug macros */
+
+
 #ifndef _NDEBUG
 
 #define PRINT(x) std::cout << x << '\n';
@@ -291,6 +293,15 @@ struct CountLTMax<Max> {
 /** Wrapper around a vardiac size_t pack */
 template <size_t...> 
 struct Sequence {};
+
+#ifndef _NDEBUG
+template <size_t... I>
+void PrintSequence(Sequence<I...>)
+{
+  VARDIAC_MAP(std::cout << I << " ");
+  std::cout << '\n';
+}
+#endif
 
 /** Extends `Sequence<I...>` by placing `Index` in front */
 template <size_t Index, typename>
@@ -4575,6 +4586,12 @@ auto BinaryMul<LHS, RHS>::slice(Indices<M> const &indices) const
   auto sequence2 = typename Append<0, typename SequenceTransformer<
         typename MakeSequence2<thresh_hold, Slices...>::sequence,
         SequenceOffset, LHS::rank() - 1>::sequence>::sequence{};
+  PRINT("Slices...");
+  PrintSequence(Sequence<Slices...>());
+  PRINT("sequence1: ");
+  PrintSequence(sequence1);
+  PRINT("sequence2: ");
+  PrintSequence(sequence2);
   return pSliceSequences(sequence1, sequence2, indices);
 }
 
