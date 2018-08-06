@@ -170,6 +170,12 @@ constexpr size_t Min(size_t x, size_t y)
   return x < y ? x : y;
 }
 
+/** returns x if x > y, y o.w. */
+constexpr size_t Max(size_t x, size_t y)
+{
+  return x > y ? x : y;
+}
+
 /** Returns 1 if x < y, 0 o.w. */
 constexpr bool LessThan(size_t x, size_t y)
 {
@@ -183,7 +189,7 @@ struct LogicalAnd { static constexpr bool value = B1 && B2; };
 template <size_t Index, size_t Middle, size_t End>
 struct FillSecond {
   template <typename... Args>
-  FillSecond(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args... args)
+  FillSecond(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args&&... args)
   {
     array2[Index - Middle] = next;
     FillSecond<Index + 1, Middle, End>(array1, array2, args...);
@@ -196,6 +202,16 @@ struct FillSecond<End, Middle, End> {
   FillSecond(size_t (&)[Middle], size_t (&)[End - Middle]) {}
 };
 
+// FIXME g++ 6.3 cannot pattern match this ???
+template <size_t End>
+struct FillSecond<End, 0, End> {
+  template <typename... Args>
+  FillSecond(size_t (&)[0], size_t (&)[End]) {}
+};
+
+template <size_t, size_t, size_t>
+struct FillFirst; 
+
 template <size_t Index, size_t Middle, size_t End>
 struct FillFirst {
   template <typename... Args>
@@ -205,6 +221,17 @@ struct FillFirst {
     FillFirst<Index + 1, Middle, End>(array1, array2, args...);
   }
 }; 
+
+// FIXME g++ 6.3 cannot pattern match this ???
+template <size_t Index, size_t Middle>
+struct FillFirst<Index, Middle, Middle> {
+  template <typename... Args>
+  FillFirst(size_t (&array1)[Middle], size_t (&array2)[0], size_t next, Args... args)
+  {
+    array1[Index] = next;
+    FillFirst<Index + 1, Middle, Middle>(array1, array2, args...);
+  }
+};
 
 template <size_t Middle, size_t End>
 struct FillFirst<Middle, Middle, End> {
@@ -217,12 +244,33 @@ struct FillFirst<Middle, Middle, End> {
   }
 };
 
+// FIXME g++ 6.3 cannot pattern match this ???
+template <size_t End>
+struct FillFirst<0, 0, End> {
+
+  template <typename... Args>
+  FillFirst(size_t (&array1)[0], size_t (&array2)[End], size_t next, Args... args)
+  {
+    array2[0] = next;
+    FillSecond<1, 0, End>(array1, array2, args...);
+  }
+};
+
 template <size_t End>
 struct FillFirst<End, End, End> {
   template <typename... Args>
   FillFirst(size_t (&)[End], size_t (&)[0])
   {}
 };
+
+// FIXME g++ 6.3 cannot pattern match this ???
+template <>
+struct FillFirst<0, 0, 0> {
+  template <typename... Args>
+  FillFirst(size_t (&)[0], size_t (&)[0])
+  {}
+};
+
 
 template <size_t Middle, size_t End>
 struct FillArgs {
@@ -677,11 +725,10 @@ template <typename LHS, typename RHS>
 struct ValueAsTensor<BinaryMul<LHS, RHS>> {
   ValueAsTensor(BinaryMul<LHS, RHS> const &val): value(val) {}
   BinaryMul<LHS, RHS> const &value;
-  typedef typename LHS::value_type                   value_type;
-  template <typename X>
-  using container_type = typename                    LHS::template container_type<X>;
-  constexpr static size_t rank()                     { return LHS::rank() + RHS::rank() - 2; }
-  typedef Tensor<value_type, rank(), container_type> return_type;
+  typedef typename LHS::value_type                        value_type;
+  template <typename X> using container_type = typename   LHS::template container_type<X>;
+  constexpr static size_t rank()                          { return LHS::rank() + RHS::rank() - 2; }
+  typedef Tensor<value_type, rank(), container_type>      return_type;
 
   template <typename... Args>
   auto operator()(Args... args) const
@@ -2486,8 +2533,15 @@ Tensor<X, M1 + M2 - 2, C1> multiply(Tensor<X, M1, C1> const& tensor_1, Tensor<Y,
 {
   static_assert(M1, SCALAR_TENSOR_MULT);
   static_assert(M2, SCALAR_TENSOR_MULT);
-  assert((tensor_1.shape_.dimensions_[M1 - 1] == tensor_2.shape_.dimensions_[0]) 
-      && INNER_DIMENSION_MISMATCH);
+  if((tensor_1.shape_[M1 - 1] != tensor_2.shape_[0]) 
+      && INNER_DIMENSION_MISMATCH)
+  {
+    PRINTV(tensor_1.shape_);
+    PRINTV(tensor_2.shape_);
+    PRINTV(M1);
+    PRINTV(M2);
+    assert(0);
+  }
 
   auto shape = Shape<M1 + M2 - 2>();
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
@@ -4527,8 +4581,8 @@ auto BinaryMul<LHS, RHS>::operator()(Args... args) const
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
-  return multiply(ValueAsTensor<LHS>(lhs_)[Indices<left>(seperate_args.array1)],
-                  ValueAsTensor<RHS>(rhs_).template slice<0>(Indices<right>(seperate_args.array2)));
+  return multiply(lhs_[Indices<left>(seperate_args.array1)],
+                  rhs_.template slice<0>(Indices<right>(seperate_args.array2)));
 }
 
 template <typename LHS, typename RHS>
@@ -4541,8 +4595,8 @@ auto BinaryMul<LHS, RHS>::at(Args... args) const
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate(args...);
   return Tensor<value_type, self_type::rank() - sizeof...(Args), container_type>(
-      multiply(ValueAsTensor<LHS>(lhs_)[Indices<left>(seperate.array1)],
-               ValueAsTensor<RHS>(rhs_).template slice<0>(Indices<right>(seperate.array2))));
+      multiply(lhs_[Indices<left>(seperate.array1)],
+               rhs_.template slice<0>(Indices<right>(seperate.array2))));
 }
 
 template <typename LHS, typename RHS>
@@ -4556,8 +4610,8 @@ auto BinaryMul<LHS, RHS>::operator[](Indices<M> const &indices) const
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return multiply(ValueAsTensor<LHS>(lhs_)[Indices<left>(array1)],
-                  ValueAsTensor<RHS>(rhs_).template slice<0>(Indices<right>(array2)));
+  return multiply(lhs_[Indices<left>(array1)],
+                  rhs_.template slice<0>(Indices<right>(array2)));
 }
 
 template <typename LHS, typename RHS>
@@ -4567,12 +4621,12 @@ auto BinaryMul<LHS, RHS>::slice(Args... args) const
 {
   using namespace meta; // WARNING -- using namespace
   static_assert(IsIncreasingSequence<Slices...>::value, SLICE_INDICES_DESCENDING);
-  constexpr size_t thresh_hold = CountLTMax<LHS::rank(), Slices...>::value;
+  constexpr size_t thresh_hold = CountLTMax<LHS::rank() - 1, Slices...>::value;
   auto sequence1 = typename MakeSequence1<thresh_hold, Slices...>::sequence{};
   // FIXME -- Very difficult to read
   auto sequence2 = typename Append<0, typename SequenceTransformer<
         typename MakeSequence2<thresh_hold, Slices...>::sequence,
-        SequenceOffset, LHS::rank() - 1>::sequence>::sequence{};
+        SequenceOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
   return pSliceSequences(sequence1, sequence2, args...);
 }
 
@@ -4583,18 +4637,12 @@ auto BinaryMul<LHS, RHS>::slice(Indices<M> const &indices) const
 {
   using namespace meta; // WARNING -- using namespace
   static_assert(IsIncreasingSequence<Slices...>::value, SLICE_INDICES_DESCENDING);
-  constexpr size_t thresh_hold = CountLTMax<LHS::rank(), Slices...>::value;
+  constexpr size_t thresh_hold = CountLTMax<LHS::rank() - 1, Slices...>::value;
   auto sequence1 = typename MakeSequence1<thresh_hold, Slices...>::sequence{};
   // FIXME -- Very difficult to read
   auto sequence2 = typename Append<0, typename SequenceTransformer<
         typename MakeSequence2<thresh_hold, Slices...>::sequence,
-        SequenceOffset, LHS::rank() - 1>::sequence>::sequence{};
-  PRINT("Slices...");
-  PrintSequence(Sequence<Slices...>());
-  PRINT("sequence1: ");
-  PrintSequence(sequence1);
-  PRINT("sequence2: ");
-  PrintSequence(sequence2);
+        SequenceOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
   return pSliceSequences(sequence1, sequence2, indices);
 }
 
@@ -4612,26 +4660,26 @@ auto BinaryMul<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>,
     meta::Sequence<Slices2...>, Args... args) const 
   -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(args...))>::type
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
-  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
+  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), sizeof...(args));
+  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1 - sizeof...(Slices1));
   meta::FillArgs<left, right + left> seperate(args...);
-  return multiply(ValueAsTensor<LHS>(lhs_).template slice<Slices1...>(Indices<left>(seperate.array1)),
-                  ValueAsTensor<RHS>(rhs_).template slice<Slices2...>(Indices<right>(seperate.array2)));
+  return multiply(lhs_.template slice<Slices1...>(Indices<left>(seperate.array1)), 
+          rhs_.template slice<Slices2...>(Indices<right>(seperate.array2)));
 }
 
 template <typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, size_t M>
 auto BinaryMul<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
-    meta::Sequence<Slices2...>, Indices<M> const &indices) const 
+    meta::Sequence<Slices2...> , Indices<M> const &indices) const 
   -> typename std::remove_reference<decltype(std::declval<return_type const>().slice(indices))>::type
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1, M);
-  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1);
+  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), M);
+  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1 - sizeof...(Slices1));
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return multiply(ValueAsTensor<LHS>(lhs_).template slice<Slices1...>(Indices<left>(array1)),
-                  ValueAsTensor<RHS>(rhs_).template slice<Slices2...>(Indices<right>(array2)));
+  return multiply(lhs_.template slice<Slices1...>(Indices<left>(array1)),
+               rhs_.template slice<Slices2...>(Indices<right>(array2)));
 }
 
 } // namespace tensor

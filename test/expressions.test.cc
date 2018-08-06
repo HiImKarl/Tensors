@@ -8,20 +8,23 @@ template <template <class> class Container>
 void RawExpressionTests() {
   auto tensor_1 = Tensor<int32_t, 3, Container>{6, 4, 6}; 
   auto tensor_2 = Tensor<int32_t, 3, Container>{6, 4, 6}; 
+  auto tensor_3 = Tensor<int32_t, 2, Container>{9, 9};
+  auto tensor_4 = Tensor<int32_t, 2, Container>{9, 9};
   REQUIRE((tensor_1 - tensor_2 + tensor_1).rank() == 3);
   REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(0) == 6);
   REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(1) == 4);
   REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(2) == 6);
   REQUIRE((tensor_1 - tensor_2 + tensor_1)(2, 2).rank() == 1);
   REQUIRE((tensor_1 - tensor_2 + tensor_1)(2, 2).dimension(0) == 6);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1)[Indices<2>{2, 2}].rank() == 1);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1)[Indices<2>{2, 2}].dimension(0) == 6);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).rank() == 2);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).dimension(0) == 6);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).dimension(1) == 4);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).rank() == 2);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).dimension(0) == 6);
-  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).dimension(1) == 6);
+
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2)[Indices<2>{2, 2}].rank() == 1);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2)[Indices<2>{2, 2}].dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 1>(2).rank() == 2);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 1>(2).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 1>(2).dimension(1) == 4);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 2>(Indices<1>{2}).rank() == 2);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 2>(Indices<1>{2}).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1 - tensor_2).template slice<0, 2>(Indices<1>{2}).dimension(1) == 6);
 
   REQUIRE((tensor_1 * tensor_2 * tensor_1).rank() == 5);
   REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(0) == 6);
@@ -37,15 +40,32 @@ void RawExpressionTests() {
   REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(0) == 4);
   REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(1) == 4);
   REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(2) == 6);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).rank() == 4);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(0) == 6);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(1) == 4);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(2) == 4);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(3) == 6);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).rank() == 3);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(0) == 4);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(1) == 4);
-  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(2) == 6);
+
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).rank() == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(0) == 6);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(2) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(3) == 6);
+  REQUIRE((tensor_1 * tensor_1 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).rank() == 3);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(0) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(2) == 6);
+
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<0, 3, 5>(2, 2, 3).rank() == 3);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<0, 3, 5>(2, 2, 3).dimension(0) == 6);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<0, 3, 5>(2, 2, 3).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<0, 3, 5>(2, 2, 3).dimension(2) == 6);
+  REQUIRE((tensor_1 * tensor_1 * tensor_1 * tensor_2).template slice<1, 2, 3, 4>(Indices<2>{2, 2}).rank() == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<1, 2, 3, 4>(Indices<2>{2, 2}).dimension(0) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<1, 2, 3, 4>(Indices<2>{2, 2}).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<1, 2, 3, 4>(Indices<2>{2, 2}).dimension(2) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1 * tensor_2).template slice<1, 2, 3, 4>(Indices<2>{2, 2}).dimension(3) == 4);
+
+  REQUIRE((tensor_4 * tensor_3 * tensor_4 * tensor_3 * tensor_4).template slice<0>(2).rank() == 1);
+  REQUIRE((tensor_4 * tensor_3 * tensor_4 * tensor_3 * tensor_4).template slice<0>(2).dimension(0) == 9);
+  REQUIRE((tensor_4 * tensor_3 * tensor_4 * tensor_3 * tensor_4).template slice<0>(Indices<0>{}).rank() == 2);
+  REQUIRE((tensor_4 * tensor_3 * tensor_4 * tensor_3 * tensor_4).template slice<0>(Indices<0>{}).dimension(0) == 9);
+  REQUIRE((tensor_4 * tensor_3 * tensor_4 * tensor_3 * tensor_4).template slice<0>(Indices<0>{}).dimension(1) == 9);
 }
 
 template <template <class> class Container> 
