@@ -203,8 +203,10 @@ struct FillFirst {
     FillFirst<Index + 1, Middle, End>(array1, array2, args...);
   }
 }; 
+
 template <size_t Middle, size_t End>
 struct FillFirst<Middle, Middle, End> {
+
   template <typename... Args>
   FillFirst(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args... args)
   {
@@ -213,10 +215,11 @@ struct FillFirst<Middle, Middle, End> {
   }
 };
 
-template <>
-struct FillFirst<0, 0, 0> {
+template <size_t End>
+struct FillFirst<End, End, End> {
   template <typename... Args>
-  FillFirst(size_t (&)[0], size_t (&)[0]) {}
+  FillFirst(size_t (&)[End], size_t (&)[0])
+  {}
 };
 
 template <size_t Middle, size_t End>
@@ -2322,19 +2325,19 @@ T &Tensor<T, N, C>::pGet(size_t *indices, size_t index)
 }
 
 template <typename U, size_t M, template <class> class C_, typename... Tensors>
-Shape<M> const &pGetShape(Tensor<U, M, C_> tensor, Tensors&&...)
+inline Shape<M> const &pGetShape(Tensor<U, M, C_> tensor, Tensors&&...)
 {
   return tensor.shape();
 }
 
 template <typename FunctionType, size_t... I, typename... Tensors>
-void pMapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
+inline void pMapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
 {
   fn(tensors.pGet(indices, I)...);
 }
 
 template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-void pReduceForwardSequence(U &ret_val, FunctionType &&fn, size_t *indices, 
+inline void pReduceForwardSequence(U &ret_val, FunctionType &&fn, size_t *indices, 
     meta::Sequence<I...>, Tensors const&... tensors)
 {
   ret_val = fn(ret_val, tensors.pGet(indices, I)...);

@@ -4,6 +4,50 @@
 
 using namespace tensor;
 
+template <template <class> class Container>
+void RawExpressionTests() {
+  auto tensor_1 = Tensor<int32_t, 3, Container>{6, 4, 6}; 
+  auto tensor_2 = Tensor<int32_t, 3, Container>{6, 4, 6}; 
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).rank() == 3);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(1) == 4);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).dimension(2) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1)(2, 2).rank() == 1);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1)(2, 2).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1)[Indices<2>{2, 2}].rank() == 1);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1)[Indices<2>{2, 2}].dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).rank() == 2);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 1>(2).dimension(1) == 4);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).rank() == 2);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).dimension(0) == 6);
+  REQUIRE((tensor_1 - tensor_2 + tensor_1).template slice<0, 2>(Indices<1>{2}).dimension(1) == 6);
+
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).rank() == 5);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(0) == 6);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(2) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(3) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1).dimension(4) == 6);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)(2, 2).rank() == 3);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)(2, 2).dimension(0) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)(2, 2).dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)(2, 2).dimension(2) == 6);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].rank() == 3);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(0) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(1) == 4);
+  REQUIRE((tensor_1 * tensor_2 * tensor_1)[Indices<2>{2, 2}].dimension(2) == 6);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).rank() == 4);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(0) == 6);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(1) == 4);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(2) == 4);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<0, 1, 3>(2).dimension(3) == 6);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).rank() == 3);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(0) == 4);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(1) == 4);
+  //REQUIRE((tensor_1 * tensor_2 * tensor_1).template slice<1, 2>(Indices<2>{2, 2}).dimension(2) == 6);
+}
+
 template <template <class> class Container> 
 void TensorArithmeticTests() {
   auto tensor_1 = Tensor<int32_t, 3, Container>{2, 3, 4}; 
@@ -17,7 +61,6 @@ void TensorArithmeticTests() {
     for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
       for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
         tensor_2(i, j, k) = 100 * i + 10 * j + 1 * k; 
- 
  
   SECTION("Two Term Addition/Subtract") { 
     Tensor<int32_t, 3, Container> tensor_3 = tensor_1 + tensor_2; 
@@ -401,7 +444,15 @@ void TensorMultiplicationTests() {
       for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
         REQUIRE(tensor_3(i, j) == correct_vals[i][j]); 
   } 
-} 
+}
+
+TEST_CASE(BeginTest("Raw Expressions", "Array")) { 
+  RawExpressionTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Raw Expressions", "HashMap")) { 
+  RawExpressionTests<data::HashMap>();
+}
    
 TEST_CASE(BeginTest("Basic Tensor Arithmetic", "Array")) { 
   TensorArithmeticTests<data::Array>();
