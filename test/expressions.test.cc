@@ -98,15 +98,26 @@ void TensorArithmeticTests() {
       for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
           REQUIRE((tensor_1 + tensor_2)(i, j, k) == (int)(100100 * i + 10010 * j + 1001 * k)); 
+
+    for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+        REQUIRE((tensor_1 + tensor_2).template slice<1, 2>(0)(j, k) == (int)(10010 * j + 1001 * k)); 
  
     Shape<3> shape_1 = (tensor_1 + tensor_2).shape(); 
-    Indices<3> indices{}; 
-    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
-      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+    Indices<3> indices_1{}; 
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
         for (size_t k = 0; k < tensor_3.dimension(2); ++k) { 
-          REQUIRE((tensor_1 + tensor_2)[indices] == (int)(100100 * i + 10010 * j + 1001 * k)); 
-          indices.increment(shape_1); 
-        } 
+          REQUIRE((tensor_1 + tensor_2)[indices_1] == (int)(100100 * i + 10010 * j + 1001 * k)); 
+          indices_1.increment(shape_1); 
+        }
+ 
+    Shape<1> shape_2 = (tensor_1 + tensor_2).template slice<2>(1, 1).shape(); 
+    Indices<1> indices_2{}; 
+    for (size_t k = 0; k < tensor_3.dimension(2); ++k) {
+          REQUIRE((tensor_1 + tensor_2).template slice<2>(1, 1)[indices_2] == (int)(100100 + 10010 + 1001 * k)); 
+          indices_2.increment(shape_2); 
+    }
  
     for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
@@ -117,11 +128,20 @@ void TensorArithmeticTests() {
       for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
           REQUIRE((tensor_3 - tensor_1)(i, j, k) == (int)(100 * i + 10 * j + 1 * k)); 
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
+          REQUIRE((tensor_3 - tensor_1).template slice<>()(i, j, k) == (int)(100 * i + 10 * j + 1 * k)); 
  
     for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
           REQUIRE((tensor_3 - tensor_1)[Indices<3>{i, j, k}] == (int)(100 * i + 10 * j + 1 * k)); 
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i)
+      for (size_t k = 0; k < tensor_4.dimension(2); ++k)
+        REQUIRE((tensor_3 - tensor_1).template slice<0, 2>(2)[Indices<2>{i, k}] == (int)(100 * i + 20 + 1 * k)); 
   } 
  
   SECTION("Multi-Term Addition/Subtract") { 
@@ -257,42 +277,6 @@ void ScalarArithmeticTests() {
 } 
  
 template <template <class> class Container>
-void ElementwiseArithmeticTests() {
-  auto tensor_1 = Tensor<int32_t, 3, Container>({2, 3, 4}, 1); 
- 
-  SECTION("Scalar Tensor") { 
-    Tensor<int32_t, 3, Container> tensor_2 = elem_wise(tensor_1, 4, 
-        [](int x, int y) -> int { return x + y; }); 
-
-    for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
-      for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
-        for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
-          REQUIRE(tensor_2(i, j, k) == 5); 
- 
-    tensor_2 = elem_wise(tensor_1, 6, 
-        [](int x, int y) -> int { return y - x; }); 
-    for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
-      for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
-        for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
-          REQUIRE(tensor_2(i, j, k) == 5); 
- 
-    tensor_2 = elem_wise(tensor_1, 100, 
-        [](int x, int y) -> int { return x * (-y); }); 
-    for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
-      for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
-        for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
-          REQUIRE(tensor_2(i, j, k) == -100); 
- 
-    tensor_2 = elem_wise(tensor_1, tensor_1, 
-        [](int x, int y) -> int { return (x + 9)/(x + y); }); 
-    for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
-      for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
-        for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
-          REQUIRE(tensor_2(i, j, k) == 5); 
-  } 
-} 
- 
-template <template <class> class Container>
 void TensorMultiplicationTests() {
   auto tensor_1 = Tensor<int32_t, 3, Container>{2, 3, 4}; 
   auto tensor_2 = Tensor<int32_t, 3, Container>{4, 3, 2}; 
@@ -389,6 +373,11 @@ void TensorMultiplicationTests() {
         for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_5.dimension(3); ++l) 
             REQUIRE((tensor_4 * tensor_3 * tensor_4)(i, j, k, l) == 144); 
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+        for (size_t l = 0; l < tensor_5.dimension(3); ++l) 
+          REQUIRE((tensor_4 * tensor_3 * tensor_4).template slice<0, 2>(2)(i, k, l) == 144); 
  
     Shape<4> shape_3 = (tensor_4 * tensor_3 * tensor_4).shape(); 
     Indices<4> indices_3 {}; 
@@ -399,7 +388,14 @@ void TensorMultiplicationTests() {
             REQUIRE((tensor_4 * tensor_3 * tensor_4)[indices_3] == 144); 
             indices_3.increment(shape_3); 
           } 
- 
+
+    Shape<2> shape_4 = (tensor_4 * tensor_3 * tensor_4).template slice<0>(1, 1).shape(); 
+    Indices<2> indices_4 {}; 
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+        for (size_t l = 0; l < tensor_5.dimension(3); ++l) {
+          REQUIRE((tensor_4 * tensor_3 * tensor_4).template slice<0>(1, 1)[indices_4] == 144); 
+          indices_4.increment(shape_4);
+        }
  
     Tensor<int32_t, 2, Container> tensor_6{2, 2}; 
  
@@ -425,10 +421,21 @@ void TensorMultiplicationTests() {
     REQUIRE((tensor_6 * tensor_6)(0, 1) == 4); 
     REQUIRE((tensor_6 * tensor_6)(1, 0) == 12); 
     REQUIRE((tensor_6 * tensor_6)(1, 1) == 7); 
+
+    REQUIRE((tensor_6 * tensor_6).template slice<1>(0)(0) == 7); 
+    REQUIRE((tensor_6 * tensor_6).template slice<1>(0)(1) == 4); 
+    REQUIRE((tensor_6 * tensor_6).template slice<0>(0)(1) == 12); 
+    REQUIRE((tensor_6 * tensor_6).template slice<>()(1, 1) == 7); 
+
     REQUIRE((tensor_6 * tensor_6)[Indices<2>{0, 0}] == 7); 
     REQUIRE((tensor_6 * tensor_6)[Indices<2>{0, 1}] == 4); 
     REQUIRE((tensor_6 * tensor_6)[Indices<2>{1, 0}] == 12); 
     REQUIRE((tensor_6 * tensor_6)[Indices<2>{1, 1}] == 7); 
+
+    REQUIRE((tensor_6 * tensor_6).template slice<0>(0)[Indices<1>{0}] == 7); 
+    REQUIRE((tensor_6 * tensor_6).template slice<0>(1)[Indices<1>{0}] == 4); 
+    REQUIRE((tensor_6 * tensor_6).template slice<1>(1)[Indices<1>{0}] == 12); 
+    REQUIRE((tensor_6 * tensor_6).template slice<0, 1>()[Indices<2>{1, 1}] == 7); 
   } 
  
   SECTION("Combined Multiplication and Addition/Subtraction") { 
@@ -488,14 +495,6 @@ TEST_CASE(BeginTest("Scalar Arithmetic", "Array")) {
 
 TEST_CASE(BeginTest("Scalar Arithmetic", "HashMap")) { 
   ScalarArithmeticTests<data::HashMap>();
-}
-
-TEST_CASE(BeginTest("Elementwise Arithmetic", "Array")) { 
-  ElementwiseArithmeticTests<data::Array>();
-}
-
-TEST_CASE(BeginTest("Elementwise Arithmetic", "HashMap")) { 
-  ElementwiseArithmeticTests<data::HashMap>();
 }
 
 TEST_CASE(BeginTest("Tensor Multplication", "Array")) { 

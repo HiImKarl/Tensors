@@ -7,6 +7,8 @@ using namespace tensor;
 template <template <class> class Container>
 void MethodTests() {
   auto tensor = Tensor<int32_t, 4, Container>{2, 4, 6, 8}; 
+  auto tensor_2 = Tensor<int32_t, 3, Container>({2, 3, 4}, 1); 
+
   for (size_t i = 0; i < tensor.dimension(0); ++i) 
     for (size_t j = 0; j < tensor.dimension(1); ++j) 
       for (size_t k = 0; k < tensor.dimension(2); ++k) 
@@ -59,6 +61,36 @@ void MethodTests() {
           for (size_t l = 0; l < tensor.dimension(3); ++l) 
             REQUIRE(tensor_1(i, j, k, l) == 
                 2000 * (int)i + 200 * (int)j + 20 * (int)k + 2 * (int)l); 
+
+    Tensor<int32_t, 3, Container> tensor_3 (tensor_2.shape());
+    Map([](int &x, int y) { x = 4 + y; }, 
+        tensor_3, tensor_2); 
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == 5); 
+ 
+    Map([](int &x, int y) { x = 6 - y; },
+        tensor_3, tensor_2);
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == 5); 
+ 
+    Map([](int &x, int y) { x = y * -100; },
+        tensor_3, tensor_2);
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == -100); 
+ 
+    Map([](int &x, int y, int z, int a) { x = a * (y + 9)/(y + z); },
+        tensor_2, tensor_2, tensor_2, tensor_3);
+    for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
+          REQUIRE(tensor_2(i, j, k) == -500); 
   } 
 } 
 
@@ -100,16 +132,31 @@ void ConstMethodTests() {
           for (size_t l = 0; l < tensor.dimension(3); ++l) 
             sum += 1000 * i + 100 * j + 10 * k + l; 
     REQUIRE(tensor.reduce(0, fn) == sum); 
-    REQUIRE(Reduce(0, fn, tensor) == sum); 
+    REQUIRE(reduce(0, fn, tensor) == sum); 
 
     auto tensor_2 = tensor; 
     sum *= 2; 
     auto fn2 = [](size_t accum, size_t x, size_t y) { 
       return accum + x + y; 
     }; 
-    REQUIRE(Reduce(0, fn2, tensor, tensor_2) == sum); 
+    REQUIRE(reduce(0, fn2, tensor, tensor_2) == sum); 
   } 
 }
+ 
+template <template <class> class Container>
+void ElementwiseArithmeticTests() {
+  auto tensor_1 = Tensor<int32_t, 3, Container>({2, 4, 6}, 5); 
+  auto tensor_2 = Tensor<int32_t, 3, Container>({2, 4, 6}, -5); 
+
+  SECTION("Eager Evaluation") {
+    auto tensor = elemwise([](int x, int y) { return x + y; },
+        tensor_1, tensor_2);
+    for (size_t i = 0; i < tensor.dimension(0); ++i)
+      for (size_t j = 0; j < tensor.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor.dimension(2); ++k)
+          REQUIRE(tensor(i, j, k) == 0);
+  }
+} 
 
 TEST_CASE(BeginTest("Methods", "Array")) { 
   MethodTests<data::Array>();
@@ -126,3 +173,12 @@ TEST_CASE(BeginTest("Const Methods", "Array")) {
 TEST_CASE(BeginTest("Const Methods", "HashMap")) { 
   ConstMethodTests<data::HashMap>(); 
 }
+
+TEST_CASE(BeginTest("Elementwise Arithmetic", "Array")) { 
+  ElementwiseArithmeticTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Elementwise Arithmetic", "HashMap")) { 
+  ElementwiseArithmeticTests<data::HashMap>();
+}
+

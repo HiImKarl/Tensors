@@ -157,8 +157,21 @@ void TensorAssignmentTest() {
 
     float fVALUE = -tensor_1(0, 1, 1, 1); 
     REQUIRE(fVALUE == -111); 
-  } 
-} 
+  }
+
+  SECTION("Assigning C-Arrays to Tensors") {
+    tensor_1 = _A<int[1][2][3][4]>({{
+        {{23, 22, 21, 20}, {19, 18, 17, 16}, {15, 14, 13, 12}},
+        {{11, 10, 9, 8}, {7, 6, 5, 4}, {3, 2, 1, 0}},
+        }});
+    int correct_val = 24;
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(tensor_1(i, j, k, l) == --correct_val);
+  }
+}
 
 template <template <class> class Container>
 void ScalarAssignmentTest() {
