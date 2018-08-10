@@ -1,9 +1,9 @@
 TEST_DIR := test
 BENCHMARK_DIR := benchmark
 
-CXX := clang++
+CXX := g++
 CXXFLAGS := -I./include -I./external -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD -g 
-LINK := clang++
+LINK := g++
 LINKFLAGS := -g
 
 TEMPORARY_PATTERNS := *.o *~ *.d
