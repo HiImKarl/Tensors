@@ -139,6 +139,7 @@ template <typename LHS, typename RHS> class BinaryAddExpr;
 template <typename LHS, typename RHS> class BinarySubExpr;
 template <typename LHS, typename RHS> class BinaryMulExpr;
 template <typename Function, typename... Exprs> class MapExpr;
+template <typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
 
 /* ----------------- Type Definitions ---------------- */
@@ -2698,6 +2699,13 @@ U Tensor<T, N, C>::reduce(U&& initial_value, FunctionType&& fun) const
   return ret_val;
 }
 
+/** Given a function `fn` and a variable sequence of Tensors, `Tensors`,
+ *  apply the function to each element of `Tensors`simultaneously. Thus, 
+ *  `fn` must have arity equivalen to `sizeof...(Tensors)` and each argument
+ *  to `fn` must have the same cv-qualified ref-unqualified type as the 
+ *  corresponding Tensor. Mutates `Tensors` in place; if `fn` has a 
+ *  return type it is discarded.
+ */
 template <typename FunctionType, typename... Tensors>
 void Map(FunctionType &&fn, Tensors&&... tensors)
 {
@@ -3367,12 +3375,10 @@ public:
   Tensor<T, 0, C> &operator=(X&& elem); /**< Assigns `elem` to the underlying data */
 
   template <typename U, template <class> class C_>
-  friend void Set(Tensor<U, 0, C_> &tensor, Indices<0> const&, U&& value)
-    { tensor.ref_->set(tensor.offset_, std::forward<U>(value)); }
+  friend void Set(Tensor<U, 0, C_> &tensor, Indices<0> const&, U&& value);
 
   template <typename U, template <class> class C_>
-  friend void Set(Tensor<U, 0, C_> &tensor, U&& value)
-    { tensor.ref_->set(tensor.offset_, std::forward<U>(value)); }
+  friend inline void Set(Tensor<U, 0, C_> &tensor, U&& value);
 
   /* --------------- Print --------------- */
  
@@ -3678,6 +3684,18 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator=(X&& elem)
 {
   (*ref_)[offset_] = std::forward<X>(elem);
   return *this;
+}
+
+template <typename U, template <class> class C_>
+void Set(Tensor<U, 0, C_> &tensor, Indices<0> const&, U&& value)
+{ 
+  tensor.ref_->set(tensor.offset_, std::forward<U>(value)); 
+}
+
+template <typename U, template <class> class C_>
+inline void Set(Tensor<U, 0, C_> &tensor, U&& value)
+{ 
+  tensor.ref_->set(tensor.offset_, std::forward<U>(value)); 
 }
 
 /* ------------------------ Equivalence ----------------------- */
@@ -4735,7 +4753,7 @@ public:
   using container_t = typename                    first_t::template container_t<X>;
   constexpr static size_t rank()                  { return first_t::rank(); }
   typedef MapExpr                                 self_t;
-  typedef 
+  typedef
     Tensor<value_t, self_t::rank(), container_t>  return_t;
 
   /* ------------------------------ Friend ------------------------------ */
@@ -4795,6 +4813,24 @@ private:
             typename std::enable_if<self_t::rank() == M>::type>
   value_t pMapExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const;
 
+  template <size_t... Slices, size_t... TupleIndices, typename... Args, typename = 
+            typename std::enable_if<self_t::rank() != sizeof...(Args)>::type>
+  auto pMapSliceExpansion(meta::Sequence<TupleIndices...>, Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type;
+
+  template <size_t... Slices, size_t... TupleIndices, typename... Args, typename = 
+            typename std::enable_if<self_t::rank() == sizeof...(Args)>::type>
+  value_t pMapSliceExpansion(meta::Sequence<TupleIndices...>, Args... args) const;
+
+  template <size_t... Slices, size_t... TupleIndices, size_t M, typename =
+            typename std::enable_if<self_t::rank() != M>::type>
+  auto pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type;
+
+  template <size_t... Slices, size_t... TupleIndices, size_t M, typename =
+            typename std::enable_if<self_t::rank() == M>::type>
+  value_t pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const;
+
   /* ---------------------------- data ------------------------------ */
 
   std::tuple<Exprs const&...> exprs_;
@@ -4835,17 +4871,21 @@ auto MapExpr<Function, Exprs...>::operator[](Indices<M> const &indices) const
 template <typename Function, typename... Exprs>
 template <size_t... Slices, typename... Args>
 auto MapExpr<Function, Exprs...>::slice(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().template slice(args...))>::type
 {
-  assert(0);
+  static_assert(self_t::rank() >= sizeof...(Slices) + sizeof...(Args), SLICES_OUT_OF_BOUNDS);
+  return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
+      std::tuple_size<decltype(exprs_)>::value>::sequence{}, args...);
 }
 
 template <typename Function, typename... Exprs>
 template <size_t... Slices, size_t M>
 auto MapExpr<Function, Exprs...>::slice(Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().template slice(indices))>::type
 {
-  assert(0);
+  static_assert(self_t::rank() >= M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
+  return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
+      std::tuple_size<decltype(exprs_)>::value>::sequence{}, indices); 
 }
 
 template <typename Function_, typename... Exprs_> 
@@ -4893,6 +4933,47 @@ typename MapExpr<Function, Exprs...>::value_t
   MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
 {
   static_assert(self_t::rank() == M, PANIC_ASSERTION);
+  return fn_(std::get<TupleIndices>(exprs_)[indices]...);
+}
+
+template <typename Function, typename... Exprs>
+template <size_t... Slices, size_t... TupleIndices, typename... Args, typename>
+auto MapExpr<Function, Exprs...>::pMapSliceExpansion(meta::Sequence<TupleIndices...>, Args... args) const
+-> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
+{
+  static_assert(self_t::rank() >= sizeof...(Args) + sizeof...(Slices), PANIC_ASSERTION);
+  static_assert(self_t::rank() != sizeof...(Args), PANIC_ASSERTION);
+  return _map(fn_, std::get<TupleIndices>(exprs_).template slice<Slices...>(args...)...);
+}
+
+template <typename Function, typename... Exprs>
+template <size_t... Slices, size_t... TupleIndices, typename... Args, typename>
+typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
+  pMapSliceExpansion(meta::Sequence<TupleIndices...>, Args... args) const
+{
+  static_assert(self_t::rank() == sizeof...(Args), PANIC_ASSERTION);
+  static_assert(sizeof...(Slices) == 0, PANIC_ASSERTION);
+  return fn_(std::get<TupleIndices>(exprs_)(args...)...);
+}
+
+template <typename Function, typename... Exprs>
+template <size_t... Slices, size_t... TupleIndices, size_t M, typename>
+auto MapExpr<Function, Exprs...>::
+  pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
+{
+  static_assert(self_t::rank() != M, PANIC_ASSERTION);
+  static_assert(self_t::rank() >= M + sizeof...(Slices), PANIC_ASSERTION);
+  return _map(fn_, std::get<TupleIndices>(exprs_).template slice<Slices...>(indices)...);
+}
+
+template <typename Function, typename... Exprs>
+template <size_t... Slices, size_t... TupleIndices, size_t M, typename>
+typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
+  pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
+{
+  static_assert(self_t::rank() == M, PANIC_ASSERTION);
+  static_assert(sizeof...(Slices) == 0, PANIC_ASSERTION);
   return fn_(std::get<TupleIndices>(exprs_)[indices]...);
 }
 

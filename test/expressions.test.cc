@@ -484,26 +484,82 @@ template <template <class> class C>
 void TensorManipulationTests() 
 {
   Tensor<int, 3, C> tensor_1{2, 2, 2};
+  Tensor<int, 3, C> tensor_2{2, 2, 2};
+  Tensor<int, 3, C> tensor_3{2, 2, 2};
   
   for (size_t i = 0; i < tensor_1.dimension(0); ++i)
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
         tensor_1(i, j, k) = -(int)(i + j + k);
 
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        tensor_2(i, j, k) = (int)(i + j + k);
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        tensor_3(i, j, k) = (int)(100 * i + 10 * j + k);
+
   SECTION("Single Tensor Map") {
-    Tensor<int, 3, C> tensor_2 = _map([](int x) { return 2 * x; }, tensor_1);
+    Tensor<int, 3, C> tensor_ = _map([](int x) { return 2 * x; }, tensor_1);
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-          REQUIRE(tensor_2(i, j, k) == -(int)(i + j + k) * 2);
+          REQUIRE(tensor_(i, j, k) == -(int)(i + j + k) * 2);
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
           REQUIRE(_map([](int x) { return 2 * x; }, tensor_1)(i, j, k) 
               == -(int)(i + j + k) * 2);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(_map([](int x) { return 2 * x; }, tensor_1)[Indices<3>{i, j, k}]
+              == -(int)(i + j + k) * 2);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template 
+            slice<0, 2>(1)(i, k) == -(int)(i + 1 + k) * 2);
+
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template 
+          slice<1>(1, 1)[Indices<1>{j}] == -(int)(1 + j + 1) * 2);
   }
-  
+
+  SECTION("Multi Tensor Map") {
+    auto add_neg = [](int x, int y, int z) { return -(x + y + z); };
+    Tensor<int, 3, C> tensor_ = _map(add_neg, tensor_1, tensor_2, tensor_3);
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(tensor_(i, j, k) == -(int)(100 * i + 10 * j + k));
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3)(i, j, k) 
+              == -(int)(100 * i + 10 * j + k));
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3)[Indices<3>{i, j, k}]
+              == -(int)(100 * i + 10 * j + k));
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
+            slice<0, 2>(1)(i, k) == -(int)(100 * i + 10 + k));
+
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
+          slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
+  }
 }
 
 TEST_CASE(BeginTest("Raw Expressions", "Array")) { 
