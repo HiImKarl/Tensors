@@ -219,67 +219,67 @@ void TensorArithmeticTests() {
  
 template <template <class> class C>
 void ScalarArithmeticTests() {
-  auto tensor_1 = Scalar<int32_t, C>(10); 
-  auto tensor_2 = Scalar<int32_t, C>(-10); 
+  auto scalar_1 = Scalar<int32_t, C>(10); 
+  auto scalar_2 = Scalar<int32_t, C>(-10); 
  
   SECTION("Binary Addition/Subtract") { 
-    REQUIRE(tensor_1() + tensor_2() == 0); 
-    REQUIRE((tensor_1 + tensor_2)() == 0); 
-    REQUIRE(tensor_1() - tensor_2() == 20); 
-    REQUIRE((tensor_1 - tensor_2)() == 20); 
-    REQUIRE(tensor_1 + 10 == 20); 
-    REQUIRE(10 + tensor_1 == 20); 
-    REQUIRE(tensor_1 - 10 == 0); 
+    REQUIRE(scalar_1() + scalar_2() == 0); 
+    REQUIRE((scalar_1 + scalar_2)() == 0); 
+    REQUIRE(scalar_1() - scalar_2() == 20); 
+    REQUIRE((scalar_1 - scalar_2)() == 20); 
+    REQUIRE(scalar_1 + 10 == 20); 
+    REQUIRE(10 + scalar_1 == 20); 
+    REQUIRE(scalar_1 - 10 == 0); 
  
-    Scalar<int32_t, C> tensor_3 = tensor_1 + tensor_2; 
-    REQUIRE(tensor_3 == 0); 
+    Scalar<int32_t, C> scalar_3 = scalar_1 + scalar_2; 
+    REQUIRE(scalar_3 == 0); 
  
-    Scalar<int32_t, C> tensor_4 = tensor_1 - tensor_2; 
-    REQUIRE(tensor_4 == 20); 
+    Scalar<int32_t, C> scalar_4 = scalar_1 - scalar_2; 
+    REQUIRE(scalar_4 == 20); 
   } 
  
   SECTION("Multi-Term Addition/Subtract") { 
-    REQUIRE(tensor_1 + 10 + tensor_2 + 5 == 15); 
-    REQUIRE(tensor_1 - 10 - tensor_2 - 5 == 5); 
-    REQUIRE(tensor_1 - 10 + tensor_2 - 5 == -15); 
-    REQUIRE(tensor_1 + 10 - tensor_2 + 5 == 35); 
+    REQUIRE(scalar_1 + 10 + scalar_2 + 5 == 15); 
+    REQUIRE(scalar_1 - 10 - scalar_2 - 5 == 5); 
+    REQUIRE(scalar_1 - 10 + scalar_2 - 5 == -15); 
+    REQUIRE(scalar_1 + 10 - scalar_2 + 5 == 35); 
   } 
  
   SECTION("Multiplication") { 
-    REQUIRE(tensor_1() * tensor_2() == -100); 
-    REQUIRE((tensor_1 * tensor_2)() == -100); 
-    REQUIRE(tensor_1 * 4 == 40); 
+    REQUIRE(scalar_1() * scalar_2() == -100); 
+    REQUIRE((scalar_1 * scalar_2)() == -100); 
+    REQUIRE(scalar_1 * 4 == 40); 
  
-    Scalar<int32_t, C> tensor_3 = tensor_1 * tensor_2; 
-    REQUIRE(tensor_3 == -100); 
+    Scalar<int32_t, C> scalar_3 = scalar_1 * scalar_2; 
+    REQUIRE(scalar_3 == -100); 
   } 
  
   SECTION("Assignment arithmetic") { 
-    tensor_1 += 10; 
-    REQUIRE(tensor_1() == 20); 
-    tensor_1 -= 10; 
-    REQUIRE(tensor_1() == 10); 
-    tensor_1 *= 10; 
-    REQUIRE(tensor_1() == 100); 
-    tensor_1 += tensor_2; 
-    REQUIRE(tensor_1() == 90); 
-    tensor_1 -= tensor_2; 
-    REQUIRE(tensor_1() == 100); 
-    tensor_1 /= tensor_2; 
-    REQUIRE(tensor_1() == -10); 
-    tensor_1 += tensor_1 + tensor_2; 
-    REQUIRE(tensor_1() == -30); 
-    tensor_1 -= tensor_1 + tensor_2; 
-    REQUIRE(tensor_1() == 10); 
-    tensor_1 *= tensor_1 - tensor_2; 
-    REQUIRE(tensor_1() == 200); 
-    tensor_1 /= tensor_1 + 10 * tensor_2; 
-    REQUIRE(tensor_1() == 2); 
+    scalar_1 += 10; 
+    REQUIRE(scalar_1() == 20); 
+    scalar_1 -= 10; 
+    REQUIRE(scalar_1() == 10); 
+    scalar_1 *= 10; 
+    REQUIRE(scalar_1() == 100); 
+    scalar_1 += scalar_2; 
+    REQUIRE(scalar_1() == 90); 
+    scalar_1 -= scalar_2; 
+    REQUIRE(scalar_1() == 100); 
+    scalar_1 /= scalar_2; 
+    REQUIRE(scalar_1() == -10); 
+    scalar_1 += scalar_1 + scalar_2; 
+    REQUIRE(scalar_1() == -30); 
+    scalar_1 -= scalar_1 + scalar_2; 
+    REQUIRE(scalar_1() == 10); 
+    scalar_1 *= scalar_1 - scalar_2; 
+    REQUIRE(scalar_1() == 200); 
+    scalar_1 /= scalar_1 + 10 * scalar_2; 
+    REQUIRE(scalar_1() == 2); 
   } 
  
   SECTION("Negation") { 
     // FIXME
-    REQUIRE(tensor_1.neg() == -10); 
+    REQUIRE(scalar_1.neg() == -10); 
   } 
 } 
  
@@ -480,6 +480,32 @@ void TensorMultiplicationTests() {
   } 
 }
 
+template <template <class> class C>
+void TensorManipulationTests() 
+{
+  Tensor<int, 3, C> tensor_1{2, 2, 2};
+  
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        tensor_1(i, j, k) = -(int)(i + j + k);
+
+  SECTION("Single Tensor Map") {
+    Tensor<int, 3, C> tensor_2 = _map([](int x) { return 2 * x; }, tensor_1);
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(tensor_2(i, j, k) == -(int)(i + j + k) * 2);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+          REQUIRE(_map([](int x) { return 2 * x; }, tensor_1)(i, j, k) 
+              == -(int)(i + j + k) * 2);
+  }
+  
+}
+
 TEST_CASE(BeginTest("Raw Expressions", "Array")) { 
   RawExpressionTests<data::Array>();
 }
@@ -510,5 +536,13 @@ TEST_CASE(BeginTest("Tensor Multplication", "Array")) {
 
 TEST_CASE(BeginTest("Tensor Multplication", "HashMap")) { 
   TensorMultiplicationTests<data::HashMap>();
+}
+
+TEST_CASE(BeginTest("Tensor Manipulation", "Array")) {
+  TensorManipulationTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Tensor Manipulation", "HashMap")) {
+  TensorManipulationTests<data::HashMap>();
 }
 

@@ -170,6 +170,20 @@ void TensorAssignmentTest() {
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
             REQUIRE(tensor_1(i, j, k, l) == --correct_val);
+
+    tensor_1(0, 1) = _A<int[3][4]>({
+      {-1, -1, -1, -1},  {-1, -1, -1, -1},  {-1, -1, -1, -1}
+      });
+    for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+      for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+        REQUIRE(tensor_1(0, 1, k, l) == -1);
+
+    tensor_1.template slice<1, 2>(0, 1) = _A<int[2][3]>({
+      {0, 0, 0},  {0, 0, 0}
+      });
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        REQUIRE(tensor_1(0, j, k, 1) == 0);
   }
 }
 

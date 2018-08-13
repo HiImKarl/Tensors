@@ -57,6 +57,38 @@ void AdditionSubtractionTests() {
   }
 }
  
+template <template <class> class C>
+void MultiplicationTests() {
+  Matrix<int, C> tensor_1({4, 4});
+  Matrix<int, C> tensor_2({4, 4});
+  
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      tensor_1(i, j) = (int)(i + j);
+
+  for (size_t i = 0; i < tensor_2.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_2.dimension(1); ++j)
+      tensor_2(i, j) = -(int)(i + j);
+
+  SECTION("Multiplication") {
+    REQUIRE(mul(tensor_1, tensor_2)(0, 0) == -14);
+    REQUIRE(mul(tensor_1, tensor_2)(0, 1) == -20);
+    REQUIRE(mul(tensor_1, tensor_2)(0, 2) == -26);
+    REQUIRE(mul(tensor_1, tensor_2)(0, 3) == -32);
+    REQUIRE(mul(tensor_1, tensor_2)(1, 0) == -20);
+    REQUIRE(mul(tensor_1, tensor_2)(1, 1) == -30);
+    REQUIRE(mul(tensor_1, tensor_2)(1, 2) == -40);
+    REQUIRE(mul(tensor_1, tensor_2)(1, 3) == -50);
+    REQUIRE(mul(tensor_1, tensor_2)(2, 0) == -26);
+    REQUIRE(mul(tensor_1, tensor_2)(2, 1) == -40);
+    REQUIRE(mul(tensor_1, tensor_2)(2, 2) == -54);
+    REQUIRE(mul(tensor_1, tensor_2)(2, 3) == -68);
+    REQUIRE(mul(tensor_1, tensor_2)(3, 0) == -32);
+    REQUIRE(mul(tensor_1, tensor_2)(3, 1) == -50);
+    REQUIRE(mul(tensor_1, tensor_2)(3, 2) == -68);
+    REQUIRE(mul(tensor_1, tensor_2)(3, 3) == -86);
+  }
+}
 
 template <template <class> class C>
 void MiscTests() {
@@ -84,6 +116,14 @@ TEST_CASE(BeginTest("Addition/Subtraction", "HashMap")) {
   AdditionSubtractionTests<data::HashMap>();
 }
 
+TEST_CASE(BeginTest("Multiplication", "Array")) {
+  MultiplicationTests<data::Array>(); 
+}
+
+TEST_CASE(BeginTest("Multiplication", "HashMap")) {
+  MultiplicationTests<data::HashMap>(); 
+}
+
 TEST_CASE(BeginTest("Misc", "Array")) {
   MiscTests<data::Array>();
 }
@@ -91,3 +131,4 @@ TEST_CASE(BeginTest("Misc", "Array")) {
 TEST_CASE(BeginTest("Misc", "HashMap")) {
   MiscTests<data::HashMap>();
 }
+
