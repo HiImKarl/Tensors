@@ -53,30 +53,30 @@ void TensorAccessTests() {
   SECTION("operator[](Indices), decrement") { 
     Indices<4> indices{0, 0, 1, 0}; 
     REQUIRE(tensor_1[indices] == 10); 
-    REQUIRE(indices.decrement(tensor_1.shape()) == false); /* 0, 0, 0, 3 */ 
+    REQUIRE(indices.decrement(tensor_1.shape()) == true);   /* 0, 0, 0, 3 */ 
     REQUIRE(tensor_1[indices] == 3); 
-    REQUIRE(indices.decrement(tensor_1.shape()) == false); /* 0, 0, 0, 2 */ 
+    REQUIRE(indices.decrement(tensor_1.shape()) == true);   /* 0, 0, 0, 2 */ 
     REQUIRE(tensor_1[indices] == 2); 
-    REQUIRE(indices.decrement(tensor_1.shape()) == false); /* 0, 0, 0, 1 */ 
+    REQUIRE(indices.decrement(tensor_1.shape()) == true);   /* 0, 0, 0, 1 */ 
     REQUIRE(tensor_1[indices] == 1); 
-    REQUIRE(indices.decrement(tensor_1.shape()) == false); /* 0, 0, 0, 0 */ 
+    REQUIRE(indices.decrement(tensor_1.shape()) == true);   /* 0, 0, 0, 0 */ 
     REQUIRE(tensor_1[indices] == 0); 
-    REQUIRE(indices.decrement(tensor_1.shape()) == true);  /* 0, 1, 2, 3 */ 
+    REQUIRE(indices.decrement(tensor_1.shape()) == false);  /* 0, 1, 2, 3 */ 
     REQUIRE(tensor_1[indices] == 123); 
   } 
 
   SECTION("operator[](Indices), increment") { 
     Indices<4> indices{0, 1, 1, 3}; 
     REQUIRE(tensor_1[indices] == 113); 
-    REQUIRE(indices.increment(tensor_1.shape()) == false); /* 0, 1, 2, 0 */ 
+    REQUIRE(indices.increment(tensor_1.shape()) == true);   /* 0, 1, 2, 0 */ 
     REQUIRE(tensor_1[indices] == 120); 
-    REQUIRE(indices.increment(tensor_1.shape()) == false); /* 0, 1, 2, 1 */ 
+    REQUIRE(indices.increment(tensor_1.shape()) == true);   /* 0, 1, 2, 1 */ 
     REQUIRE(tensor_1[indices] == 121); 
-    REQUIRE(indices.increment(tensor_1.shape()) == false); /* 0, 0, 0, 2 */ 
+    REQUIRE(indices.increment(tensor_1.shape()) == true);   /* 0, 0, 0, 2 */ 
     REQUIRE(tensor_1[indices] == 122); 
-    REQUIRE(indices.increment(tensor_1.shape()) == false); /* 0, 1, 2, 3 */ 
+    REQUIRE(indices.increment(tensor_1.shape()) == true);   /* 0, 1, 2, 3 */ 
     REQUIRE(tensor_1[indices] == 123); 
-    REQUIRE(indices.increment(tensor_1.shape()) == true);  /* 0, 0, 0, 0 */ 
+    REQUIRE(indices.increment(tensor_1.shape()) == false);  /* 0, 0, 0, 0 */ 
     REQUIRE(tensor_1[indices] == 0); 
   } 
 
@@ -123,7 +123,7 @@ void TensorAccessTests() {
     for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
         REQUIRE(tensor_5[Indices<2>{i, j}] == (int32_t)(100 + 10 * i + j)); 
-  } 
+  }
 }
 
 // Instantiate test cases

@@ -560,6 +560,26 @@ void TensorManipulationTests()
         REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
           slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
   }
+
+  SECTION("Single Tensor Reduce") {
+    Scalar<int> x = _reduce(0, [](int &x, int y) { x += y; }, tensor_1);
+    REQUIRE(x == -12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)() == 12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)[Indices<0>{}] == 12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice() == 12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice(Indices<0>{}) == 12);
+  }
+
+  SECTION("Multi Tensor Reduce") {
+    auto add = [](int &x, int y1, int y2, int y3) { x += y1 - y2 - y3; };
+    Scalar<int> x = _reduce(0, add, tensor_1, tensor_2, tensor_3);
+    REQUIRE(x == -468);
+    REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)() == -444);
+    REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)[Indices<0>{}] == -444);
+    REQUIRE(_reduce(-111, add, tensor_1, tensor_1, tensor_3).template slice() == -555);
+    REQUIRE(_reduce(111, add, tensor_1, tensor_1, tensor_3).template slice(Indices<0>{}) == -333);
+  }
+
 }
 
 TEST_CASE(BeginTest("Raw Expressions", "Array")) { 

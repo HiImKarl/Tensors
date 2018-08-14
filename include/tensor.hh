@@ -130,6 +130,7 @@ template <typename T> class HashMap;
 
 } // namespace data
 
+template <typename NodeType> struct Expression;
 template <size_t N> class Shape;
 template <> class Shape<0>;
 template <size_t N> class Indices;
@@ -139,7 +140,7 @@ template <typename LHS, typename RHS> class BinaryAddExpr;
 template <typename LHS, typename RHS> class BinarySubExpr;
 template <typename LHS, typename RHS> class BinaryMulExpr;
 template <typename Function, typename... Exprs> class MapExpr;
-template <typename Function, typename... Exprs> class ReduceExpr;
+template <typename T, typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
 
 /* ----------------- Type Definitions ---------------- */
@@ -543,10 +544,10 @@ void UpdateIndices(Indices<M> &reference_indices, Shape<N> const &shape, size_t 
 
 /* ------- Expansion for methods which take Tensors...  --------- */
 
-template <typename U, size_t M, template <class> class C_, typename... Tensors>
-inline Shape<M> const &GetShape(Tensor<U, M, C_> const &tensor, Tensors&&...)
+template <typename NodeType, typename... Tensors>
+Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Tensors const&...)
 {
-  return tensor.shape();
+  return expr.self().shape();
 }
 
 template <typename FunctionType, size_t... I, typename... Tensors>
@@ -859,6 +860,7 @@ public:
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename Function, typename... Exprs> class MapExpr;
+  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
 
   /* ------------------ Constructors ------------------ */
@@ -1020,6 +1022,7 @@ public:
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename Function, typename... Exprs> class MapExpr;
+  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
 
   /* ---------------- Constructors -------------- */
@@ -1034,7 +1037,7 @@ public:
    *  propogated accordingly, I.e. (1, 3) indices with a 2x3 
    *  shape will become (2, 0) after increment. indices will
    *  overflow if incremented beyond their maximum value, returns
-   *  true if overflow, false o.w.
+   *  false if overflow, true o.w.
    */
   bool increment(Shape<N> const &shape);
   
@@ -1042,8 +1045,8 @@ public:
    *  next element in an N-rank() Tensor. The dimensions are
    *  propogated accordingly, I.e. (2, 0) indices with a 2x3 
    *  shape will become (1, 3) after decrement. Indices will
-   *  underflow if decremented at 0, returns true if 
-   *  underflow, false o.w.
+   *  underflow if decremented at 0, returns false if 
+   *  underflow, true o.w.
    */
   bool decrement(Shape<N> const &shape);
   
@@ -1097,7 +1100,7 @@ bool Indices<N>::increment(Shape<N> const &shape)
       propogate = false;
     }
   }
-  return dim_index < 0;
+  return dim_index >= 0;
 }
 
 template <size_t N>
@@ -1114,7 +1117,7 @@ bool Indices<N>::decrement(Shape<N> const &shape)
       propogate = false;
     }
   }
-  return dim_index < 0;
+  return dim_index >= 0;
 }
 
 template <size_t N>
@@ -1162,6 +1165,7 @@ public:
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename Function, typename... Exprs> class MapExpr;
+  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
 
   /* ------------------ Proxy Objects ----------------- */
@@ -2420,8 +2424,8 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
 {
   using return_t = typename FirstTensor<Tensors...>::type;
   static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
-  auto shape = details::GetShape(tensors...);
-  constexpr size_t M = shape.rank();
+  auto const &shape = details::GetShape(tensors...);
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
   return_t result = return_t(shape);
   size_t cumul_index = shape.index_product();
@@ -2597,7 +2601,7 @@ Tensor<T, M, C_> Tensor<T, N, C>::resize(Shape<M> const &shape) const
   do {
     resized_tensor[indices_resized] = (*this)[indices];
     indices_resized.increment(shape);
-  } while (!indices.increment(shape_));
+  } while (indices.increment(shape_));
   return resized_tensor;
 }
 
@@ -2710,8 +2714,8 @@ template <typename FunctionType, typename... Tensors>
 void Map(FunctionType &&fn, Tensors&&... tensors)
 {
   static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
-  auto shape = details::GetShape(tensors...);
-  constexpr size_t M = shape.rank();
+  auto const &shape = details::GetShape(tensors...);
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
   size_t cumul_index = shape.index_product();
   Indices<M> reference_indices {};
@@ -2728,10 +2732,10 @@ template <typename U, typename FunctionType, typename... Tensors>
 U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
 {
   static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
-  auto shape = details::GetShape(tensors...);
+  auto const &shape = details::GetShape(tensors...);
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
   U ret_val = std::forward<U>(initial_value);
-  constexpr size_t M = shape.rank();
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
   size_t cumul_index = shape.index_product();
   Indices<M> reference_indices {};
   size_t indices[sizeof...(Tensors)] = {};
@@ -3210,6 +3214,7 @@ public:
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename Function, typename... Exprs> class MapExpr;
+  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
 
   /* ------------------ Constructors ------------------ */
@@ -4976,6 +4981,135 @@ typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
   static_assert(sizeof...(Slices) == 0, PANIC_ASSERTION);
   return fn_(std::get<TupleIndices>(exprs_)[indices]...);
 }
+
+template <typename T, typename Function, typename... Exprs> 
+class ReduceExpr: public Expression<ReduceExpr<T, Function, Exprs...>> {
+/*@ReduceExpr<T, Function, Exprs...>>*/
+public:
+
+  /* ----------------------------- typedefs ------------------------------ */
+
+  typedef typename FirstTensor<Exprs...>::type    first_t;
+  typedef T                                       value_t;
+  template <typename X>
+  using container_t = typename                    first_t::template container_t<X>;
+  constexpr static size_t rank()                  { return 0; }
+  typedef ReduceExpr                              self_t;
+  typedef T                                       return_t;
+
+  /* ------------------------------ Friend ------------------------------ */
+
+  template <typename U, typename Function_, typename... Exprs_> friend ReduceExpr<U, Function_, Exprs_...>
+    _reduce(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs);
+
+  /* ----------------------------- Getters ------------------------------ */
+
+  Shape<0> shape() const { return Shape<0>(); }
+
+  T operator()() const;
+
+  auto at() const -> Tensor<T, 0, container_t>;
+
+  T operator[](Indices<0> const &indices) const;
+
+  template <size_t... Slices>
+  T slice() const;
+
+  template <size_t... Slices>
+  T slice(Indices<0> const &indices) const;
+
+private:
+
+  /* ------------------------- Constructors ------------------------- */
+
+  ReduceExpr(T &&value, Function &&fn, Exprs const&... exprs);
+  ReduceExpr(ReduceExpr<T, Function, Exprs...> const&) = default;
+
+  /* --------------------------- Utility ------------------------------ */
+
+  template <size_t... TupleIndices>
+  T pReduceExpansion(meta::Sequence<TupleIndices...>) const;
+
+  /* ---------------------------- data ------------------------------ */
+
+  std::tuple<Exprs const&...> exprs_;
+  Function &fn_;
+  T return_value_;
+};
+
+template <typename U, typename Function_, typename... Exprs_> ReduceExpr<U, Function_, Exprs_...>
+  _reduce(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs)
+{
+  auto const &shape = details::GetShape(exprs...);
+  VARDIAC_MAP(assert(shape == exprs.self().shape() && SHAPE_MISMATCH));
+  return ReduceExpr<U, Function_, Exprs_...>(
+      std::forward<U>(value), std::forward<Function_>(fn), exprs.self()...);
+}
+
+/* ----------------------------- Getters ------------------------------ */
+
+template <typename T, typename Function, typename... Exprs>
+T ReduceExpr<T, Function, Exprs...>::operator()() const
+{
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
+      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+}
+
+template <typename T, typename Function, typename... Exprs>
+auto ReduceExpr<T, Function, Exprs...>::at() const
+  -> Tensor<T, 0, container_t>
+{
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
+      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+}
+
+template <typename T, typename Function, typename... Exprs>
+T ReduceExpr<T, Function, Exprs...>::operator[](Indices<0> const &) const
+{
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
+      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+}
+
+template <typename T, typename Function, typename... Exprs>
+template <size_t... Slices>
+T ReduceExpr<T, Function, Exprs...>::slice() const
+{
+  static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
+      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+}
+
+template <typename T, typename Function, typename... Exprs>
+template <size_t... Slices>
+T ReduceExpr<T, Function, Exprs...>::slice(Indices<0> const&) const
+{
+  static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
+      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+}
+
+/* ----------------------- Constructors --------------------- */
+
+template <typename T, typename Function, typename... Exprs>
+ReduceExpr<T, Function, Exprs...>::ReduceExpr(T &&value, Function &&fn, Exprs const&... exprs)
+  : exprs_(std::forward_as_tuple(exprs...)), fn_(fn), return_value_(std::forward<T>(value))  {}
+
+/* ------------------------- Utility ----------------------- */
+
+template <typename T, typename Function, typename... Exprs>
+template <size_t... TupleIndices>
+T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndices...>) const
+{
+  auto const &shape = details::GetShape<Exprs...>(std::get<TupleIndices>(exprs_)...);
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+  Indices<M> indices{};
+  T return_value = return_value_;
+  do {
+    fn_(return_value, std::get<TupleIndices>(exprs_)[indices]...);
+  } while (indices.increment(shape));
+  return return_value;
+}
+
 
 template <typename RHS> class UnaryNegExpr {};
 
