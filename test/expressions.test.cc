@@ -559,6 +559,15 @@ void TensorManipulationTests()
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
           slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
+
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+        REQUIRE(_map(add_neg, tensor_1 + tensor_2, tensor_2 + tensor_1, tensor_3).template 
+          slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
+
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+        REQUIRE(_map(add_neg, tensor_1 * tensor_2, tensor_1 * tensor_1, (tensor_1 + tensor_2) * tensor_3).template 
+          slice<1, 2>(1, 1)[Indices<2>{j, k}] == 0);
   }
 
   SECTION("Single Tensor Reduce") {
@@ -568,6 +577,15 @@ void TensorManipulationTests()
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)[Indices<0>{}] == 12);
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice() == 12);
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice(Indices<0>{}) == 12);
+
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_2)() == -24);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, 
+          tensor_1 + tensor_1 - tensor_1 + tensor_2)[Indices<0>{}] == 0);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2 - tensor_1).template slice() == 24);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_1 + tensor_1).template slice(Indices<0>{}) == -12);
+
+    x = _reduce(0, [](int &x, int y) { x += y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
+    REQUIRE(x == -1056);
   }
 
   SECTION("Multi Tensor Reduce") {
@@ -580,6 +598,19 @@ void TensorManipulationTests()
     REQUIRE(_reduce(111, add, tensor_1, tensor_1, tensor_3).template slice(Indices<0>{}) == -333);
   }
 
+  SECTION("Combined Map/Reduce/Arithmetic") {
+    auto fn1 = [](int x, int y) { return x * 2 - y * 2; };
+    auto fn2 = [](int &x, int y1, int y2) { x = y1 * 2 + y2 * 2; }; 
+    // FIXME -- Manually compute the return value
+    Scalar<int> x = _reduce(0, fn2, tensor_2 * tensor_1, _map(fn1, tensor_1 * tensor_1, tensor_2 * tensor_1)
+          - tensor_2 * tensor_2);
+
+    auto fn3 = [](int y1, int y2) { return y1 * 2 + y2 * 2; };
+    auto fn4 = [](int &x, int y1, int y2, int y3) { x += y1 + y2 + y3; };
+    
+    REQUIRE(_reduce(0, fn4, tensor_1, tensor_2, 
+          _map(fn3, tensor_1, tensor_1) + tensor_2)() == -36);
+  }
 }
 
 TEST_CASE(BeginTest("Raw Expressions", "Array")) { 

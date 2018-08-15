@@ -37,6 +37,13 @@ void AdditionSubtractionTests() {
             REQUIRE(add(add(tensor_1,  tensor_2), tensor_1)(i, j, k, l)
               == 4000 * i + 400 * j + 40 * k + 4 *l);
 
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(add(tensor_1,  tensor_2, tensor_1, tensor_2)(i, j, k, l)
+              == 6000 * i + 600 * j + 60 * k + 6 *l);
+
   }
 
   SECTION("Subtraction") {
@@ -53,6 +60,20 @@ void AdditionSubtractionTests() {
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
             REQUIRE(sub(tensor_2, sub(tensor_2, sub(tensor_1, tensor_1)))
                 (i, j, k, l) == 0);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(sub(tensor_2, sub(tensor_2, sub(tensor_1, tensor_1)))
+                (i, j, k, l) == 0);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(sub(tensor_2, sub(tensor_2, tensor_1, tensor_1), tensor_1)
+                (i, j, k, l) == 1000 * i + 100 * j + 10 * k + l);
 
   }
 }
@@ -88,6 +109,8 @@ void MultiplicationTests() {
     REQUIRE(mul(tensor_1, tensor_2)(3, 2) == -68);
     REQUIRE(mul(tensor_1, tensor_2)(3, 3) == -86);
   }
+
+  // FIXME -- test mul(tensors...)
 }
 
 template <template <class> class C>

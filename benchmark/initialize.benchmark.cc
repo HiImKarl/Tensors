@@ -24,14 +24,14 @@ BENCHMARK(BM_TensorValueInitialization)->RangeMultiplier(2)->Range(2, 4 * sizeof
 
 static void BM_ScalarInitialization(benchmark::State &state) 
 {
-  for (auto _ : state) Tensor<int32_t>();
+  for (auto _ : state) Scalar<int32_t>();
 }
 
 BENCHMARK(BM_ScalarInitialization);
 
 static void BM_ScalarValueInitialization(benchmark::State &state) 
 {
-  for (auto _ : state) Tensor<int32_t>(-1);
+  for (auto _ : state) Scalar<int32_t>(-1);
 }
 
 BENCHMARK(BM_ScalarValueInitialization);

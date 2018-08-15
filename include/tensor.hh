@@ -16,10 +16,12 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef _ENABLE_OPENCL
+#include <CL/cl2.hpp>
+#endif
+
 #ifdef _TEST
-
 extern int eDebugConstructorCounter; 
-
 #endif
 
 /* FIXME -- Remove debug macros */
@@ -57,6 +59,12 @@ extern int eDebugConstructorCounter;
   "Cannot be constructed with a zero dimension"
 #define EXPECTING_C_ARRAY \
   "Expecting argument to be a C-array"
+#define EXPECTING_TENSOR \
+  "Expecting argument to be an any-rank Tensor"
+#define EXPECTING_SCALAR \
+  "Expecting argument to be a Scalar"
+#define EXPECTING_EXPRESSION \
+  "Expecting argument to be an Expression"
 
 // Out of bounds
 #define DIMENSION_INVALID \
@@ -160,6 +168,138 @@ template <typename T>
 using SparseVector = Tensor<T, 1, data::HashMap>;
 template <typename T>
 using SparseScalar = Tensor<T, 0, data::HashMap>;
+
+/* -------------- Tensor Meta-Patterns --------------- */
+
+/** Boolean member `value` is true if T is a non-cv qualified, non-ref
+ *  Tensor of any rank, false o.w.  
+ */
+template <typename T>
+struct IsNonCVRefTensor { enum: bool { value = false }; };
+
+/** Tensor specialization of IsNonCVRefTensor, boolean enum 
+ * `value` is true
+ */
+template <typename T, size_t N, template <class> class C>
+struct IsNonCVRefTensor<Tensor<T, N, C>> { enum: bool { value = true }; };
+
+/** Boolean member `value` is true if T is a Tensor of any rank,
+ *  ignoring cv, ref qualification, false o.w.  
+ */
+template <typename T>
+struct IsTensor { 
+  enum: bool { value = IsNonCVRefTensor<
+          typename std::remove_reference<
+          typename std::remove_cv<T>::type>::type>::value
+        };
+};
+
+/** Boolean member `value` is true if T is a non-cv qualified, non-ref 
+ *  0-rank Tensor, false o.w.
+ */
+template <typename T>
+struct IsNonCVRefScalarTensor { static bool const value = true; };
+
+/** Scalar specialization of IsScalar, Boolean member 
+ * `value` is true
+ */
+template <typename T, template <class> class C>
+struct IsNonCVRefScalarTensor<Tensor<T, 0, C>> { static bool const value = true; };
+
+/** Enum `value` is true if T is a 0-rank Tensor, ingoring 
+ *  CV, ref qualification, false o.w.
+ */
+template <typename T>
+struct IsScalar { 
+  enum: bool { value = IsNonCVRefScalarTensor<
+          typename std::remove_reference<
+          typename std::remove_cv<T>::type>::type>::value
+        };
+};
+
+/** Boolean member `value` is true if T is a non-cv qualified, non-ref
+ *  Expression of any NodeType, false o.w.  
+ */
+template <typename T>
+struct IsNonCVRefExpression { enum: bool { value = false }; };
+
+/** Expression specialization, boolean enum 
+ * `value` is true.
+ */
+template <typename T, size_t N, template <class> class C>
+struct IsNonCVRefExpression<Tensor<T, N, C>> { enum: bool { value = true }; };
+
+template <typename LHS, typename RHS>
+struct IsNonCVRefExpression<BinaryAddExpr<LHS, RHS>> { enum: bool { value = true }; };
+
+template <typename LHS, typename RHS>
+struct IsNonCVRefExpression<BinarySubExpr<LHS, RHS>> { enum: bool { value = true }; };
+
+template <typename LHS, typename RHS> 
+struct IsNonCVRefExpression<BinaryMulExpr<LHS, RHS>> { enum: bool { value = true }; };
+
+template <typename Function, typename... Exprs> 
+struct IsNonCVRefExpression<MapExpr<Function, Exprs...>> { enum: bool { value = true }; };
+
+template <typename T, typename Function, typename... Exprs> 
+struct IsNonCVRefExpression<ReduceExpr<T, Function, Exprs...>> { enum: bool { value = true }; };
+
+template <typename RHS> 
+struct IsNonCVRefExpression<UnaryNegExpr<RHS>> { enum: bool { value = true }; };
+
+/** Boolean member `value` is true if T is an Expression of any NodeType
+ *  ignoring cv, ref qualification, false o.w.  
+ */
+template <typename T>
+struct IsExpression {
+  enum: bool { value = IsNonCVRefExpression<
+          typename std::remove_reference<
+          typename std::remove_cv<T>::type>::type>::value
+        };
+};
+
+/** Provides `value` equal to the rank() of `type`, 0 
+ *  if not a non-cv qualified, Tensor type (
+ *  are considered to be rank() 0 in this context)
+ */
+template <typename T>
+struct Rank { enum: size_t { value = 0 }; };
+
+/** Provides `value` equal to the rank() of `type`, 0 
+ *  if not a tensor::Tensor type (C mutli-dimensional arrays 
+ *  are considered to be rank() 0 in this context)
+ */
+template <typename T, size_t N, template <class> class C>
+struct Rank<Tensor<T, N, C>> { enum: size_t { value = N }; };
+
+/** Provides typedef 'type' as the type of the first Tensor 
+ *  in `Tensors...`. Definition Statement.
+ */
+template <typename... Tensors>
+struct FirstTensor;
+
+/** Provides typedef 'type' as the type of the first Tensor 
+ *  in `Tensors...`. 
+ */
+template <typename Tensor, typename... Tensors>
+struct FirstTensor<Tensor, Tensors...> {
+  using type = typename std::remove_reference<Tensor>::type;
+  static_assert(IsTensor<type>::value, EXPECTED_TENSOR);
+};
+
+/** Provides typedef 'type' as the type of the first Tensor 
+ *  in `Tensors...`. 
+ */
+template <typename... Exprs>
+struct FirstExpression;
+
+/** Provides typedef 'type' as the type of the first Tensor 
+ *  in `Tensors...`. 
+ */
+template <typename Expr, typename... Exprs>
+struct FirstExpression<Expr, Exprs...> {
+  using type = typename std::remove_reference<Expr>::type;
+};
 
 /* ------------- Template Meta-Patterns -------------- */
 
@@ -512,6 +652,49 @@ struct InsertZeros<Size> {
   InsertZeros(size_t *) {}
 };
 
+/** Enum 'value' is true if all arguments are Tensors, false o.w. */
+template <typename... Args>
+struct AreTensors; 
+
+template <typename Arg, typename... Args>
+struct AreTensors<Arg, Args...> {
+  enum: bool { value = IsTensor<Arg>::value && AreTensors<Args...>::value }; 
+};
+
+template <>
+struct AreTensors<> {
+  enum: bool { value = true };
+};
+
+/** Enum 'value' is true if all arguments are Expressions, false o.w. */
+template <typename... Args>
+struct AreExpressions; 
+
+template <typename Arg, typename... Args>
+struct AreExpressions<Arg, Args...> {
+  enum: bool { value = (IsExpression<Arg>::value || IsTensor<Arg>::value)
+            && AreExpressions<Args...>::value }; 
+};
+
+template <>
+struct AreExpressions<> {
+  enum: bool { value = true };
+};
+
+template <typename... Exprs>
+struct RankSum;
+
+template <typename Expr, typename... Exprs>
+struct RankSum<Expr, Exprs...> {
+  enum: size_t { value = Expr::rank() + RankSum<Exprs...>::value };
+};
+
+template <>
+struct RankSum<> {
+  enum: size_t { value = 0 };
+};
+
+
 } // namespace meta
 
 namespace details {
@@ -571,83 +754,6 @@ inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
 }
 
 } // namespace details
-
-/* -------------- Tensor Meta-Patterns --------------- */
-
-/** Boolean member `value` is true if T is a non-cv qualified, non-ref
- *  Tensor of any rank, false o.w.  
- */
-template <typename T>
-struct IsNonCVRefTensor { enum: bool { value = false }; };
-
-/** Tensor specialization of IsNonCVRefTensor, boolean enum 
- * `value` is true
- */
-template <typename T, size_t N, template <class> class C>
-struct IsNonCVRefTensor<Tensor<T, N, C>> { enum: bool { value = true }; };
-
-/** Boolean member `value` is true if T is a Tensor of any rank,
- *  ignoring cv, ref qualification, false o.w.  
- */
-template <typename T>
-struct IsTensor { 
-  enum: bool { value = IsNonCVRefTensor<
-          typename std::remove_reference<
-          typename std::remove_cv<T>::type>::type>::value
-        };
-};
-
-/** Boolean member `value` is true if T is a non-cv qualified, non-ref 
- *  0-rank Tensor, false o.w.
- */
-template <typename T>
-struct IsNonCVRefScalarTensor { static bool const value = true; };
-
-/** Scalar specialization of IsScalar, Boolean member 
- * `value` is true
- */
-template <typename T, template <class> class C>
-struct IsNonCVRefScalarTensor<Tensor<T, 0, C>> { static bool const value = true; };
-
-/** Boolean member `value` is true if T is a 0-rank Tensor, ingoring 
- *  CV, ref qualification, false o.w.
- */
-template <typename T>
-struct IsScalar { 
-  enum: bool { value = IsNonCVRefScalarTensor<
-          typename std::remove_reference<
-          typename std::remove_cv<T>::type>::type>::value
-        };
-};
-
-/** Provides `value` equal to the rank() of `type`, 0 
- *  if not a non-cv qualified, Tensor type (
- *  are considered to be rank() 0 in this context)
- */
-template <typename T>
-struct Rank { enum: size_t { value = 0 }; };
-
-/** Provides `value` equal to the rank() of `type`, 0 
- *  if not a tensor::Tensor type (C mutli-dimensional arrays 
- *  are considered to be rank() 0 in this context)
- */
-template <typename T, size_t N, template <class> class C>
-struct Rank<Tensor<T, N, C>> { enum: size_t { value = N }; };
-
-/** Provides typedef 'type' as the type of the first Tensor 
- *  in `Tensors...`. Definition Statement.
- */
-template <typename... Tensors>
-struct FirstTensor;
-
-/** Provides typedef 'type' as the type of the first Tensor 
- *  in `Tensors...`. 
- */
-template <typename Tensor, typename... Tensors>
-struct FirstTensor<Tensor, Tensors...> {
-  using type = typename std::remove_reference<Tensor>::type;
-  static_assert(IsTensor<type>::value, EXPECTED_TENSOR);
-};
 
 /* -------------------- Data Containers --------------------- */
 
@@ -2445,17 +2551,27 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
  *  an assertion will fail during debug.
  */
 template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-Tensor<X, M, C1> add(
-    Tensor<X, M, C1> const& tensor_1, 
-    Tensor<Y, M, C2> const& tensor_2)
+Tensor<X, M, C1> add(Tensor<X, M, C1> const& tensor_1, Tensor<Y, M, C2> const& tensor_2)
 {
   assert((tensor_1.shape_ == tensor_2.shape_)  && DIMENSION_MISMATCH);
   Tensor<X, M, C1> sum_tensor(tensor_1.shape_);
-  auto add = [](X &x, X const &y, Y const &z) -> void
-  {
+  auto add = [](X &x, X const &y, Y const &z) -> void {
     x = y + z;
   };
   Map(add, sum_tensor, tensor_1, tensor_2);
+  return sum_tensor;
+}
+
+/** Creates a Tensor whose elements are the elementwise sum of `tensor`, and every Tensor in `Tensors...`,
+ *  which must all have equivalent shape, or an assertion will fail during debug.
+ */
+template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
+          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
+Tensor<X, M, C_> add(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
+{
+  auto sum_tensor = tensor;
+  VARDIAC_MAP(assert(sum_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(sum_tensor = add(sum_tensor, tensors));
   return sum_tensor;
 }
 
@@ -2476,13 +2592,26 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator+=(Expression<RHS> const &rhs)
 template <typename X, typename Y, size_t M, template <class> class C_>
 Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor_1, Tensor<Y, M, C_> const& tensor_2)
 {
-  assert((tensor_1.shape_ == tensor_2.shape_) && DIMENSION_MISMATCH);
+  assert(tensor_1.shape_ == tensor_2.shape_ && DIMENSION_MISMATCH);
   Tensor<X, M, C_> diff_tensor(tensor_1.shape_);
   auto sub = [](X &x, X const &y, Y const &z) -> void
   {
     x = y - z;
   };
   Map(sub, diff_tensor, tensor_1, tensor_2);
+  return diff_tensor;
+}
+
+/** Creates a Tensor whose elements are the elementwise difference of `tensor`, and the sum of `Tensors...`,
+ *  which must all have equivalent shape, or an assertion will fail during debug.
+ */
+template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
+          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
+Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
+{
+  auto diff_tensor = tensor;
+  VARDIAC_MAP(assert(diff_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(diff_tensor = sub(diff_tensor, tensors));
   return diff_tensor;
 }
 
@@ -2508,16 +2637,7 @@ Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, 
 {
   static_assert(M1, SCALAR_TENSOR_MULT);
   static_assert(M2, SCALAR_TENSOR_MULT);
-  if((tensor_1.shape_[M1 - 1] != tensor_2.shape_[0]) 
-      && INNER_DIMENSION_MISMATCH)
-  {
-    PRINTV(tensor_1.shape_);
-    PRINTV(tensor_2.shape_);
-    PRINTV(M1);
-    PRINTV(M2);
-    assert(0);
-  }
-
+  assert((tensor_1.shape_[M1 - 1] == tensor_2.shape_[0]) && INNER_DIMENSION_MISMATCH);
   auto shape = Shape<M1 + M2 - 2>();
   std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
   std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
@@ -3463,6 +3583,7 @@ public:
   Tensor<T, 0, C> &operator/=(T const &scalar);
 
   Tensor<T, 0, C> neg() const;
+  Tensor<T, 0, C> operator-() const { return this->neg(); }
 
   /* ---------------- Iterator -------------- */
 
@@ -4751,13 +4872,13 @@ public:
 
   /* ----------------------------- typedefs ------------------------------ */
 
-  typedef typename FirstTensor<Exprs...>::type    first_t;
+  typedef typename FirstExpression<Exprs...>::type    first_t;
   typedef typename std::result_of<
-    Function(typename Exprs::value_t...)>::type   value_t;
+    Function(typename Exprs::value_t...)>::type        value_t;
   template <typename X>
-  using container_t = typename                    first_t::template container_t<X>;
-  constexpr static size_t rank()                  { return first_t::rank(); }
-  typedef MapExpr                                 self_t;
+  using container_t = typename                         first_t::template container_t<X>;
+  constexpr static size_t rank()                       { return first_t::rank(); }
+  typedef MapExpr                                      self_t;
   typedef
     Tensor<value_t, self_t::rank(), container_t>  return_t;
 
@@ -4989,13 +5110,13 @@ public:
 
   /* ----------------------------- typedefs ------------------------------ */
 
-  typedef typename FirstTensor<Exprs...>::type    first_t;
-  typedef T                                       value_t;
+  typedef typename FirstExpression<Exprs...>::type    first_t;
+  typedef T                                           value_t;
   template <typename X>
-  using container_t = typename                    first_t::template container_t<X>;
-  constexpr static size_t rank()                  { return 0; }
-  typedef ReduceExpr                              self_t;
-  typedef T                                       return_t;
+  using container_t = typename                        first_t::template container_t<X>;
+  constexpr static size_t rank()                      { return 0; }
+  typedef ReduceExpr                                  self_t;
+  typedef T                                           return_t;
 
   /* ------------------------------ Friend ------------------------------ */
 
@@ -5042,6 +5163,7 @@ template <typename U, typename Function_, typename... Exprs_> ReduceExpr<U, Func
 {
   auto const &shape = details::GetShape(exprs...);
   VARDIAC_MAP(assert(shape == exprs.self().shape() && SHAPE_MISMATCH));
+  static_assert(meta::AreExpressions<Exprs_...>::value, EXPECTING_EXPRESSION);
   return ReduceExpr<U, Function_, Exprs_...>(
       std::forward<U>(value), std::forward<Function_>(fn), exprs.self()...);
 }
@@ -5110,8 +5232,123 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
   return return_value;
 }
 
+template <typename RHS> 
+class UnaryNegExpr {
+/*@UnaryNegExpr*/ 
+public:
 
-template <typename RHS> class UnaryNegExpr {};
+  /* ---------------- typedefs --------------- */
+
+  typedef typename RHS::value_t        value_t;
+  template <typename X>
+  using container_t = typename         RHS::template container_t<X>;
+  constexpr static size_t rank()       { return RHS::rank(); } 
+  typedef UnaryNegExpr                 self_t;
+  typedef typename RHS::return_t       return_t;
+
+  /* ---------------- Friends ---------------- */
+  
+  template <typename RHS_>
+  friend UnaryNegExpr<RHS_> operator-(Expression<RHS_> const &rhs);
+
+  /* ---------------- Getters ----------------- */
+
+  size_t dimension(size_t index) const { return rhs_.dimension(index); }
+  Shape<RHS::rank()> const &shape() const { return rhs_.shape(); }
+
+  template <typename... Args>
+  auto operator()(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<RHS const>()(args...))>::type;
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<RHS const>().at(args...))>::type;
+
+  template <size_t M>
+  auto operator[](Indices<M> const &indices) const 
+    -> typename std::remove_reference<decltype(std::declval<RHS const>()[indices])>::type;
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(args...))>::type;
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(indices))>::type;
+
+private:
+
+  /* -------------- Constructors -------------- */
+
+  UnaryNegExpr(RHS const &rhs);
+  UnaryNegExpr(UnaryNegExpr<RHS> const&) = default;
+
+  /* ------------------ Data ------------------ */
+
+  RHS const &rhs_;
+
+};
+
+template <typename RHS_>
+UnaryNegExpr<RHS_> operator-(Expression<RHS_> const &rhs)
+{
+  return UnaryNegExpr<RHS_>(rhs.self());
+}
+
+/* ------------------ Getters ------------------ */
+
+template <typename RHS>
+template <typename... Args>
+auto UnaryNegExpr<RHS>::operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<RHS const>()(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return -rhs_(args...);
+}
+
+template <typename RHS>
+template <typename... Args>
+auto UnaryNegExpr<RHS>::at(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<RHS const>().at(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return -rhs_(args...);
+}
+
+template <typename RHS>
+template <size_t M>
+auto UnaryNegExpr<RHS>::operator[](Indices<M> const &indices) const 
+  -> typename std::remove_reference<decltype(std::declval<RHS const>()[indices])>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  return -rhs_[indices];
+}
+
+template <typename RHS>
+template <size_t... Slices, typename... Args>
+auto UnaryNegExpr<RHS>::slice(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  static_assert(rank() >= sizeof...(Slices) + sizeof...(Args), SLICES_OUT_OF_BOUNDS);
+  return -rhs_.template slice<Slices...>(args...);
+}
+
+template <typename RHS>
+template <size_t... Slices, size_t M>
+auto UnaryNegExpr<RHS>::slice(Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(indices))>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  static_assert(rank() >= sizeof...(Slices) + M, SLICES_OUT_OF_BOUNDS);
+  return -rhs_.template slice<Slices...>(indices);
+}
+
+/* ------------------ Constructors ------------------ */
+
+template <typename RHS>
+UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
+  : rhs_(rhs) {}
 
 } // namespace tensor
 
@@ -5120,6 +5357,9 @@ template <typename RHS> class UnaryNegExpr {};
 #undef NELEMENTS
 #undef ZERO_ELEMENT
 #undef EXPECTING_C_ARRAY
+#undef EXPECTING_TENSOR 
+#undef EXPECTING_SCALAR 
+#undef EXPECTING_EXPRESSION 
 #undef DIMENSION_INVALID
 #undef RANK_OUT_OF_BOUNDS
 #undef INDEX_OUT_OF_BOUNDS

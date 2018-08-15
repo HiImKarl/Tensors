@@ -33,12 +33,3 @@ add_custom_target(
     COMMAND cat "${CMAKE_BINARY_DIR}/Testing/Temporary/MemoryChecker.*.log"
 	)
 
-if (OpenCL_FOUND)
-  target_link_libraries (test ${OpenCL_LIBRARY})
-  target_compile_definitions (test ENABLE_CMAKE=1)
-endif()
-
-if (OpenCL_FOUND AND benchmark_FOUND)
-  target_link_libraries (benchmark ${OpenCL_LIBRARY})
-  target_compile_definitions (benchmark ENABLE_CMAKE=1)
-endif()

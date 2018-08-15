@@ -22,4 +22,11 @@ foreach(ONE_TEST_CC ${TEST_CC})
 endforeach()
 
 add_executable(tests ${TEST_CC} test.cc) 
+target_compile_definitions (test _TEST=1)
+
+if (OpenCL_FOUND)
+  target_link_libraries (test ${OpenCL_LIBRARY})
+  target_compile_definitions (test _ENABLE_OPENCL=1)
+endif()
+
 

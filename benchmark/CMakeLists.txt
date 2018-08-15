@@ -28,3 +28,8 @@ target_link_libraries(
    benchmarks benchmark
    ${CMAKE_THREAD_LIBS_INIT}
    )
+
+if (OpenCL_FOUND)
+  target_link_libraries (benchmark ${OpenCL_LIBRARY})
+  target_compile_definitions (benchmark _ENABLE_OPENCL=1)
+endif()

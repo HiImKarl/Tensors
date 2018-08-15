@@ -17,8 +17,8 @@ BENCHMARK(BM_TensorTensor_Assignment)->RangeMultiplier(2)->Range(2,  4 * sizeof(
 
 static void BM_ScalarScalar_Assignment(benchmark::State &state)
 {
-  Tensor<int32_t> t1{};
-  Tensor<int32_t> t2{};
+  Scalar<int32_t> t1{};
+  Scalar<int32_t> t2{};
   for (auto _ : state) t1 = t2;
 }
 
