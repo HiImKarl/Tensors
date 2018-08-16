@@ -2,9 +2,9 @@ TEST_DIR := test
 BENCHMARK_DIR := benchmark
 
 CXX := g++
-CXXFLAGS := -I./include -I./external -Wall -Wextra -fmax-errors=5 -std=c++11 -MMD -g 
+CXXFLAGS := -I./include -I./external -Wall -Wextra -ferror-limit=3 -D_ENABLE_OPENCL -std=c++11  -MMD -g 
 LINK := g++
-LINKFLAGS := -g
+LINKFLAGS := -framework OpenCL -g
 
 TEMPORARY_PATTERNS := *.o *~ *.d
 TEMPORARIES := $(foreach DIR, $(TEST_DIR) $(BENCHMARK_DIR),$(addprefix $(DIR)/,$(TEMPORARY_PATTERNS)))

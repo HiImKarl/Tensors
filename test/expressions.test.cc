@@ -143,8 +143,37 @@ void TensorArithmeticTests() {
       for (size_t k = 0; k < tensor_4.dimension(2); ++k)
         REQUIRE((tensor_3 - tensor_1).template slice<0, 2>(2)[Indices<2>{i, k}] == (int)(100 * i + 20 + 1 * k)); 
   } 
+
+  SECTION("Negation") {
+    Tensor<int32_t, 3, C> tensor_3 = -tensor_1;
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        REQUIRE(tensor_3(i, j, k) == -100000 * (int)i + -10000 * (int)j + -1000 * (int)k); 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        REQUIRE(-tensor_2(i, j, k) == -100 * (int)i + -10 * (int)j + -1 * (int)k); 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        REQUIRE(-tensor_2[Indices<3>{i, j, k}] == -100 * (int)i + -10 * (int)j + -1 * (int)k); 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+      REQUIRE(-tensor_2.template slice<0, 1, 2>()(i, j, k) == -100 * (int)i + -10 * (int)j + -1 * (int)k); 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      REQUIRE(-tensor_2.template slice<0, 1>(2)[Indices<2>{i, j}] == -100 * (int)i + -10 * (int)j + -2); 
+
+  }
  
-  SECTION("Multi-Term Addition/Subtract") { 
+  SECTION("Multi-Term Arithmetic") { 
     Tensor<int32_t, 3, C> tensor_3 = tensor_2 + tensor_1 + tensor_2; 
  
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
@@ -198,6 +227,25 @@ void TensorArithmeticTests() {
         for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
           REQUIRE((tensor_3 - tensor_2 + tensor_1).template slice<0, 2>(2)[Indices<2>{i, k}] 
               == (int)(200100 * i + 40020 + 2001 * k)); 
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
+          REQUIRE((tensor_3 - tensor_2 + (-tensor_1))(i, j, k) 
+              == (int)(100 * i + 10 * j + k)); 
+
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
+      REQUIRE((tensor_3 - tensor_2 + (-tensor_1)).template slice<0>(1, 1)(i)
+              == (int)(100 * i + 10 + 1)); 
+ 
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
+          REQUIRE((tensor_3 - tensor_2 + (-tensor_1))[Indices<3>{i, j, k}] 
+              == (int)(100 * i + 10 * j + k)); 
+
+    REQUIRE((tensor_3 - tensor_2 + (-tensor_1)).template slice<0, 1, 2>()[Indices<3>{1, 1, 1}] 
+              == (int)(100 + 10 + 1)); 
   }
  
   SECTION("Assignment Arithmetic") { 

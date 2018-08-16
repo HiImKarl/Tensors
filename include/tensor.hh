@@ -17,6 +17,8 @@
 #include <unordered_map>
 
 #ifdef _ENABLE_OPENCL
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
 #include <CL/cl2.hpp>
 #endif
 
@@ -2666,6 +2668,15 @@ Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, 
   return prod_tensor;
 }
 
+template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, 
+  template <class> class C2, typename... Tensors, typename = typename std::enable_if<(sizeof...(Tensors) >= 1)>::type>
+auto mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2, Tensors const&... tensors)
+  -> Tensor<X, M1 + M2 + meta::RankSum<Tensors...>::value - 2 * (sizeof...(Tensors) + 1), C1>
+{
+  auto prod_tensor = mul(tensor_1, tensor_2);
+  return mul(prod_tensor, tensors...);
+}
+
 template <typename T, size_t N, template <class> class C>
 template <typename RHS>
 Tensor<T, N, C> &Tensor<T, N, C>::operator*=(Expression<RHS> const &rhs)
@@ -5233,7 +5244,7 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 }
 
 template <typename RHS> 
-class UnaryNegExpr {
+class UnaryNegExpr: public Expression<UnaryNegExpr<RHS>> {
 /*@UnaryNegExpr*/ 
 public:
 

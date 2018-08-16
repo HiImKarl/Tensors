@@ -108,9 +108,24 @@ void MultiplicationTests() {
     REQUIRE(mul(tensor_1, tensor_2)(3, 1) == -50);
     REQUIRE(mul(tensor_1, tensor_2)(3, 2) == -68);
     REQUIRE(mul(tensor_1, tensor_2)(3, 3) == -86);
-  }
 
-  // FIXME -- test mul(tensors...)
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(0, 0) == 2296);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(0, 1) == 3520);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(0, 2) == 4744);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(0, 3) == 5968);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(1, 0) == 3520);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(1, 1) == 5400);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(1, 2) == 7280);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(1, 3) == 9160);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(2, 0) == 4744);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(2, 1) == 7280);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(2, 2) == 9816);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(2, 3) == 12352);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 0) == 5968);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 1) == 9160);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 2) == 12352);
+    REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 3) == 15544);
+  }
 }
 
 template <template <class> class C>
