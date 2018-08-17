@@ -1,9 +1,9 @@
 TEST_DIR := test
 BENCHMARK_DIR := benchmark
 
-CXX := g++
+CXX := clang++
 CXXFLAGS := -I./include -I./external -Wall -Wextra -ferror-limit=3 -D_ENABLE_OPENCL -std=c++11  -MMD -g 
-LINK := g++
+LINK := clang++
 LINKFLAGS := -framework OpenCL -g
 
 TEMPORARY_PATTERNS := *.o *~ *.d

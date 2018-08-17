@@ -262,6 +262,20 @@ void TensorArithmeticTests() {
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           REQUIRE(tensor_1(i, j, k) == (int)(100000 * i + 10000 * j + 1000 * k)); 
+
+    tensor_1 = _NA(tensor_1 + tensor_2);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          REQUIRE(tensor_1(i, j, k) == (int)(100100 * i + 10010 * j + 1001 * k)); 
+
+    tensor_1 = _NA(tensor_1 - tensor_2);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          REQUIRE(tensor_1(i, j, k) == (int)(100000 * i + 10000 * j + 1000 * k)); 
   } 
 } 
  
@@ -518,8 +532,8 @@ void TensorMultiplicationTests() {
   } 
  
   SECTION("Assignment Arithmetic") { 
-    Tensor<int32_t, 2, C> tensor_3 = _A<int[2][2]>({{2, 3}, {4, 5}}); 
-    Tensor<int32_t, 2, C> tensor_4 = _A<int[2][2]>({{6, 7}, {8, 9}}); 
+    Tensor<int32_t, 2, C> tensor_3 = _C<int[2][2]>({{2, 3}, {4, 5}}); 
+    Tensor<int32_t, 2, C> tensor_4 = _C<int[2][2]>({{6, 7}, {8, 9}}); 
     tensor_3 = tensor_3 * tensor_4 + tensor_4; 
     int correct_vals[2][2] = {{42, 48}, {72, 82}}; 
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 

@@ -19,7 +19,15 @@
 #ifdef _ENABLE_OPENCL
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#if (defined __GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 #include <CL/cl2.hpp>
+#if (defined __GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 #ifdef _TEST
@@ -152,6 +160,12 @@ template <typename LHS, typename RHS> class BinaryMulExpr;
 template <typename Function, typename... Exprs> class MapExpr;
 template <typename T, typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
+
+namespace opencl {
+
+template <typename Expr> class Model;
+
+} // namespace opencl
 
 /* ----------------- Type Definitions ---------------- */
 
@@ -696,7 +710,6 @@ struct RankSum<> {
   enum: size_t { value = 0 };
 };
 
-
 } // namespace meta
 
 namespace details {
@@ -940,6 +953,45 @@ T const &HashMap<T>::operator[](size_t index) const
 
 } // namespace data
 
+/* ---------------------------------- Proxy Objects ---------------------------------- */
+
+/** Proxy object used to construct Tensors with C-arrays */
+template <typename Array>
+struct CArrayProxy {
+  CArrayProxy(Array const &_value);
+  Array const &value;
+};
+
+template <typename Array>
+CArrayProxy<Array>::CArrayProxy(Array const &_value): value(_value)
+{
+  static_assert(std::is_array<Array>::value, EXPECTING_C_ARRAY);
+}
+
+template <typename Array>
+CArrayProxy<Array> _C(Array const &value)
+{
+  return CArrayProxy<Array>(value);
+}
+
+/** Proxy object used to avoid alias restrictions for tensor assignment */
+template <typename NodeType>
+struct NoAliasProxy {
+  NoAliasProxy(Expression<NodeType> const &_expr);
+  Expression<NodeType> const &expr;
+};
+
+template <typename NodeType>
+NoAliasProxy<NodeType>::NoAliasProxy(Expression<NodeType> const &_expr): expr(_expr) {}
+
+template <typename NodeType>
+NoAliasProxy<NodeType> _NA(Expression<NodeType> const& expr)
+{
+  return NoAliasProxy<NodeType>(expr);
+}
+
+
+
 /* ----------------------- Core Data Structures ----------------------- */
 
 /** CRTP base for Tensor expressions */
@@ -970,6 +1022,7 @@ public:
   template <typename Function, typename... Exprs> class MapExpr;
   template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ------------------ Constructors ------------------ */
 
@@ -1132,6 +1185,7 @@ public:
   template <typename Function, typename... Exprs> class MapExpr;
   template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Constructors -------------- */
 
@@ -1234,19 +1288,6 @@ Indices<N>::Indices(size_t const (&indices)[N])
   std::copy_n(indices, N, indices_);
 }
 
-/** Proxy object used to construct */
-template <typename Array>
-struct _A {
-  _A(Array const &_value);
-  Array const &value;
-};
-
-template <typename Array>
-_A<Array>::_A(Array const &_value): value(_value)
-{
-  static_assert(std::is_array<Array>::value, EXPECTING_C_ARRAY);
-}
-
 template <typename T, size_t N, template <class> class C>
 class Tensor: public Expression<Tensor<T, N, C>> { 
 //  @Tensor<T, N, C>
@@ -1275,6 +1316,7 @@ public:
   template <typename Function, typename... Exprs> class MapExpr;
   template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ------------------ Proxy Objects ----------------- */
 
@@ -1313,11 +1355,11 @@ public:
   Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args);
 
   /** Use a C multi-dimensional array to initialize the tensor. The
-   *  multi-dimensional array is enclosed by the _A struct, and
+   *  multi-dimensional array is enclosed by the _C struct, and
    *  must be equal to the tensor's declared rank. 
    */
   template <typename Array>
-  Tensor(_A<Array> &&md_array);
+  Tensor(CArrayProxy<Array> &&md_array);
 
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are zero initialized. Note: dimensions index from 1.
@@ -1375,17 +1417,23 @@ public:
   Tensor<T, N, C> &operator=(Tensor<T, N, C> const &tensor);
 
   /** Assigns to the tensor the elements of a C multi-dimensional array, 
-   *  enclosed by the _A struct, and have rank() and dimensions
+   *  enclosed by the _C struct, and have rank() and dimensions
    *  equivalent to *this.
    */
   template <typename Array>
-  Tensor<T, N, C> &operator=(_A<Array> &&md_array);
+  Tensor<T, N, C> &operator=(CArrayProxy<Array> &&md_array);
 
   /** Assign to every element of `this` the corresponding element in
    *  `rhs` after expression evaluation. The shapes must match.
    */
   template <typename NodeType>
   Tensor<T, N, C> &operator=(Expression<NodeType> const &rhs);
+
+  /** Expression evaluation under the assumption that no aliasing
+   *  of the LHS occurs on the RHS, thus no temporary Tensor is created. 
+   */
+  template <typename NodeType>
+  Tensor<T, N, C> &operator=(NoAliasProxy<NodeType> const &rhs);
 
   /* --------------------- Getters --------------------- */
 
@@ -1961,7 +2009,7 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N],
 
 template <typename T, size_t N, template <class> class C> 
 template <typename Array> 
-Tensor<T, N, C>::Tensor(_A<Array> &&md_array): offset_(0) 
+Tensor<T, N, C>::Tensor(CArrayProxy<Array> &&md_array): offset_(0) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -2109,7 +2157,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<U, N, C_> const &tensor)
 
 template <typename T, size_t N, template <class> class C> 
 template <typename Array> 
-Tensor<T, N, C> &Tensor<T, N, C>::operator=(_A<Array> &&md_array)
+Tensor<T, N, C> &Tensor<T, N, C>::operator=(CArrayProxy<Array> &&md_array)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -2145,6 +2193,22 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Expression<NodeType> const &rhs)
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   *this = tensor;
+  return *this;
+}
+
+template <typename T, size_t N, template <class> class C>
+template <typename NodeType>
+Tensor<T, N, C> &Tensor<T, N, C>::operator=(NoAliasProxy<NodeType> const &rhs)
+{
+  auto const &expression = rhs.expr.self();
+  assert((shape_ == expression.shape()) && DIMENSION_MISMATCH);
+  Indices<N> reference_indices{};
+  size_t indices[1] = {};
+  size_t const * const strides[1] = { strides_ };
+  for (size_t i = 0; i < shape_.index_product(); ++i) {
+    ref_->set(indices[0] + offset_, expression[reference_indices]);
+    details::UpdateIndices(reference_indices, this->shape_, indices, strides);
+  }
   return *this;
 }
 
@@ -3347,6 +3411,7 @@ public:
   template <typename Function, typename... Exprs> class MapExpr;
   template <typename U, typename Function, typename... Exprs> class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ------------------ Constructors ------------------ */
 
@@ -5361,6 +5426,49 @@ template <typename RHS>
 UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
   : rhs_(rhs) {}
 
+/* ---------------------------- OpenCL ---------------------------- */
+
+namespace opencl {
+namespace details {
+
+  // Keywords of OpenCL identifiers
+  constexpr char cKernelIdentifier[]   = "kernel";
+  constexpr char cGlobalIdentifier[]   = "global";
+  constexpr char cLocalIdentifier[]    = "local";
+  constexpr char cPointerIdentifier[]  = "*";
+
+  // Keywords of OpenCL data types
+  constexpr char cBoolType[]           = "bool";
+  constexpr char cCharType[]           = "char";
+  constexpr char cUCharType[]          = "uchar";
+  constexpr char cShortType[]          = "short";
+  constexpr char cUShortType[]         = "ushort";
+  constexpr char cIntType[]            = "int";
+  constexpr char cUIntType[]           = "uint";
+  constexpr char cLongType[]           = "long";
+  constexpr char cULongType[]          = "ulong";
+  constexpr char cFloatType[]          = "float";
+  constexpr char cVoidType[]           = "void";
+
+  // Naming constants
+  constexpr char cVariablePrefix[]     = "v";
+  constexpr char cFunctionPrefix[]     = "f";
+  constexpr char cKernelPrefix[]       = "k";
+
+} // namespace details
+
+template <typename NodeType>
+class Model {
+/*@opencl::Model*/ 
+public:
+  Model(Expression<NodeType> const &expr)
+    : expr_(expr), kernel_("") {}
+private:
+  std::string kernel_;
+  Expression<NodeType> const &expr_;
+}; // Model
+
+} // namespace opencl
 } // namespace tensor
 
 #undef NTENSOR_0CONSTRUCTOR

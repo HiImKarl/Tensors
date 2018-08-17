@@ -72,7 +72,7 @@ void InitializingTensorTests() {
       for (size_t j = 0; j < ones.dimension(1); ++j) 
         for (size_t k = 0; k < ones.dimension(2); ++k) 
           REQUIRE(ones(i, j, k) == 1); 
-    auto twos = Tensor<int32_t, 3, Container>({2, 3, 4}, 2.3f); 
+    auto twos = Tensor<int32_t, 3, Container>({2, 3, 4}, 2); 
     for (size_t i = 0; i < twos.dimension(0); ++i) 
       for (size_t j = 0; j < twos.dimension(1); ++j) 
         for (size_t k = 0; k < twos.dimension(2); ++k) 
@@ -80,7 +80,7 @@ void InitializingTensorTests() {
  } 
  
  SECTION("C Multi-dimensional arrays") { 
-    Tensor<int32_t, 3, Container> naturals = _A<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); 
+    Tensor<int32_t, 3, Container> naturals = _C<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); 
     REQUIRE(naturals.rank() == 3); 
     REQUIRE(naturals.dimension(0) == 1); 
     REQUIRE(naturals.dimension(1) == 6); 
