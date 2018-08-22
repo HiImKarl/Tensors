@@ -14,6 +14,7 @@
 #include <memory>
 #include <cassert>
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 #ifdef _ENABLE_OPENCL
@@ -23,6 +24,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wmissing-braces"
+#pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
 #include <CL/cl2.hpp>
 #if (defined __GNUC__)
@@ -121,6 +124,16 @@ extern int eDebugConstructorCounter;
 #define NO_TENSORS_PROVIDED \
   "This method requires at least one tensor as an argument"
 
+// OpenCL
+#define OPENCL_NO_PLATFORMS \
+  "No OpenCL platforms found -- consult your device vendor for up-to-date OpenCL drivers"
+#define OPENCL_NO_DEVICES \
+  "No OpenCL devices found -- consult your device vendor for up-to-date OpenCL drivers"
+#define OPENCL_BUFFER_ERROR \
+  "OpenCL Buffer Error"
+#define OPENCL_KERNEL_ERROR \
+  "OpenCL Kernel Error"
+
 /* ---------------- Debug Messages --------------- */
 
 #define PANIC_ASSERTION \
@@ -161,11 +174,163 @@ template <typename Function, typename... Exprs> class MapExpr;
 template <typename T, typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
 
+#ifdef _ENABLE_OPENCL
 namespace opencl {
+
+/** Singleton collection of opencl context information */
+class Info {
+public:
+  static Info &v(); /** Reference to Singleton */
+  static std::vector<cl::Platform> get_platforms();
+  void set_platform(cl::Platform const &platform) { platform_ = platform; }
+  cl::Platform const &platform() const { return platform_; }
+  static std::vector<cl::Device> get_devices(cl::Platform const& platform);
+  void set_device(cl::Device const &device) { device_ = device; }
+  cl::Device const &device() const { return device_; }
+  void set_context(cl::Context const &context) { context_ = context; }
+  cl::Context const &context() const { return context_; }
+private:
+  Info();
+  cl::Platform platform_;
+  cl::Device device_;
+  cl::Context context_; 
+};
+
+inline Info &Info::v()
+{
+  static Info instance;
+  return instance;
+}
+
+inline std::vector<cl::Platform> Info::get_platforms()
+{
+  std::vector<cl::Platform> platforms;
+  cl::Platform::get(&platforms);
+  assert(platforms.size() && OPENCL_NO_PLATFORMS);
+  return platforms;
+}
+
+inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
+{
+  std::vector<cl::Device> devices;
+  platform.getDevices(CL_DEVICE_TYPE_ALL, &devices); 
+  assert(devices.size() && OPENCL_NO_DEVICES);
+  return devices;
+}
+
+inline Info::Info() 
+{
+  // Defaults to the first platform, first device given by the OpenCL API
+  platform_ = get_platforms()[0];
+  device_ = get_devices(platform_)[0];
+  context_ = cl::Context({device_});
+}
 
 template <typename Expr> class Model;
 
+namespace details {
+
+// Keywords of OpenCL identifiers
+constexpr char cKernelIdentifier[]   = "kernel";
+constexpr char cGlobalIdentifier[]   = "global";
+constexpr char cLocalIdentifier[]    = "local";
+constexpr char cConstIdentifier[]    = "const";
+constexpr char cPointerIdentifier[]  = "*";
+
+// Keywords of OpenCL data types
+constexpr char cBoolType[]           = "bool";
+constexpr char cCharType[]           = "char";
+constexpr char cUCharType[]          = "uchar";
+constexpr char cShortType[]          = "short";
+constexpr char cUShortType[]         = "ushort";
+constexpr char cIntType[]            = "int";
+constexpr char cUIntType[]           = "uint";
+constexpr char cSizeTType[]          = "size_t";
+constexpr char cLongType[]           = "long";
+constexpr char cULongType[]          = "ulong";
+constexpr char cFloatType[]          = "float";
+constexpr char cVoidType[]           = "void";
+
+// Naming prefixes
+constexpr char cVariablePrefix[]     = "v";
+constexpr char cFunctionPrefix[]     = "f";
+constexpr char cKernelPrefix[]       = "k";
+
+// Variable names
+constexpr char cGlobalIdName[]       = "gid";
+constexpr char cGlobalIdFunction[]   = "get_global_id";
+constexpr char cOutputVariableName[]  = "o";
+
+template <typename T> 
+struct OpenCLType;
+
+template <>
+struct OpenCLType<bool> { constexpr static char const *value = cBoolType; };
+
+template <>
+struct OpenCLType<char> { constexpr static char const *value = cCharType; };
+
+template <>
+struct OpenCLType<unsigned char> { constexpr static char const *value = cUCharType; };
+
+template <>
+struct OpenCLType<short> { constexpr static char const *value = cShortType; };
+
+template <>
+struct OpenCLType<unsigned short> { constexpr static char const *value = cUShortType; };
+
+template <>
+struct OpenCLType<int> { constexpr static char const *value = cIntType; };
+
+template <>
+struct OpenCLType<unsigned> { constexpr static char const *value = cUIntType; };
+
+template <>
+struct OpenCLType<long> { constexpr static char const *value = cLongType; };
+
+template <>
+struct OpenCLType<unsigned long> { constexpr static char const *value = cULongType; };
+
+template <>
+struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
+
+template <typename T>
+cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+    std::string const &arg_list, std::string const &expr, size_t num_elems) 
+{
+  std::string kernel_code = 
+         std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
+         + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
+         + " " + cPointerIdentifier + cOutputVariableName + ") {\n"
+         + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
+         + cOutputVariableName + "[" + cGlobalIdName + "] = " + expr + ";\n"
+         + "}\n";
+
+  // FIXME
+  PRINTV(kernel_code);
+  cl_int err = 0;
+  cl::Buffer output_buffer(opencl::Info::v().context(), 
+      CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, 
+      num_elems * sizeof(T), nullptr, &err);
+
+  cl::Program::Sources sources({ kernel_code });
+  cl::Program program(Info::v().context(), sources);
+  err = program.build({ Info::v().device() });
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  cl::Kernel kernel(program, cKernelPrefix);
+  for (size_t i = 0; i < buffers.size(); ++i)
+    kernel.setArg(i, buffers[i]);
+  kernel.setArg(buffers.size(), output_buffer);
+  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_elems));
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  return output_buffer; 
+}
+
+} // namespace details
+
 } // namespace opencl
+
+#endif
 
 /* ----------------- Type Definitions ---------------- */
 
@@ -1019,8 +1184,8 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
-  template <typename Function, typename... Exprs> class MapExpr;
-  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
@@ -1182,8 +1347,8 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
-  template <typename Function, typename... Exprs> class MapExpr;
-  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
@@ -1313,8 +1478,8 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
-  template <typename Function, typename... Exprs> class MapExpr;
-  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
@@ -1866,14 +2031,14 @@ public:
   friend U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors);
 
 private:
-  /* ----------------- data ---------------- */
+  /* ---------------------- Data ---------------------- */
 
   Shape<N> shape_;
   size_t strides_[N];
   size_t offset_;
   std::shared_ptr<C<T>> ref_;
 
-  /* --------------- Getters --------------- */
+  /* -------------------- Getters -------------------- */
 
   size_t const *strides() const noexcept { return strides_; }
 
@@ -1888,7 +2053,7 @@ private:
   template <size_t M>
   Tensor<T, N - M, C> pSliceExpansion(size_t (&placed_indices)[N], Indices<M> const &indices);
 
-  /* ------- Expansion for methods which take Tensors...  --------- */
+  /* ------- Expansion for methods which take Tensors --------- */
 
   inline T const &pGet(size_t *indices, size_t index) const
   { return (static_cast<C<T> const&>(*ref_))[offset_ + indices[index]]; }
@@ -1914,6 +2079,14 @@ private:
   template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
   friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
       FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors);
+
+  /* ------------------- OpenCL --------------------- */
+
+#ifdef _ENABLE_OPENCL
+  void pOpenCLBuffer(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+#endif 
 
   /* ------------------ Utility --------------------- */
 
@@ -2049,8 +2222,7 @@ Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0],
-                (static_cast<C<T> const&>(*tensor.ref_))[tensor.offset_ + indices[1]]);
+    ref_->set(indices[0], tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -2070,8 +2242,7 @@ Tensor<T, N, C>::Tensor(Tensor<U, N, C_> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0],
-                (static_cast<C_<U> const&>(*tensor.ref_))[tensor.offset_ + indices[1]]);
+    ref_->set(indices[0], tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -2131,8 +2302,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<T, N, C> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0] + offset_,
-             (static_cast<C<T> const&>(*tensor.ref_))[tensor.offset_ + indices[1]]);
+    ref_->set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   return *this;
@@ -2148,8 +2318,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<U, N, C_> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[2] = { this->strides_, tensor.strides_ };
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0] + offset_,
-             (static_cast<C_<U> const&>(*tensor.ref_))[tensor.offset_ + indices[1]]);
+    ref_->set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   return *this;
@@ -2456,26 +2625,26 @@ bool Tensor<T, N, C>::operator==(Tensor<X, N, C> const& tensor) const
   return true;
 }
 
-/** Prints `tensor` to an ostream, using square braces "[]" to denotate
+/** Creates a string form of `tensor`, using square braces "[]" to denotate
  *  dimensions. I.e. a 1x1x1 Tensor with element x will appear as [[[x]]]
  */
-template <typename T, size_t N, template <class> class C_>
-std::ostream &operator<<(std::ostream &os, const Tensor<T, N, C_> &tensor)
+template <typename U, size_t M, template <class> class C_>
+std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
 {
   auto add_brackets = [&os](size_t n, bool left) -> void {
     for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
   size_t cumul_index = tensor.shape_.index_product();
-  size_t dim_quotas[N];
-  std::copy_n(tensor.shape_.dimensions_, N, dim_quotas);
+  size_t dim_quotas[M];
+  std::copy_n(tensor.shape_.dimensions_, M, dim_quotas);
   size_t index = 0;
 
-  add_brackets(N, true);
+  add_brackets(M, true);
   os << (*tensor.ref_)[tensor.offset_]; 
   for (size_t i = 0; i < cumul_index - 1; ++i) {
     size_t bracket_count = 0;
     bool propogate = true;
-    int dim_index = N - 1;
+    int dim_index = M - 1;
     // find the correct index to "step" to
     while (dim_index >= 0 && propogate) {
       --dim_quotas[dim_index];
@@ -2494,7 +2663,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<T, N, C_> &tensor)
     add_brackets(bracket_count - 1, true);
     os << (*tensor.ref_)[index + tensor.offset_];
   }
-  add_brackets(N, false); // closing brackets
+  add_brackets(M, false); // closing brackets
   return os;
 }
 
@@ -2582,6 +2751,44 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t const *strides, size_t 
 #endif
   std::copy_n(strides, N, strides_);
 }
+
+/* ------------------- OpenCL --------------------- */
+
+#ifdef _ENABLE_OPENCL
+
+template <typename T, size_t N, template <class> class C>
+void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  using namespace opencl::details; // WARNING -- using namespace
+
+  size_t cumul = shape().index_product();
+  cl_int err = 0;
+  size_t arg_index = buffers.size();
+  buffers.push_back(cl::Buffer(opencl::Info::v().context(), 
+      CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR, 
+      cumul * sizeof(T), nullptr, &err));
+  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+
+  Indices<N> reference_indices {};
+  size_t indices[1] = {};
+  size_t const * const strides[] = { this->strides_ };
+
+  for (size_t i = 0; i < cumul; ++i) {
+    err = cqueue.enqueueWriteBuffer(buffers.back(), CL_TRUE, sizeof(T) * i, sizeof(T), &pGet(indices, 0));
+    assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+    details::UpdateIndices(reference_indices, this->shape_, indices, strides);
+  }
+
+  expr += cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
+  arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<T>::value) + " " 
+           +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
+           +  std::to_string(arg_index) + ", ";
+  ++arg_index;
+}
+
+#endif
 
 /* -------------------------- Expressions -------------------------- */
 
@@ -3408,8 +3615,8 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
-  template <typename Function, typename... Exprs> class MapExpr;
-  template <typename U, typename Function, typename... Exprs> class ReduceExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
@@ -4396,6 +4603,42 @@ bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
 }
+/* ---------------------------- OpenCL ---------------------------- */
+
+#ifdef _ENABLE_OPENCL
+namespace opencl {
+template <typename NodeType>
+class Model {
+/*@opencl::Model*/ 
+public:
+  /* -------------- friends -------------- */
+  template <typename X, size_t M, template <class> class C_> friend class Tensor;
+  template <typename LHS, typename RHS> friend class BinaryAddExpr;
+  template <typename LHS, typename RHS> friend class BinarySubExpr;
+  template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
+  template <typename RHS> friend class UnaryNegExpr;
+  
+private:
+  Model(Expression<NodeType> const &expr);
+  NodeType const &expr_;
+}; // Model
+
+template <typename NodeType>
+Model<NodeType>::Model(Expression<NodeType> const &expr): expr_(expr.self())
+{
+  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
+  std::vector<cl::Buffer> buffers{};
+  std::string cl_arg_list{};
+  std::string cl_expr{};
+  expr_.pOpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
+  cl::Buffer output_buffer = details::CreateBasicKernel<typename NodeType::value_t>
+    (cqueue, buffers, cl_arg_list, cl_expr, expr_.shape().index_product());
+}
+
+} // namespace opencl
+#endif
 
 /* ---------------------- Expressions ------------------------ */
 
@@ -4418,6 +4661,7 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinaryAddExpr<LHS_, RHS_> 
     operator+(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -4444,6 +4688,12 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
 
+  /* ---------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl_model() const { return opencl::Model<self_t>(*this); }
+#endif
+
 private:
 
   /* -------------- Constructors -------------- */
@@ -4451,15 +4701,29 @@ private:
   BinaryAddExpr(LHS const &lhs, RHS const &rhs);
   BinaryAddExpr(BinaryAddExpr<LHS, RHS> const&) = default;
 
+  /* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  void pOpenCLBuffer(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+#endif
+
   /* ------------------ Data ------------------ */
 
   LHS const &lhs_;
   RHS const &rhs_;
 };
 
+/* ---------------- Friends ---------------- */
+
 template <typename LHS, typename RHS>
-BinaryAddExpr<LHS, RHS>::BinaryAddExpr(LHS const &lhs, RHS const &rhs)
-  : lhs_(lhs), rhs_(rhs) {}
+BinaryAddExpr<LHS, RHS> operator+(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinaryAddExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
+
+/* ---------------- Getters ---------------- */
 
 template <typename LHS, typename RHS>
 template <typename... Args>
@@ -4506,11 +4770,27 @@ auto BinaryAddExpr<LHS, RHS>::slice(Indices<M> const &indices) const
   return lhs_.template slice<Slices...>(indices) + rhs_.template slice<Slices...>(indices);
 }
 
+/* -------------- Constructors -------------- */
+
 template <typename LHS, typename RHS>
-BinaryAddExpr<LHS, RHS> operator+(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+BinaryAddExpr<LHS, RHS>::BinaryAddExpr(LHS const &lhs, RHS const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
+
+/* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+
+template <typename LHS, typename RHS>
+void BinaryAddExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
 {
-  return BinaryAddExpr<LHS, RHS>(lhs.self(), rhs.self());
+  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  expr += " + ";
+  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
+
+#endif
 
 /* ----------------- Print ----------------- */
 
@@ -4541,6 +4821,7 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
     operator-(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -4567,6 +4848,12 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
 
+  /* ---------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl_model() const { return opencl::Model<self_t>(*this); }
+#endif
+
 private:
 
   /* -------------- Constructors -------------- */
@@ -4574,15 +4861,26 @@ private:
   BinarySubExpr(LHS const &lhs, RHS const &rhs);
   BinarySubExpr(BinarySubExpr<LHS, RHS> const&) = default;
 
+  /* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+#endif
+
   /* ------------------ Data ------------------ */
 
   LHS const &lhs_;
   RHS const &rhs_;
 };
 
+/* ----------------- Friends ----------------- */
+
 template <typename LHS, typename RHS>
-BinarySubExpr<LHS, RHS>::BinarySubExpr(LHS const &lhs, RHS const &rhs)
-  : lhs_(lhs), rhs_(rhs) {}
+BinarySubExpr<LHS, RHS> operator-(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinarySubExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
 
 template <typename LHS, typename RHS>
 template <typename... Args>
@@ -4629,11 +4927,27 @@ auto BinarySubExpr<LHS, RHS>::slice(Indices<M> const &indices) const
   return lhs_.template slice<Slices...>(indices) - rhs_.template slice<Slices...>(indices);
 }
 
+/* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+
 template <typename LHS, typename RHS>
-BinarySubExpr<LHS, RHS> operator-(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+void BinarySubExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
 {
-  return BinarySubExpr<LHS, RHS>(lhs.self(), rhs.self());
+  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  expr += " - ";
+  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
+
+#endif
+
+/* -------------- Constructors -------------- */
+
+template <typename LHS, typename RHS>
+BinarySubExpr<LHS, RHS>::BinarySubExpr(LHS const &lhs, RHS const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
 
 /* ----------------- Print ----------------- */
 
@@ -4669,6 +4983,7 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinaryMulExpr<LHS_, RHS_> 
     operator*(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -4962,6 +5277,7 @@ public:
 
   template <typename Function_, typename... Exprs_> friend MapExpr<Function_, Exprs_...>
     _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
+  template <typename Expr> friend class opencl::Model;
 
   /* ----------------------------- Getters ------------------------------ */
 
@@ -5047,7 +5363,7 @@ auto MapExpr<Function, Exprs...>::operator()(Args... args) const
 {
   static_assert(self_t::rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
   return pMapExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{}, args...);
+      sizeof...(Exprs)>::sequence{}, args...);
 }
 
 template <typename Function, typename... Exprs>
@@ -5057,7 +5373,7 @@ auto MapExpr<Function, Exprs...>::at(Args... args) const
 {
   static_assert(self_t::rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
   return pMapExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{}, args...);
+      sizeof...(Exprs)>::sequence{}, args...);
 }
 
 template <typename Function, typename... Exprs>
@@ -5067,7 +5383,7 @@ auto MapExpr<Function, Exprs...>::operator[](Indices<M> const &indices) const
 {
   static_assert(self_t::rank() >= M, RANK_OUT_OF_BOUNDS);
   return pMapExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{}, indices);
+      sizeof...(Exprs)>::sequence{}, indices);
 }
 
 template <typename Function, typename... Exprs>
@@ -5077,7 +5393,7 @@ auto MapExpr<Function, Exprs...>::slice(Args... args) const
 {
   static_assert(self_t::rank() >= sizeof...(Slices) + sizeof...(Args), SLICES_OUT_OF_BOUNDS);
   return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
-      std::tuple_size<decltype(exprs_)>::value>::sequence{}, args...);
+      sizeof...(Exprs)>::sequence{}, args...);
 }
 
 template <typename Function, typename... Exprs>
@@ -5087,7 +5403,7 @@ auto MapExpr<Function, Exprs...>::slice(Indices<M> const &indices) const
 {
   static_assert(self_t::rank() >= M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
   return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
-      std::tuple_size<decltype(exprs_)>::value>::sequence{}, indices); 
+      sizeof...(Exprs)>::sequence{}, indices); 
 }
 
 template <typename Function_, typename... Exprs_> 
@@ -5198,6 +5514,7 @@ public:
 
   template <typename U, typename Function_, typename... Exprs_> friend ReduceExpr<U, Function_, Exprs_...>
     _reduce(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs);
+  template <typename Expr> friend class opencl::Model;
 
   /* ----------------------------- Getters ------------------------------ */
 
@@ -5215,6 +5532,9 @@ public:
   template <size_t... Slices>
   T slice(Indices<0> const &indices) const;
 
+  opencl::Model<self_t> opencl_model() const 
+    { return opencl::Model<self_t>(*this); }
+
 private:
 
   /* ------------------------- Constructors ------------------------- */
@@ -5227,7 +5547,9 @@ private:
   template <size_t... TupleIndices>
   T pReduceExpansion(meta::Sequence<TupleIndices...>) const;
 
-  /* ---------------------------- data ------------------------------ */
+  /* --------------------------- OpenCL ----------------------------- */
+
+  /* ---------------------------- Data ------------------------------ */
 
   std::tuple<Exprs const&...> exprs_;
   Function &fn_;
@@ -5250,7 +5572,7 @@ template <typename T, typename Function, typename... Exprs>
 T ReduceExpr<T, Function, Exprs...>::operator()() const
 {
   return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+      sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
@@ -5258,14 +5580,14 @@ auto ReduceExpr<T, Function, Exprs...>::at() const
   -> Tensor<T, 0, container_t>
 {
   return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+      sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
 T ReduceExpr<T, Function, Exprs...>::operator[](Indices<0> const &) const
 {
   return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+      sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
@@ -5274,7 +5596,7 @@ T ReduceExpr<T, Function, Exprs...>::slice() const
 {
   static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
   return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+      sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
@@ -5283,7 +5605,7 @@ T ReduceExpr<T, Function, Exprs...>::slice(Indices<0> const&) const
 {
   static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
   return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      std::tuple_size<decltype(exprs_)>::value>::sequence{});
+      sizeof...(Exprs)>::sequence{});
 }
 
 /* ----------------------- Constructors --------------------- */
@@ -5307,6 +5629,11 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
   } while (indices.increment(shape));
   return return_value;
 }
+
+/* --------------------- OpenCL --------------------- */
+
+
+/* -------------------------------------------------- */
 
 template <typename RHS> 
 class UnaryNegExpr: public Expression<UnaryNegExpr<RHS>> {
@@ -5426,49 +5753,6 @@ template <typename RHS>
 UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
   : rhs_(rhs) {}
 
-/* ---------------------------- OpenCL ---------------------------- */
-
-namespace opencl {
-namespace details {
-
-  // Keywords of OpenCL identifiers
-  constexpr char cKernelIdentifier[]   = "kernel";
-  constexpr char cGlobalIdentifier[]   = "global";
-  constexpr char cLocalIdentifier[]    = "local";
-  constexpr char cPointerIdentifier[]  = "*";
-
-  // Keywords of OpenCL data types
-  constexpr char cBoolType[]           = "bool";
-  constexpr char cCharType[]           = "char";
-  constexpr char cUCharType[]          = "uchar";
-  constexpr char cShortType[]          = "short";
-  constexpr char cUShortType[]         = "ushort";
-  constexpr char cIntType[]            = "int";
-  constexpr char cUIntType[]           = "uint";
-  constexpr char cLongType[]           = "long";
-  constexpr char cULongType[]          = "ulong";
-  constexpr char cFloatType[]          = "float";
-  constexpr char cVoidType[]           = "void";
-
-  // Naming constants
-  constexpr char cVariablePrefix[]     = "v";
-  constexpr char cFunctionPrefix[]     = "f";
-  constexpr char cKernelPrefix[]       = "k";
-
-} // namespace details
-
-template <typename NodeType>
-class Model {
-/*@opencl::Model*/ 
-public:
-  Model(Expression<NodeType> const &expr)
-    : expr_(expr), kernel_("") {}
-private:
-  std::string kernel_;
-  Expression<NodeType> const &expr_;
-}; // Model
-
-} // namespace opencl
 } // namespace tensor
 
 #undef NTENSOR_0CONSTRUCTOR
@@ -5495,5 +5779,7 @@ private:
 #undef ELEMENT_COUNT_MISMATCH
 #undef SCALAR_TENSOR_MULT
 #undef PANIC_ASSERTION
+#undef OPENCL_NO_PLATFORMS 
+#undef OPENCL_NO_DEVICES 
 
 #endif // TENSORS_H_
