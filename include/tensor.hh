@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <exception>
 #include <utility>
+#include <cmath>
 #include <type_traits>
 #include <tuple>
 #include <initializer_list>
@@ -130,9 +131,11 @@ extern int eDebugConstructorCounter;
 #define OPENCL_NO_DEVICES \
   "No OpenCL devices found -- consult your device vendor for up-to-date OpenCL drivers"
 #define OPENCL_BUFFER_ERROR \
-  "OpenCL Buffer Error"
+  "OpenCL -- Buffer Error"
 #define OPENCL_KERNEL_ERROR \
-  "OpenCL Kernel Error"
+  "OpenCL -- Kernel Error"
+#define OPENCL_ARITY_ERROR \
+  "OpenCL -- Number of arguments given to OpenCL built-in function is incorrect"
 
 /* ---------------- Debug Messages --------------- */
 
@@ -182,10 +185,10 @@ class Info {
 public:
   static Info &v(); /** Reference to Singleton */
   static std::vector<cl::Platform> get_platforms();
-  void set_platform(cl::Platform const &platform) { platform_ = platform; }
+  void set_platform(cl::Platform const &platform);
   cl::Platform const &platform() const { return platform_; }
   static std::vector<cl::Device> get_devices(cl::Platform const& platform);
-  void set_device(cl::Device const &device) { device_ = device; }
+  void set_device(cl::Device const &device);
   cl::Device const &device() const { return device_; }
   void set_context(cl::Context const &context) { context_ = context; }
   cl::Context const &context() const { return context_; }
@@ -202,12 +205,27 @@ inline Info &Info::v()
   return instance;
 }
 
+inline void Info::set_platform(cl::Platform const &platform) 
+{ 
+  platform_ = platform; 
+  std::vector<cl::Device> devices = get_devices(platform);
+  assert(devices.size() && OPENCL_NO_DEVICES);
+  device_ = devices[0];
+  context_ = cl::Context({device_});
+}
+
 inline std::vector<cl::Platform> Info::get_platforms()
 {
   std::vector<cl::Platform> platforms;
   cl::Platform::get(&platforms);
   assert(platforms.size() && OPENCL_NO_PLATFORMS);
   return platforms;
+}
+
+inline void Info::set_device(cl::Device const &device) 
+{ 
+  device_ = device; 
+  context_ = cl::Context({device_});
 }
 
 inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
@@ -259,7 +277,7 @@ constexpr char cKernelPrefix[]       = "k";
 // Variable names
 constexpr char cGlobalIdName[]       = "gid";
 constexpr char cGlobalIdFunction[]   = "get_global_id";
-constexpr char cOutputVariableName[]  = "o";
+constexpr char cOutputVariableName[] = "o";
 
 template <typename T> 
 struct OpenCLType;
@@ -327,10 +345,15 @@ cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &
 }
 
 } // namespace details
-
 } // namespace opencl
 
 #endif
+
+namespace meta {
+
+template <typename T> struct RemoveCVRef;
+
+} // namespace meta
 
 /* ----------------- Type Definitions ---------------- */
 
@@ -370,8 +393,7 @@ struct IsNonCVRefTensor<Tensor<T, N, C>> { enum: bool { value = true }; };
 template <typename T>
 struct IsTensor { 
   enum: bool { value = IsNonCVRefTensor<
-          typename std::remove_reference<
-          typename std::remove_cv<T>::type>::type>::value
+          typename meta::RemoveCVRef<T>::type>::value
         };
 };
 
@@ -393,8 +415,7 @@ struct IsNonCVRefScalarTensor<Tensor<T, 0, C>> { static bool const value = true;
 template <typename T>
 struct IsScalar { 
   enum: bool { value = IsNonCVRefScalarTensor<
-          typename std::remove_reference<
-          typename std::remove_cv<T>::type>::type>::value
+          typename meta::RemoveCVRef<T>::type>::value
         };
 };
 
@@ -509,6 +530,14 @@ constexpr bool LessThan(size_t x, size_t y)
 {
   return x < y;
 }
+
+/** Combine std::remove_reference and std::remove_cv */
+template <typename T>
+struct RemoveCVRef {
+  using type = typename std::remove_cv<
+               typename std::remove_reference<T>::type
+               >::type;
+};
 
 /** template && */
 template <bool B1, bool B2>
@@ -877,6 +906,16 @@ struct RankSum<> {
 
 } // namespace meta
 
+/* --------------------------- OpenCL Meta-Patterns --------------------------- */
+
+namespace opencl {
+namespace meta {
+
+// FIXME
+
+} // namespace meta
+} // namespace opencl
+
 namespace details {
 
 template <size_t N, size_t Count>
@@ -965,6 +1004,9 @@ public:
   template <typename It>
   Array(size_t capacity, It const &first, It const &end);
 
+  /** Takes direct ownership of `data` */
+  Array(size_t, T *data): data_(data) {}
+
   /** Constructs an element at `index` with `value`. Must perform 
    *  correct forwarding. `index` must be less than capacity.
    */
@@ -1044,6 +1086,11 @@ public:
   template <typename It>
   HashMap(size_t capacity, It const &first, It const &end);
 
+  /** Equivalent to HashMap(size_t, It,  It), except the memory owned by 
+   *  `data` is also deleted (with delete[])
+   */
+  HashMap(size_t capacity, T *data);
+
   /** Invokes STL unordered_map destructor */
   ~HashMap() = default;
 
@@ -1091,6 +1138,13 @@ HashMap<T>::HashMap(size_t capacity, It const &first, It const &end)
     ++index;
   }
 } 
+
+template <typename T>
+HashMap<T>::HashMap(size_t capacity, T *data)
+{
+  HashMap<T*>(capacity, data, data + capacity);
+  delete[] data;
+}
 
 template <typename T>
 template <typename U>
@@ -1154,8 +1208,6 @@ NoAliasProxy<NodeType> _NA(Expression<NodeType> const& expr)
 {
   return NoAliasProxy<NodeType>(expr);
 }
-
-
 
 /* ----------------------- Core Data Structures ----------------------- */
 
@@ -1232,7 +1284,6 @@ public:
 
   template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
   friend Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2);
-
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat);
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 1, C_> &vec);
 
@@ -1563,6 +1614,12 @@ public:
   template <typename NodeType,
             typename = typename std::enable_if<NodeType::rank() == N>::type>
   Tensor(Expression<NodeType> const& expression); // WARNING -- no explicit specifier
+
+#ifdef _ENABLE_OPENCL
+  /** Constructs the tensor using the result from an OpenCL computation */
+  template <typename NodeType>
+  Tensor(opencl::Model<NodeType> const &model);
+#endif
 
   /* ------------------- Destructor ------------------- */
 
@@ -2291,6 +2348,25 @@ NodeType, typename> Tensor<T, N, C>::Tensor(Expression<NodeType> const& rhs)
   }
 }
 
+#ifdef _ENABLE_OPENCL
+
+template <typename T, size_t N, template <class> class C>
+template <typename NodeType>
+Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
+{
+#ifdef _TEST
+  ++eDebugConstructorCounter;
+#endif
+  shape_ = model.shape(); 
+  pInitializeStrides(); 
+  size_t cumul = shape_.index_product();
+  T *data = new T[cumul];
+  model.template pFill<T>(data, cumul);
+  ref_ = std::make_shared<C<T>>(cumul, data);
+}
+
+#endif
+
 /* ------------------------- Assignment ------------------------- */
 
 template <typename T, size_t N, template <class> class C>
@@ -2764,6 +2840,16 @@ void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue &cqueue,
   using namespace opencl::details; // WARNING -- using namespace
 
   size_t cumul = shape().index_product();
+  Indices<N> reference_indices {};
+  size_t indices[1] = {};
+  size_t const * const strides[] = { this->strides_ };
+  T *data = new T[cumul];
+
+  for (size_t i = 0; i < cumul; ++i) {
+    data[cumul] = pGet(indices, 0);
+    details::UpdateIndices(reference_indices, this->shape_, indices, strides);
+  }
+
   cl_int err = 0;
   size_t arg_index = buffers.size();
   buffers.push_back(cl::Buffer(opencl::Info::v().context(), 
@@ -2771,15 +2857,11 @@ void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue &cqueue,
       cumul * sizeof(T), nullptr, &err));
   assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
 
-  Indices<N> reference_indices {};
-  size_t indices[1] = {};
-  size_t const * const strides[] = { this->strides_ };
-
-  for (size_t i = 0; i < cumul; ++i) {
-    err = cqueue.enqueueWriteBuffer(buffers.back(), CL_TRUE, sizeof(T) * i, sizeof(T), &pGet(indices, 0));
-    assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
-    details::UpdateIndices(reference_indices, this->shape_, indices, strides);
-  }
+  err = cqueue.enqueueWriteBuffer(buffers.back(), CL_TRUE, 0, sizeof(T) * cumul, data);
+  //err = cqueue.enqueueWriteBuffer(buffers.back(), CL_TRUE, sizeof(T) * i, sizeof(T), &pGet(indices, 0));
+  //assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+  PRINT("DONE WRITING BUFFER");
+  delete[] data;
 
   expr += cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
   arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<T>::value) + " " 
@@ -4603,6 +4685,43 @@ bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
 }
+
+/* ----------------------------- Math ----------------------------- */ 
+
+namespace math {
+
+/** Wrapper around std::sin with OpenCL code emission */
+struct sin {
+  template <typename T>
+  T operator()(T const &x) const { return std::sin(x); }
+#ifdef _ENABLE_OPENCL
+  static std::string opencl_fn() { return "sin"; } 
+#endif
+  static constexpr size_t arity() { return 1; }
+};
+
+/** Wrapper around std::cos with OpenCL code emission */
+struct cos {
+  template <typename T>
+  T operator()(T const &x) const { return std::cos(x); }
+#ifdef _ENABLE_OPENCL
+  static std::string opencl_fn() { return "cos"; } 
+#endif
+  static constexpr size_t arity() { return 1; }
+};
+
+/** Wrapper around std::max with OpenCL code emission */
+struct min {
+  template <typename T>
+  T const &operator()(T const &x, T const &y) const { return std::min(x, y); }
+#ifdef _ENABLE_OPENCL
+  static std::string opencl_fn() { return "fmin"; } 
+#endif
+  static constexpr size_t arity() { return 2; }
+};
+
+} // namespace math
+
 /* ---------------------------- OpenCL ---------------------------- */
 
 #ifdef _ENABLE_OPENCL
@@ -4611,30 +4730,55 @@ template <typename NodeType>
 class Model {
 /*@opencl::Model*/ 
 public:
-  /* -------------- friends -------------- */
-  template <typename X, size_t M, template <class> class C_> friend class Tensor;
-  template <typename LHS, typename RHS> friend class BinaryAddExpr;
-  template <typename LHS, typename RHS> friend class BinarySubExpr;
-  template <typename LHS, typename RHS> friend class BinaryMulExpr;
-  template <typename Function, typename... Exprs> friend class MapExpr;
-  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
-  template <typename RHS> friend class UnaryNegExpr;
-  
+
+  /* -------------- Friends -------------- */
+
+  template <typename X, size_t M, template <class> class C_> friend class tensor::Tensor;
+  template <typename LHS, typename RHS> friend class tensor::BinaryAddExpr;
+  template <typename LHS, typename RHS> friend class tensor::BinarySubExpr;
+  template <typename LHS, typename RHS> friend class tensor::BinaryMulExpr;
+  template <typename Function, typename... Exprs> friend class tensor::MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class tensor::ReduceExpr;
+  template <typename RHS> friend class tensor::UnaryNegExpr;
+
+  /* ------------- Getters -------------- */
+
+  Shape<NodeType::rank()> const &shape() const noexcept { return node_.shape(); }
+
 private:
+
+  /* --------------- Data --------------- */
+
+  cl::Buffer buffer_;
+  cl::CommandQueue cqueue_;
+  NodeType const &node_;
+
+  /* ------------- Methods -------------- */
+
   Model(Expression<NodeType> const &expr);
-  NodeType const &expr_;
+  template <typename U>
+  void pFill(U *ptr, size_t num_elems) const;
+
 }; // Model
 
 template <typename NodeType>
-Model<NodeType>::Model(Expression<NodeType> const &expr): expr_(expr.self())
+Model<NodeType>::Model(Expression<NodeType> const &expr)
+  : cqueue_(Info::v().context(), Info::v().device()), node_(expr.self())
 {
-  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
   std::vector<cl::Buffer> buffers{};
   std::string cl_arg_list{};
   std::string cl_expr{};
-  expr_.pOpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
-  cl::Buffer output_buffer = details::CreateBasicKernel<typename NodeType::value_t>
-    (cqueue, buffers, cl_arg_list, cl_expr, expr_.shape().index_product());
+  node_.pOpenCLBuffer(cqueue_, buffers, cl_arg_list, cl_expr);
+  buffer_ = node_.pOpenCLKernel(cqueue_, buffers, cl_arg_list, cl_expr);
+}
+
+template <typename NodeType>
+template <typename U>
+void Model<NodeType>::pFill(U *ptr, size_t num_elems) const
+{
+  cl_int err = cqueue_.enqueueReadBuffer(buffer_, CL_TRUE, 0, 
+      num_elems * sizeof(typename NodeType::value_t), ptr);
+  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
 }
 
 } // namespace opencl
@@ -4649,11 +4793,11 @@ public:
 
   /* ---------------- typedefs --------------- */
 
-  typedef typename LHS::value_t        value_t;
   template <typename X>
   using container_t = typename         LHS::template container_t<X>;
-  constexpr static size_t rank()          { return LHS::rank(); } 
-  typedef BinaryAddExpr                       self_t;
+  typedef typename LHS::value_t        value_t;
+  constexpr static size_t rank()       { return LHS::rank(); } 
+  typedef BinaryAddExpr                self_t;
   typedef typename LHS::return_t       return_t;
 
   /* ---------------- Friends ---------------- */
@@ -4662,6 +4806,9 @@ public:
   friend BinaryAddExpr<LHS_, RHS_> 
     operator+(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
   template <typename Expr> friend class opencl::Model;
+
+  template <typename LHS_, typename RHS_> friend class BinarySubExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
 
   /* ---------------- Getters ----------------- */
 
@@ -4691,7 +4838,7 @@ public:
   /* ---------------- OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
-  opencl::Model<self_t> opencl_model() const { return opencl::Model<self_t>(*this); }
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 #endif
 
 private:
@@ -4705,6 +4852,10 @@ private:
 
 #ifdef _ENABLE_OPENCL
   void pOpenCLBuffer(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+
+  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, std::string &arg_list,
       std::string &expr) const noexcept;
 #endif
@@ -4790,6 +4941,15 @@ void BinaryAddExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue,
   rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
+template <typename LHS, typename RHS>
+cl::Buffer BinaryAddExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
+      arg_list, expr, lhs_.shape().index_product());
+}
+
 #endif
 
 /* ----------------- Print ----------------- */
@@ -4816,12 +4976,15 @@ public:
   constexpr static size_t rank()          { return LHS::rank(); }
   typedef typename LHS::return_t       return_t;
 
-  /* ---------------- Friend ----------------- */
+  /* ---------------- Friends ---------------- */
 
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
     operator-(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
   template <typename Expr> friend class opencl::Model;
+
+  template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
 
   /* ---------------- Getters ----------------- */
 
@@ -4851,7 +5014,7 @@ public:
   /* ---------------- OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
-  opencl::Model<self_t> opencl_model() const { return opencl::Model<self_t>(*this); }
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 #endif
 
 private:
@@ -4866,6 +5029,10 @@ private:
 #ifdef _ENABLE_OPENCL
   void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
       std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
   /* ------------------ Data ------------------ */
@@ -4939,6 +5106,15 @@ void BinarySubExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue,
   lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
   expr += " - ";
   rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+}
+
+template <typename LHS, typename RHS>
+cl::Buffer BinarySubExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
+      arg_list, expr, lhs_.shape().index_product());
 }
 
 #endif
@@ -5263,9 +5439,11 @@ public:
 
   /* ----------------------------- typedefs ------------------------------ */
 
-  typedef typename FirstExpression<Exprs...>::type    first_t;
-  typedef typename std::result_of<
-    Function(typename Exprs::value_t...)>::type        value_t;
+  typedef typename meta::RemoveCVRef<
+    typename std::result_of<Function(
+    typename Exprs::value_t...)>::
+    type>::type                                        value_t;
+  typedef typename FirstExpression<Exprs...>::type     first_t;
   template <typename X>
   using container_t = typename                         first_t::template container_t<X>;
   constexpr static size_t rank()                       { return first_t::rank(); }
@@ -5303,6 +5481,12 @@ public:
   template <size_t... Slices, size_t M>
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type;
+
+  /* ---------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+#endif
 
 private:
 
@@ -5349,7 +5533,23 @@ private:
             typename std::enable_if<self_t::rank() == M>::type>
   value_t pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const;
 
-  /* ---------------------------- data ------------------------------ */
+  /* ---------------------------- OpenCL ---------------------------- */
+
+#ifdef _ENABLE_OPENCL
+  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  template <size_t... TupleIndices>
+  void pOpenCLBufferTupleExpansion(meta::Sequence<TupleIndices...>, 
+      cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list, 
+      std::string &expr) const noexcept;
+
+  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+#endif
+
+  /* ---------------------------- Data ------------------------------ */
 
   std::tuple<Exprs const&...> exprs_;
   Function &fn_;
@@ -5495,6 +5695,44 @@ typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
   return fn_(std::get<TupleIndices>(exprs_)[indices]...);
 }
 
+/* ---------------------------- OpenCL ---------------------------- */
+
+#ifdef _ENABLE_OPENCL
+
+template <typename Function, typename... Exprs>
+void MapExpr<Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list, std::string &expr) const noexcept
+{
+  static_assert(sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
+  expr += Function::opencl_fn() + "(";
+  pOpenCLBufferTupleExpansion(typename meta::MakeIndexSequence<0, 
+      sizeof...(Exprs)>::sequence{}, cqueue, buffers, arg_list, expr);
+  expr += ")";
+}
+
+template <typename Function, typename... Exprs>
+template <size_t... TupleIndices>
+void MapExpr<Function, Exprs...>::pOpenCLBufferTupleExpansion(meta::Sequence<TupleIndices...>, 
+    cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list, 
+    std::string &expr) const noexcept
+{
+  VARDIAC_MAP((std::get<TupleIndices>(exprs_).pOpenCLBuffer(cqueue, buffers, arg_list, expr), expr += ", "));
+  // Remove the last ", "
+  expr.pop_back();
+  expr.pop_back();
+}
+
+template <typename Function, typename... Exprs>
+cl::Buffer MapExpr<Function, Exprs...>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
+      arg_list, expr, shape().index_product());
+}
+
+#endif
+
 template <typename T, typename Function, typename... Exprs> 
 class ReduceExpr: public Expression<ReduceExpr<T, Function, Exprs...>> {
 /*@ReduceExpr<T, Function, Exprs...>>*/
@@ -5532,7 +5770,7 @@ public:
   template <size_t... Slices>
   T slice(Indices<0> const &indices) const;
 
-  opencl::Model<self_t> opencl_model() const 
+  opencl::Model<self_t> opencl() const 
     { return opencl::Model<self_t>(*this); }
 
 private:
@@ -5781,5 +6019,6 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 #undef PANIC_ASSERTION
 #undef OPENCL_NO_PLATFORMS 
 #undef OPENCL_NO_DEVICES 
+#undef OPENCL_ARITY_ERROR
 
 #endif // TENSORS_H_
