@@ -9,6 +9,7 @@ Documentation/
 bin/
 build/
 *makefile
+makefile
 q
 Win32
 run_test*
