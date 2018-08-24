@@ -5,7 +5,7 @@
 using namespace tensor;
 
 template <template <class> class C>
-void AdditionSubtractionTests() {
+void AddSubtractTests() {
   Tensor<size_t , 4, C> tensor_1({2, 4, 4, 2});
   Tensor<size_t , 4, C> tensor_2({2, 4, 4, 2});
 
@@ -77,6 +77,55 @@ void AdditionSubtractionTests() {
 
   }
 }
+
+template <template <class> class C>
+void HadarmardTests() {
+  Tensor<size_t , 4, C> tensor_1({2, 4, 4, 2});
+  Tensor<size_t , 4, C> tensor_2({2, 4, 4, 2});
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+          tensor_1(i, j, k, l) = 2;
+
+  for (size_t i = 0; i < tensor_2.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
+        for (size_t l = 0; l < tensor_2.dimension(3); ++l) 
+          tensor_2(i, j, k, l) = -2;
+
+  SECTION("Hadarmard") {
+    
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(hadarmard(tensor_1, tensor_1)(i, j, k, l) == 4);
+             
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(hadarmard(tensor_2, hadarmard(tensor_2, hadarmard(tensor_1, tensor_1)))
+                (i, j, k, l) == 16);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(hadarmard(tensor_2, tensor_2, hadarmard(tensor_1, tensor_1))
+                (i, j, k, l) == 16);
+
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+            REQUIRE(hadarmard(tensor_2, hadarmard(tensor_2, tensor_1, tensor_1), tensor_1)
+                (i, j, k, l) == 32);
+  }
+}
  
 template <template <class> class C>
 void MultiplicationTests() {
@@ -146,12 +195,20 @@ void MiscTests() {
   } 
 }
 
-TEST_CASE(BeginTest("Addition/Subtraction", "Array")) {
-  AdditionSubtractionTests<data::Array>();
+TEST_CASE(BeginTest("Add/Subtract", "Array")) {
+  AddSubtractTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Addition/Subtraction", "HashMap")) {
-  AdditionSubtractionTests<data::HashMap>();
+TEST_CASE(BeginTest("Add/Subtract", "HashMap")) {
+  AddSubtractTests<data::HashMap>();
+}
+
+TEST_CASE(BeginTest("Hadarmard", "Array")) {
+  HadarmardTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Hadarmard", "HashMap")) {
+  HadarmardTests<data::HashMap>();
 }
 
 TEST_CASE(BeginTest("Multiplication", "Array")) {

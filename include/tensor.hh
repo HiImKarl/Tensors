@@ -173,6 +173,7 @@ template <typename T, size_t N, template <class> class C = data::Array> class Te
 template <typename LHS, typename RHS> class BinaryAddExpr;
 template <typename LHS, typename RHS> class BinarySubExpr;
 template <typename LHS, typename RHS> class BinaryMulExpr;
+template <typename LHS, typename RHS> class BinaryHadExpr;
 template <typename Function, typename... Exprs> class MapExpr;
 template <typename T, typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
@@ -190,8 +191,8 @@ public:
   static std::vector<cl::Device> get_devices(cl::Platform const& platform);
   void set_device(cl::Device const &device);
   cl::Device const &device() const { return device_; }
-  void set_context(cl::Context const &context) { context_ = context; }
   cl::Context const &context() const { return context_; }
+  void set(cl::Platform const &platform, cl::Device const &device);
 private:
   Info();
   cl::Platform platform_;
@@ -236,6 +237,13 @@ inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
   return devices;
 }
 
+inline void Info::set(cl::Platform const &platform, cl::Device const &device)
+{
+  platform_ = platform;
+  device_ = device;
+  context_ = cl::Context({ device_ });
+}
+
 inline Info::Info() 
 {
   // Defaults to the first platform, first device given by the OpenCL API
@@ -278,6 +286,12 @@ constexpr char cKernelPrefix[]       = "k";
 constexpr char cGlobalIdName[]       = "gid";
 constexpr char cGlobalIdFunction[]   = "get_global_id";
 constexpr char cOutputVariableName[] = "o";
+
+// Operators
+constexpr char cAddOperator[]        = "+";
+constexpr char cSubOperator[]   = "-";
+constexpr char cMulOperator[]   = "*";
+constexpr char cDivOperator[]     = "/";
 
 template <typename T> 
 struct OpenCLType;
@@ -439,6 +453,9 @@ struct IsNonCVRefExpression<BinarySubExpr<LHS, RHS>> { enum: bool { value = true
 
 template <typename LHS, typename RHS> 
 struct IsNonCVRefExpression<BinaryMulExpr<LHS, RHS>> { enum: bool { value = true }; };
+
+template <typename LHS, typename RHS> 
+struct IsNonCVRefExpression<BinaryHadExpr<LHS, RHS>> { enum: bool { value = true }; };
 
 template <typename Function, typename... Exprs> 
 struct IsNonCVRefExpression<MapExpr<Function, Exprs...>> { enum: bool { value = true }; };
@@ -1236,6 +1253,7 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
@@ -1398,6 +1416,7 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
@@ -1529,6 +1548,7 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
@@ -2833,7 +2853,7 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t const *strides, size_t 
 #ifdef _ENABLE_OPENCL
 
 template <typename T, size_t N, template <class> class C>
-void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue&, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -2907,12 +2927,12 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
 template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
 Tensor<X, M, C1> add(Tensor<X, M, C1> const& tensor_1, Tensor<Y, M, C2> const& tensor_2)
 {
-  assert((tensor_1.shape_ == tensor_2.shape_)  && DIMENSION_MISMATCH);
-  Tensor<X, M, C1> sum_tensor(tensor_1.shape_);
-  auto add = [](X &x, X const &y, Y const &z) -> void {
+  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
+  Tensor<X, M, C1> sum_tensor(tensor_1.shape());
+  auto elemwise_add = [](X &x, X const &y, Y const &z) -> void {
     x = y + z;
   };
-  Map(add, sum_tensor, tensor_1, tensor_2);
+  Map(elemwise_add, sum_tensor, tensor_1, tensor_2);
   return sum_tensor;
 }
 
@@ -2946,13 +2966,12 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator+=(Expression<RHS> const &rhs)
 template <typename X, typename Y, size_t M, template <class> class C_>
 Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor_1, Tensor<Y, M, C_> const& tensor_2)
 {
-  assert(tensor_1.shape_ == tensor_2.shape_ && DIMENSION_MISMATCH);
-  Tensor<X, M, C_> diff_tensor(tensor_1.shape_);
-  auto sub = [](X &x, X const &y, Y const &z) -> void
-  {
+  assert(tensor_1.shape() == tensor_2.shape() && DIMENSION_MISMATCH);
+  Tensor<X, M, C_> diff_tensor(tensor_1.shape());
+  auto elemwise_sub = [](X &x, X const &y, Y const &z) -> void {
     x = y - z;
   };
-  Map(sub, diff_tensor, tensor_1, tensor_2);
+  Map(elemwise_sub, diff_tensor, tensor_1, tensor_2);
   return diff_tensor;
 }
 
@@ -2977,6 +2996,33 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator-=(Expression<RHS> const &rhs)
   assert((shape_ == tensor.shape_) && DIMENSION_MISMATCH);
   *this = *this - tensor;
   return *this;
+}
+
+/** Creates a Tensor which is the hadamard product between `tensor_1` and `tensor_2`
+ *  (elementwise product), with shape equivalent to `tensor_1` and `tensor_2`, which 
+ *  must have equivalent shape, or an assert will fail.
+ */
+template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
+Tensor<X, M, C1> hadarmard(Tensor<X, M, C1> const &tensor_1, Tensor<Y, M, C2> const &tensor_2)
+{
+  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
+  Tensor<X, M, C1> hadarmard_tensor(tensor_1.shape());
+  auto mul = [](X &x, X const &y, Y const &z) -> void {
+    x = y * z;
+  };
+  Map(mul, hadarmard_tensor, tensor_1, tensor_2);
+  return hadarmard_tensor;
+}
+
+/** Eager Hadarmard product with variable number of tensor arguments */
+template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
+          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
+Tensor<X, M, C_> hadarmard(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
+{
+  auto hadarmard_tensor = tensor;
+  VARDIAC_MAP(assert(hadarmard_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(hadarmard_tensor = hadarmard(hadarmard_tensor, tensors));
+  return hadarmard_tensor;
 }
 
 /** Produces a Tensor which is the Tensor product of `tensor_1` and 
@@ -3020,6 +3066,7 @@ Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, 
   return prod_tensor;
 }
 
+/** Eager Tensor multiplication with variable number of tensor arguments */
 template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, 
   template <class> class C2, typename... Tensors, typename = typename std::enable_if<(sizeof...(Tensors) >= 1)>::type>
 auto mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2, Tensors const&... tensors)
@@ -3696,6 +3743,7 @@ public:
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
   template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
@@ -4309,6 +4357,25 @@ inline Tensor<X, 0, C_> operator-(X const &scalar, Tensor<X, 0, C_> const &tenso
   return Tensor<X, 0, C_>(tensor() - scalar);
 }
 
+// Hadarmard operator is overloaded for convience of use with BinaryHadExpr
+template <typename X, typename Y, template <class> class C_>
+inline Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+{
+  return Tensor<X, 0, C_>(tensor_1() % tensor_2());
+}
+
+template <typename X, template <class> class C_>
+inline Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+{
+  return Tensor<X, 0, C_>(tensor() % scalar);
+}
+
+template <typename X, template <class> class C_>
+inline Tensor<X, 0, C_> operator%(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+{
+  return Tensor<X, 0, C_>(tensor() % scalar);
+}
+
 template <typename X, typename Y, template <class> class C1, template <class> class C2>
 inline Tensor<X, 0, C1> operator*(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
@@ -4736,6 +4803,7 @@ public:
   template <typename LHS, typename RHS> friend class tensor::BinaryAddExpr;
   template <typename LHS, typename RHS> friend class tensor::BinarySubExpr;
   template <typename LHS, typename RHS> friend class tensor::BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class tensor::BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class tensor::MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class tensor::ReduceExpr;
   template <typename RHS> friend class tensor::UnaryNegExpr;
@@ -4809,6 +4877,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename RHS_> class UnaryNegExpr;
@@ -4940,7 +5009,7 @@ void BinaryAddExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue,
     std::string &expr) const noexcept
 {
   lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
-  expr += " + ";
+  expr += std::string(" ") + opencl::details::cAddOperator + " ";
   rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
@@ -4989,6 +5058,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename RHS_> class UnaryNegExpr;
@@ -5111,7 +5181,7 @@ void BinarySubExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue,
     std::string &expr) const noexcept
 {
   lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
-  expr += " - ";
+  expr += std::string(" ") + opencl::details::cSubOperator + " ";
   rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
@@ -5171,6 +5241,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename RHS_> class UnaryNegExpr;
@@ -5446,6 +5517,184 @@ typename BinaryMulExpr<LHS, RHS>::value_t
 
 /* --------------------------------------------------------------------- */
 
+template <typename LHS, typename RHS> 
+class BinaryHadExpr: public Expression<BinaryHadExpr<LHS, RHS>> {
+/*@BinaryMulExpr*/
+public:
+
+  /* ---------------- typedefs --------------- */
+
+  typedef typename LHS::value_t                 value_t;
+  template <typename X>
+  using container_t = typename                  LHS::template container_t<X>;
+  typedef BinaryHadExpr                         self_t;
+  constexpr static size_t rank()                { return LHS::rank() + RHS::rank() - 2; }
+  typedef 
+  Tensor<value_t, self_t::rank(), container_t>  return_t;
+
+  /* ---------------- Friends ---------------- */
+
+  template <typename LHS_, typename RHS_>
+  friend BinaryHadExpr<LHS_, RHS_> 
+    operator%(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+  template <typename Expr> friend class opencl::Model;
+  template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
+  template <typename LHS_, typename RHS_> friend class BinarySubExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
+  template <typename Function_, typename... Exprs_> friend class MapExpr;
+  template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
+  template <typename RHS_> class UnaryNegExpr;
+
+  /* ---------------- Getters ----------------- */
+
+  size_t dimension(size_t index) const { return lhs_.dimension(index); }
+  Shape<LHS::rank()> const &shape() const { return lhs_.shape(); }
+
+  template <typename... Args>
+  auto operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>()(args...))>::type;
+
+  template <typename... Args>
+  auto at(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHS const>().at(args...))>::type;
+
+  template <size_t M>
+  auto operator[](Indices<M> const &indices) const 
+    -> typename std::remove_reference<decltype(std::declval<LHS const>()[indices])>::type;
+
+  template <size_t... Slices, typename... Args>
+  auto slice(Args... args) const
+    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type;
+
+  template <size_t... Slices, size_t M>
+  auto slice(Indices<M> const &indices) const
+    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
+
+  /* ---------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+#endif
+
+private:
+
+  /* -------------- Constructors -------------- */
+
+  BinaryHadExpr(LHS const &lhs, RHS const &rhs);
+  BinaryHadExpr(BinaryHadExpr<LHS, RHS> const&) = default;
+
+  /* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+#endif
+
+  /* ------------------ Data ------------------ */
+
+  LHS const &lhs_;
+  RHS const &rhs_;
+
+private:
+
+}; 
+
+/* ---------------- Friends ---------------- */
+
+template <typename LHS, typename RHS>
+BinaryHadExpr<LHS, RHS> operator%(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinaryHadExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
+
+/* ---------------- Getters ---------------- */
+
+template <typename LHS, typename RHS>
+template <typename... Args>
+auto BinaryHadExpr<LHS, RHS>::operator()(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>()(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return lhs_(args...) % rhs_(args...);
+}
+
+template <typename LHS, typename RHS>
+template <typename... Args>
+auto BinaryHadExpr<LHS, RHS>::at(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>().at(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return lhs_(args...) % rhs_(args...);
+}
+
+template <typename LHS, typename RHS>
+template <size_t M>
+auto BinaryHadExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>()[indices])>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  return lhs_[indices] % rhs_[indices];
+}
+
+template <typename LHS, typename RHS>
+template <size_t... Slices, typename... Args>
+auto BinaryHadExpr<LHS, RHS>::slice(Args... args) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type
+{
+  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  return lhs_.template slice<Slices...>(args...) % rhs_.template slice<Slices...>(args...);
+}
+
+template <typename LHS, typename RHS>
+template <size_t... Slices, size_t M>
+auto BinaryHadExpr<LHS, RHS>::slice(Indices<M> const &indices) const
+  -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type
+{
+  static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
+  return lhs_.template slice<Slices...>(indices) % rhs_.template slice<Slices...>(indices);
+}
+
+/* -------------- Constructors -------------- */
+
+template <typename LHS, typename RHS>
+BinaryHadExpr<LHS, RHS>::BinaryHadExpr(LHS const &lhs, RHS const &rhs)
+  : lhs_(lhs), rhs_(rhs) {}
+
+/* ----------------- OpenCL ----------------- */
+
+#ifdef _ENABLE_OPENCL
+
+template <typename LHS, typename RHS>
+void BinaryHadExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  expr += std::string(" ") + opencl::details::cMulOperator + " ";
+  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+}
+
+template <typename LHS, typename RHS>
+cl::Buffer BinaryHadExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
+      arg_list, expr, lhs_.shape().index_product());
+}
+
+#endif
+
+/* ----------------- Print ----------------- */
+
+// FIXME
+
 template <typename Function, typename... Exprs> 
 class MapExpr: public Expression<MapExpr<Function, Exprs...>>  {
 /*@MapExpr<Function, Exprs...>*/
@@ -5474,7 +5723,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename RHS_> class UnaryNegExpr;
@@ -5779,7 +6028,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename RHS_> class UnaryNegExpr;
@@ -5925,7 +6174,7 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
 
@@ -6061,7 +6310,6 @@ cl::Buffer UnaryNegExpr<RHS>::pOpenCLKernel(cl::CommandQueue &cqueue,
 }
 
 #endif
-
 
 /* ------------------ Constructors ------------------ */
 
