@@ -281,17 +281,32 @@ constexpr char cVoidType[]           = "void";
 constexpr char cVariablePrefix[]     = "v";
 constexpr char cFunctionPrefix[]     = "f";
 constexpr char cKernelPrefix[]       = "k";
+constexpr char cLocalPrefix[]        = "l";
+constexpr char cForPrefix[]          = "i";
 
 // Variable names
-constexpr char cGlobalIdName[]       = "gid";
+constexpr char cGlobalIdName[]       = "global_id";
+constexpr char cLocalIdName[]        = "local_id";
+constexpr char cGroupIdName[]        = "group_id";
+constexpr char cLocalSizeName[]      = "local_size";
+constexpr char cOutputName[]         = "o";
+constexpr char cReductionSize[]      = "N";
+constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
+
+// Thread ID functions
 constexpr char cGlobalIdFunction[]   = "get_global_id";
-constexpr char cOutputVariableName[] = "o";
+constexpr char cLocalIdFunction[]    = "get_local_id";
+constexpr char cGroupIdFunction[]    = "get_group_id";
+constexpr char cLocalSizeFunction[]  = "get_local_size";
+
+// Synchronization functions
+constexpr char cBarrierFunction[]    = "barrier";
 
 // Operators
 constexpr char cAddOperator[]        = "+";
-constexpr char cSubOperator[]   = "-";
-constexpr char cMulOperator[]   = "*";
-constexpr char cDivOperator[]     = "/";
+constexpr char cSubOperator[]        = "-";
+constexpr char cMulOperator[]        = "*";
+constexpr char cDivOperator[]        = "/";
 
 template <typename T> 
 struct OpenCLType;
@@ -333,9 +348,9 @@ cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &
   std::string kernel_code = 
          std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
          + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
-         + " " + cPointerIdentifier + cOutputVariableName + ") {\n"
+         + " " + cPointerIdentifier + cOutputName + ") {\n"
          + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
-         + cOutputVariableName + "[" + cGlobalIdName + "] = " + expr + ";\n"
+         + cOutputName + "[" + cGlobalIdName + "] = " + expr + ";\n"
          + "}\n";
 
   // FIXME
@@ -356,6 +371,49 @@ cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &
   err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_elems));
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
   return output_buffer; 
+}
+
+template <typename NodeType>
+cl::Buffer CreateBuffer(NodeType const& node) 
+{
+  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
+  std::vector<cl::Buffer> buffers{};
+  std::string cl_arg_list{};
+  std::string cl_expr{};
+  node.pOpenCLBuffer(cqueue_, buffers, cl_arg_list, cl_expr);
+  return node.pOpenCLKernel(cqueue_, buffers, cl_arg_list, cl_expr);
+}
+
+template <typename ReturnType, typename Function, typename NodeType>
+std::string CreateReductionKernelCode(NodeType const &node)
+{
+  return
+      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix
+    + "(" + cGlobalIdentifier + " " + OpenCLType<NodeType::value_t>::value + " " 
+    + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefx
+    + ", " + cGlobalIdentifier + " " +  + cPointerIdentifier
+    + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
+    + OpenCLType<ReturnType>::value + " " cPointerIdentifier + cLocalPrefix
+    + ", " + cSizeTType + " " + cReductionSize + ") {\n";
+    + "\t" + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
+    + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+    + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+    + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n"
+    + "\t" + cLocalPrefix + "[" + cLocalIdName + "] = " + cVariablePrefix + "["
+    + cGlobalIdName + "];\n"
+    + cBarrierFunction + "(" + cLocalMemFence + ");"
+    + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
+    + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
+    + " >>= 1)\n {"
+    + "\t\tif (" + cLocalIdName + " < " + cForPrefix " && "
+    + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize " ) {\n"
+    + "\t\t\t" + Function::opencl_reduce(cLocalPrefix + "[" + cLocalIdName + "]", 
+        cLocalPrefix + "[" + cLocalIdName + " + " + cForPrefix + " ]") + ";\n";
+    + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");";
+    + "}\n";
+    + "\tif (" + cLocalIdName + " == 0)\n"
+    + "\t\t" + cOutputName + "[" + cGroupIdName + "];\n";
+    + "\n";
 }
 
 } // namespace details
@@ -2163,6 +2221,10 @@ private:
   void pOpenCLBuffer(cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, std::string &arg_list,
       std::string &expr) const noexcept;
+
+  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif 
 
   /* ------------------ Utility --------------------- */
@@ -2887,6 +2949,14 @@ void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue&,
            +  std::to_string(arg_index) + ", ";
 
   delete[] data;
+}
+
+template <typename T, size_t N, template <class> class C>
+cl::Buffer Tensor<T, N, C>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept
+{
+  return buffers.back();
 }
 
 #endif
@@ -4756,12 +4826,45 @@ bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
 
 namespace math {
 
+/** Wrapper around std::plus with OpenCL code emission */
+struct plus {
+  template <typename T>
+  T const &operator()(T const &x, T const &y) const { return std::plus(x, y); }
+#ifdef _ENABLE_OPENCL
+  /** Creates the reduce expression for the given accumulator and variable names */
+  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+#endif
+  static constexpr size_t arity() { return 2; }
+};
+
+inline std::string plus::opencl_reduce(std::string const &accum, std::string const &v1)
+{
+  return accum + " += " + v1;
+}
+
+/** Wrapper around std::minus with OpenCL code emission */
+struct minus {
+  template <typename T>
+  T const &operator()(T const &x, T const &y) const { return std::minus(x, y); }
+#ifdef _ENABLE_OPENCL
+  /** Creates the reduce expression for the given accumulator and variable names */
+  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+#endif
+  static constexpr size_t arity() { return 2; }
+};
+
+inline std::string minus::opencl_reduce(std::string const &accum, std::string const &v1)
+{
+  return accum + " -= " + v1;
+}
+
 /** Wrapper around std::sin with OpenCL code emission */
 struct sin {
   template <typename T>
   T operator()(T const &x) const { return std::sin(x); }
 #ifdef _ENABLE_OPENCL
-  static std::string opencl_fn() { return "sin"; } 
+  /** OpenCL built in function, along with a single left paranthesis */
+  static std::string opencl_map() { return "sin("; } 
 #endif
   static constexpr size_t arity() { return 1; }
 };
@@ -4771,7 +4874,19 @@ struct cos {
   template <typename T>
   T operator()(T const &x) const { return std::cos(x); }
 #ifdef _ENABLE_OPENCL
-  static std::string opencl_fn() { return "cos"; } 
+  /** OpenCL built in function, along with a single left paranthesis */
+  static std::string opencl_map() { return "cos("; } 
+#endif
+  static constexpr size_t arity() { return 1; }
+};
+
+/** Wrapper around std::tan with OpenCL code emission */
+struct tan {
+  template <typename T>
+  T operator()(T const &x) const { return std::tan(x); }
+#ifdef _ENABLE_OPENCL
+  /** OpenCL built in function, along with a single left paranthesis */
+  static std::string opencl_map() { return "tan("; } 
 #endif
   static constexpr size_t arity() { return 1; }
 };
@@ -4781,10 +4896,19 @@ struct min {
   template <typename T>
   T const &operator()(T const &x, T const &y) const { return std::min(x, y); }
 #ifdef _ENABLE_OPENCL
-  static std::string opencl_fn() { return "fmin"; } 
+  /** OpenCL built in function, along with a single left paranthesis */
+  static std::string opencl_map() { return "fmin("; } 
+
+  /** Creates the reduce expression for the given accumulator and variable names */
+  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
 #endif
   static constexpr size_t arity() { return 2; }
 };
+
+inline std::string min::opencl_reduce(std::string const &accum, std::string const &v1)
+{
+  return accum + " = min(" + accum + ", " v1 ")";
+}
 
 } // namespace math
 
@@ -5975,7 +6099,7 @@ void MapExpr<Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, std::v
     std::string &arg_list, std::string &expr) const noexcept
 {
   static_assert(sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
-  expr += Function::opencl_fn() + "(";
+  expr += Function::opencl_map();
   pOpenCLBufferTupleExpansion(typename meta::MakeIndexSequence<0, 
       sizeof...(Exprs)>::sequence{}, cqueue, buffers, arg_list, expr);
   expr += ")";
@@ -6052,6 +6176,12 @@ public:
   opencl::Model<self_t> opencl() const 
     { return opencl::Model<self_t>(*this); }
 
+  /* --------------------------- OpenCL ----------------------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+#endif
+
 private:
 
   /* ------------------------- Constructors ------------------------- */
@@ -6065,6 +6195,19 @@ private:
   T pReduceExpansion(meta::Sequence<TupleIndices...>) const;
 
   /* --------------------------- OpenCL ----------------------------- */
+
+#ifdef _ENABLE_OPENCL
+void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list, std::string &expr) const noexcept;
+
+template <size_t... TupleIndices>
+void pOpenCLBufferExpansion(meta::Sequence<TupleIndices>,
+    cl::Buffer (&buffers)[sizeof...(Exprs)]) const noexcept
+
+cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept;
+#endif
 
   /* ---------------------------- Data ------------------------------ */
 
@@ -6129,7 +6272,10 @@ T ReduceExpr<T, Function, Exprs...>::slice(Indices<0> const&) const
 
 template <typename T, typename Function, typename... Exprs>
 ReduceExpr<T, Function, Exprs...>::ReduceExpr(T &&value, Function &&fn, Exprs const&... exprs)
-  : exprs_(std::forward_as_tuple(exprs...)), fn_(fn), return_value_(std::forward<T>(value))  {}
+  : exprs_(std::forward_as_tuple(exprs...)), fn_(fn), return_value_(std::forward<T>(value))
+{
+  static_assert(sizeof...(Exprs), NO_TENSORS_PROVIDED);
+}
 
 /* ------------------------- Utility ----------------------- */
 
@@ -6149,6 +6295,48 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 
 /* --------------------- OpenCL --------------------- */
 
+#ifdef _ENABLE_OPENCL
+
+template <typename T, typename Function, typename... Exprs>
+void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list, std::string &expr) const noexcept
+{
+  cl::Buffer buffers[sizeof...(Exprs)];
+  T result = pOpenCLBuffeExpansion(typename meta::MakeIndexSequence<0, 
+      sizeof...(Args)>::sequence{}, buffers);
+  result += return_value_;
+  cl_int err = 0;
+  buffers.push_back(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | 
+      CL_MEM_COPY_HOST_PTR, sizeof(T), &result, &err);
+
+  // add the new scalar to the argument list and the expression
+  size_t arg_index = buffers.size() - 1;
+  expr += cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
+  arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<T>::value) + " " 
+           +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
+           +  std::to_string(arg_index) + ", ";
+}
+
+template <typename T, typename Function, typename... Exprs>
+template <size_t... TupleIndices>
+void ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices>, 
+    cl::Buffer (&buffers)[sizeof...(Exprs)]) const noexcept
+{
+  using namespace opencl::details; // WARNING -- using namespace
+  auto const& shape = std::get<0>(exprs).shape();
+  VARDIAC_MAP(assert(shape() == std::get<TupleIndices>(exprs).shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(std::get<TupleIndices>(exprs)));
+
+}
+
+cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list,
+    std::string &expr) const noexcept
+{
+  return buffers.back();
+}
+
+#endif
 
 /* -------------------------------------------------- */
 
