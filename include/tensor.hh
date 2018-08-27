@@ -290,6 +290,7 @@ constexpr char cLocalIdName[]        = "local_id";
 constexpr char cGroupIdName[]        = "group_id";
 constexpr char cLocalSizeName[]      = "local_size";
 constexpr char cOutputName[]         = "o";
+constexpr char cInitialValueName[]   = "ival";
 constexpr char cReductionSize[]      = "N";
 constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
 
@@ -384,37 +385,74 @@ cl::Buffer CreateBuffer(NodeType const& node)
   return node.pOpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
-template <typename ReturnType, typename Function, typename NodeType>
-std::string CreateReductionKernelCode(NodeType const&)
+template <size_t... Indices, typename ReturnType, typename Function, typename NodeType>
+std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
 {
-  return
-      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix
-    + "(" + cGlobalIdentifier + " " + OpenCLType<typename NodeType::value_t>::value + " " 
-    + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
-    + ", " + cGlobalIdentifier + " " +  + cPointerIdentifier
-    + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
-    + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
-    + ", " + cSizeTType + " " + cReductionSize + ") {\n"
-    + "\t" + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
-    + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
-    + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
-    + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n"
-    + "\t" + cLocalPrefix + "[" + cLocalIdName + "] = " + cVariablePrefix + "["
-    + cGlobalIdName + "];\n"
-    + cBarrierFunction + "(" + cLocalMemFence + ");"
-    + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
-    + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
-    + " >>= 1)\n {"
-    + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
-    + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + " ) {\n"
-    + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
-        + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
-        + " + " + cForPrefix + " ]") + ";\n"
-    + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");"
-    + "}\n"
-    + "\tif (" + cLocalIdName + " == 0)\n"
-    + "\t\t" + cOutputName + "[" + cGroupIdName + "];\n"
-    + "\n";
+  std::string kernel_code =
+      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix + "(";
+
+  // The kernel recieves n + 4 arguments, the first n of which are input buffers
+  // that will be joined, n + 1 argument is a local buffer which is reduced, 
+  // the n + 2 argument is an output buffer which stores the result of the reduction,
+  // the n + 3 argument is the size of half of the reduction group, the n + 4
+  // argument is the initial value which is added to the output buffer at the end
+    
+  for (size_t i = 0; i < sizeof...(Indices); ++i) 
+    kernel_code +=
+      std::string(cGlobalIdentifier) + " " + OpenCLType<typename NodeType::value_t>::value 
+      + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
+      + std::to_string(i) + ", ";
+  
+  kernel_code +=
+    std::string(cGlobalIdentifier) + " " +  + cPointerIdentifier
+  + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
+  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
+  + ", " + cGlobalIdentifier + " " + cPointerIdentifier + cOutputName
+  + ", " + cSizeTType + " " + cReductionSize + ", " + OpenCLType<ReturnType>::value
+  + " " + " " + cInitialValueName + ") {\n";
+
+  kernel_code +=
+    std::string("\t") + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction 
+  + "(0);\n" + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+  + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+  + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
+
+  kernel_code +=
+    std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
+  + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
+        "[" + cGlobalIdName + "]")...) + ";\n";
+
+
+  kernel_code +=
+    std::to_string(cBarrierFunction) + "(" + cLocalMemFence + ");"
+  + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
+  + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
+  + " >>= 1)\n {"
+  + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
+  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + " ) {\n"
+  + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
+      + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
+      + " + " + cForPrefix + " ]") + ";\n"
+  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");"
+  + "}\n"
+  + "\tif (" + cLocalIdName + " == 0)\n"
+  + "\t\t" + cOutputName + "[" + cGroupIdName + "] + " + cInitialValueName + ";\n"
+  + "\n";
+  
+  return kernel_code;
+}
+
+template <size_t... Indices, typename ReturnType, typename Function, typename NodeType>
+cl::Buffer CreateReductionKernel(meta::Sequence<Indices...>, 
+    cl::Buffer (&buffers)[sizeof...(Indices)])
+{
+  cl_int err = 0;
+  cl::Buffer output_buffer(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY 
+      | CL_MEM_ALLOC_HOST_PTR, sizeof(ReturnType), nullptr, &err);
+  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+  // FIXME 
+  
+  return output_buffer;
 }
 
 } // namespace details
@@ -1018,6 +1056,15 @@ void UpdateIndices(Indices<M> &reference_indices, Shape<N> const &shape, size_t 
     }
     --dim_index;
   }
+}
+
+/** Fills `result` with the elements of `input`, skipping the element at position `Index` */
+template <size_t Index, size_t N>
+void FillExceptForIndex(size_t const (&input)[N], size_t (&result)[N - 1])
+{
+  static_assert(N > Index, INDEX_OUT_OF_BOUNDS);
+  std::copy_n(input, Index, result);
+  std::copy_n(input + Index + 1, N - Index - 1, result + Index);
 }
 
 /* ------- Expansion for methods which take Tensors...  --------- */
@@ -4834,6 +4881,10 @@ struct plus {
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+
+  /** Creates the join expression for the given variable names */
+  template <typename... Args>
+  static std::string opencl_join(Args const&... args);
 #endif
   static constexpr size_t arity() { return 2; }
 };
@@ -4841,6 +4892,18 @@ struct plus {
 inline std::string plus::opencl_reduce(std::string const &accum, std::string const &v1)
 {
   return accum + " += " + v1;
+}
+
+template <typename... Args>
+static std::string plus::opencl_join(Args const&... args)
+{
+  std::string str{}
+  VARDIAC_MAP((str += args + " + "));
+  // remove trailing characters
+  str.pop();
+  str.pop();
+  str.pop();
+  return str;
 }
 
 /** Wrapper around std::minus with OpenCL code emission */
@@ -6298,12 +6361,10 @@ template <typename T, typename Function, typename... Exprs>
 void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list, std::string &expr) const noexcept
 {
-  T result = pOpenCLBufferExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
-  result += return_value_;
-  cl_int err = 0;
-  buffers.push_back(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | 
-      CL_MEM_COPY_HOST_PTR, sizeof(T), &result, &err);
+  buffers.push_back(pOpenCLBufferExpansion(typename meta::MakeIndexSequence<0, 
+      sizeof...(Exprs)>::sequence{}));
+  
+  // FIXME
 
   // add the new scalar to the argument list and the expression
   size_t arg_index = buffers.size() - 1;
@@ -6317,15 +6378,14 @@ void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &,
 
 template <typename T, typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-T ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>) const noexcept
+cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>) const noexcept
 {
   using namespace opencl::details; // WARNING -- using namespace
   auto const& shape = std::get<0>(exprs_).shape();
   cl::Buffer buffers[sizeof...(Exprs)];
   VARDIAC_MAP(assert(shape() == std::get<TupleIndices>(exprs_).shape() && SHAPE_MISMATCH));
   VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(std::get<TupleIndices>(exprs_)));
-  T result{};
-  
+   
 }
 
 template <typename T, typename Function, typename... Exprs>
