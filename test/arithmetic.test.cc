@@ -140,7 +140,13 @@ void MultiplicationTests() {
     for (size_t j = 0; j < tensor_2.dimension(1); ++j)
       tensor_2(i, j) = -(int)(i + j);
 
-  SECTION("Multiplication") {
+  Tensor<int, 4, C> tensor_3({4, 4, 2, 2}, 1);
+  Tensor<int, 4, C> tensor_4({2, 2, 4, 4}, 1);
+
+  Tensor<int, 3, C> tensor_5({4, 3, 2}, 1);
+  Tensor<int, 3, C> tensor_6({4, 3, 2}, 1);
+
+  SECTION("Multiplication -- Default Facing Indices") {
     REQUIRE(mul(tensor_1, tensor_2)(0, 0) == -14);
     REQUIRE(mul(tensor_1, tensor_2)(0, 1) == -20);
     REQUIRE(mul(tensor_1, tensor_2)(0, 2) == -26);
@@ -174,6 +180,56 @@ void MultiplicationTests() {
     REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 1) == 9160);
     REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 2) == 12352);
     REQUIRE(mul(tensor_1, tensor_2, tensor_1, tensor_2)(3, 3) == 15544);
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j)
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k)
+          for (size_t l = 0; l < tensor_4.dimension(0); ++l)
+            for (size_t m = 0; m < tensor_4.dimension(1); ++m)
+              for (size_t n = 0; n < tensor_4.dimension(2); ++n)
+             REQUIRE(mul(tensor_3, tensor_4)(i, j, k, l, m, n) == 2);
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i)
+      for (size_t j = 0; j < tensor_4.dimension(3); ++j)
+        REQUIRE(mul(tensor_3.template slice<0, 3>(3, 1), tensor_4.template slice<1, 3>(0, 3))(i, j) == 2);
+  }
+
+  SECTION("Multiplication -- Specific Facing Indices") {
+    REQUIRE(mul<0, 0>(tensor_5, tensor_6).rank() == 4);
+    REQUIRE(mul<0, 0>(tensor_5, tensor_6).dimension(0) == 3);
+    REQUIRE(mul<0, 0>(tensor_5, tensor_6).dimension(1) == 2);
+    REQUIRE(mul<0, 0>(tensor_5, tensor_6).dimension(2) == 3);
+    REQUIRE(mul<0, 0>(tensor_5, tensor_6).dimension(3) == 2);
+
+    REQUIRE(mul<1, 1>(tensor_5, tensor_6).rank() == 4);
+    REQUIRE(mul<1, 1>(tensor_5, tensor_6).dimension(0) == 4);
+    REQUIRE(mul<1, 1>(tensor_5, tensor_6).dimension(1) == 2);
+    REQUIRE(mul<1, 1>(tensor_5, tensor_6).dimension(2) == 4);
+    REQUIRE(mul<1, 1>(tensor_5, tensor_6).dimension(3) == 2);
+
+    REQUIRE(mul<2, 2>(tensor_5, tensor_6).rank() == 4);
+    REQUIRE(mul<2, 2>(tensor_5, tensor_6).dimension(0) == 4);
+    REQUIRE(mul<2, 2>(tensor_5, tensor_6).dimension(1) == 3);
+    REQUIRE(mul<2, 2>(tensor_5, tensor_6).dimension(2) == 4);
+    REQUIRE(mul<2, 2>(tensor_5, tensor_6).dimension(3) == 3);
+
+    for (size_t i = 0; i < tensor_5.dimension(1); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(2); ++j) 
+        for (size_t k = 0; k < tensor_6.dimension(1); ++k) 
+          for (size_t l = 0; l < tensor_6.dimension(2); ++l) 
+            REQUIRE(mul<0, 0>(tensor_5, tensor_6)(i, j, k, l) == 4);
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(2); ++j) 
+        for (size_t k = 0; k < tensor_6.dimension(0); ++k) 
+          for (size_t l = 0; l < tensor_6.dimension(2); ++l) 
+            REQUIRE(mul<1, 1>(tensor_5, tensor_6)(i, j, k, l) == 3);
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_6.dimension(0); ++k) 
+          for (size_t l = 0; l < tensor_6.dimension(1); ++l) 
+            REQUIRE(mul<2, 2>(tensor_5, tensor_6)(i, j, k, l) == 2);
   }
 }
 

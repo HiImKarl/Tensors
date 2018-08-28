@@ -178,288 +178,6 @@ template <typename Function, typename... Exprs> class MapExpr;
 template <typename T, typename Function, typename... Exprs> class ReduceExpr;
 template <typename RHS> class UnaryNegExpr;
 
-#ifdef _ENABLE_OPENCL
-namespace opencl {
-
-/** Singleton collection of opencl context information */
-class Info {
-public:
-  static Info &v(); /** Reference to Singleton */
-  static std::vector<cl::Platform> get_platforms();
-  void set_platform(cl::Platform const &platform);
-  cl::Platform const &platform() const { return platform_; }
-  static std::vector<cl::Device> get_devices(cl::Platform const& platform);
-  void set_device(cl::Device const &device);
-  cl::Device const &device() const { return device_; }
-  cl::Context const &context() const { return context_; }
-  void set(cl::Platform const &platform, cl::Device const &device);
-private:
-  Info();
-  cl::Platform platform_;
-  cl::Device device_;
-  cl::Context context_; 
-};
-
-inline Info &Info::v()
-{
-  static Info instance;
-  return instance;
-}
-
-inline void Info::set_platform(cl::Platform const &platform) 
-{ 
-  platform_ = platform; 
-  std::vector<cl::Device> devices = get_devices(platform);
-  assert(devices.size() && OPENCL_NO_DEVICES);
-  device_ = devices[0];
-  context_ = cl::Context({device_});
-}
-
-inline std::vector<cl::Platform> Info::get_platforms()
-{
-  std::vector<cl::Platform> platforms;
-  cl::Platform::get(&platforms);
-  assert(platforms.size() && OPENCL_NO_PLATFORMS);
-  return platforms;
-}
-
-inline void Info::set_device(cl::Device const &device) 
-{ 
-  device_ = device; 
-  context_ = cl::Context({device_});
-}
-
-inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
-{
-  std::vector<cl::Device> devices;
-  platform.getDevices(CL_DEVICE_TYPE_ALL, &devices); 
-  assert(devices.size() && OPENCL_NO_DEVICES);
-  return devices;
-}
-
-inline void Info::set(cl::Platform const &platform, cl::Device const &device)
-{
-  platform_ = platform;
-  device_ = device;
-  context_ = cl::Context({ device_ });
-}
-
-inline Info::Info() 
-{
-  // Defaults to the first platform, first device given by the OpenCL API
-  platform_ = get_platforms()[0];
-  device_ = get_devices(platform_)[0];
-  context_ = cl::Context({device_});
-}
-
-template <typename Expr> class Model;
-
-namespace details {
-
-// Keywords of OpenCL identifiers
-constexpr char cKernelIdentifier[]   = "kernel";
-constexpr char cGlobalIdentifier[]   = "global";
-constexpr char cLocalIdentifier[]    = "local";
-constexpr char cConstIdentifier[]    = "const";
-constexpr char cPointerIdentifier[]  = "*";
-
-// Keywords of OpenCL data types
-constexpr char cBoolType[]           = "bool";
-constexpr char cCharType[]           = "char";
-constexpr char cUCharType[]          = "uchar";
-constexpr char cShortType[]          = "short";
-constexpr char cUShortType[]         = "ushort";
-constexpr char cIntType[]            = "int";
-constexpr char cUIntType[]           = "uint";
-constexpr char cSizeTType[]          = "size_t";
-constexpr char cLongType[]           = "long";
-constexpr char cULongType[]          = "ulong";
-constexpr char cFloatType[]          = "float";
-constexpr char cVoidType[]           = "void";
-
-// Naming prefixes
-constexpr char cVariablePrefix[]     = "v";
-constexpr char cFunctionPrefix[]     = "f";
-constexpr char cKernelPrefix[]       = "k";
-constexpr char cLocalPrefix[]        = "l";
-constexpr char cForPrefix[]          = "i";
-
-// Variable names
-constexpr char cGlobalIdName[]       = "global_id";
-constexpr char cLocalIdName[]        = "local_id";
-constexpr char cGroupIdName[]        = "group_id";
-constexpr char cLocalSizeName[]      = "local_size";
-constexpr char cOutputName[]         = "o";
-constexpr char cInitialValueName[]   = "ival";
-constexpr char cReductionSize[]      = "N";
-constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
-
-// Thread ID functions
-constexpr char cGlobalIdFunction[]   = "get_global_id";
-constexpr char cLocalIdFunction[]    = "get_local_id";
-constexpr char cGroupIdFunction[]    = "get_group_id";
-constexpr char cLocalSizeFunction[]  = "get_local_size";
-
-// Synchronization functions
-constexpr char cBarrierFunction[]    = "barrier";
-
-// Operators
-constexpr char cAddOperator[]        = "+";
-constexpr char cSubOperator[]        = "-";
-constexpr char cMulOperator[]        = "*";
-constexpr char cDivOperator[]        = "/";
-
-template <typename T> 
-struct OpenCLType;
-
-template <>
-struct OpenCLType<bool> { constexpr static char const *value = cBoolType; };
-
-template <>
-struct OpenCLType<char> { constexpr static char const *value = cCharType; };
-
-template <>
-struct OpenCLType<unsigned char> { constexpr static char const *value = cUCharType; };
-
-template <>
-struct OpenCLType<short> { constexpr static char const *value = cShortType; };
-
-template <>
-struct OpenCLType<unsigned short> { constexpr static char const *value = cUShortType; };
-
-template <>
-struct OpenCLType<int> { constexpr static char const *value = cIntType; };
-
-template <>
-struct OpenCLType<unsigned> { constexpr static char const *value = cUIntType; };
-
-template <>
-struct OpenCLType<long> { constexpr static char const *value = cLongType; };
-
-template <>
-struct OpenCLType<unsigned long> { constexpr static char const *value = cULongType; };
-
-template <>
-struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
-
-template <typename T>
-cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-    std::string const &arg_list, std::string const &expr, size_t num_elems) 
-{
-  std::string kernel_code = 
-         std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
-         + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
-         + " " + cPointerIdentifier + cOutputName + ") {\n"
-         + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
-         + cOutputName + "[" + cGlobalIdName + "] = " + expr + ";\n"
-         + "}\n";
-
-  // FIXME
-  PRINTV(kernel_code);
-  cl_int err = 0;
-  cl::Buffer output_buffer(opencl::Info::v().context(), 
-      CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, 
-      num_elems * sizeof(T), nullptr, &err);
-
-  cl::Program::Sources sources({ kernel_code });
-  cl::Program program(Info::v().context(), sources);
-  err = program.build({ Info::v().device() });
-  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-  cl::Kernel kernel(program, cKernelPrefix);
-  for (size_t i = 0; i < buffers.size(); ++i)
-    kernel.setArg(i, buffers[i]);
-  kernel.setArg(buffers.size(), output_buffer);
-  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_elems));
-  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-  return output_buffer; 
-}
-
-template <typename NodeType>
-cl::Buffer CreateBuffer(NodeType const& node) 
-{
-  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
-  std::vector<cl::Buffer> buffers{};
-  std::string cl_arg_list{};
-  std::string cl_expr{};
-  node.pOpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
-  return node.pOpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
-}
-
-template <size_t... Indices, typename ReturnType, typename Function, typename NodeType>
-std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
-{
-  std::string kernel_code =
-      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix + "(";
-
-  // The kernel recieves n + 4 arguments, the first n of which are input buffers
-  // that will be joined, n + 1 argument is a local buffer which is reduced, 
-  // the n + 2 argument is an output buffer which stores the result of the reduction,
-  // the n + 3 argument is the size of half of the reduction group, the n + 4
-  // argument is the initial value which is added to the output buffer at the end
-    
-  for (size_t i = 0; i < sizeof...(Indices); ++i) 
-    kernel_code +=
-      std::string(cGlobalIdentifier) + " " + OpenCLType<typename NodeType::value_t>::value 
-      + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
-      + std::to_string(i) + ", ";
-  
-  kernel_code +=
-    std::string(cGlobalIdentifier) + " " +  + cPointerIdentifier
-  + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
-  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
-  + ", " + cGlobalIdentifier + " " + cPointerIdentifier + cOutputName
-  + ", " + cSizeTType + " " + cReductionSize + ", " + OpenCLType<ReturnType>::value
-  + " " + " " + cInitialValueName + ") {\n";
-
-  kernel_code +=
-    std::string("\t") + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction 
-  + "(0);\n" + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
-  + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
-  + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
-
-  kernel_code +=
-    std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
-  + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
-        "[" + cGlobalIdName + "]")...) + ";\n";
-
-
-  kernel_code +=
-    std::to_string(cBarrierFunction) + "(" + cLocalMemFence + ");"
-  + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
-  + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
-  + " >>= 1)\n {"
-  + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
-  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + " ) {\n"
-  + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
-      + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
-      + " + " + cForPrefix + " ]") + ";\n"
-  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");"
-  + "}\n"
-  + "\tif (" + cLocalIdName + " == 0)\n"
-  + "\t\t" + cOutputName + "[" + cGroupIdName + "] + " + cInitialValueName + ";\n"
-  + "\n";
-  
-  return kernel_code;
-}
-
-template <size_t... Indices, typename ReturnType, typename Function, typename NodeType>
-cl::Buffer CreateReductionKernel(meta::Sequence<Indices...>, 
-    cl::Buffer (&buffers)[sizeof...(Indices)])
-{
-  cl_int err = 0;
-  cl::Buffer output_buffer(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY 
-      | CL_MEM_ALLOC_HOST_PTR, sizeof(ReturnType), nullptr, &err);
-  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
-  // FIXME 
-  
-  return output_buffer;
-}
-
-} // namespace details
-} // namespace opencl
-
-#endif
-
 namespace meta {
 
 template <typename T> struct RemoveCVRef;
@@ -1020,6 +738,312 @@ struct RankSum<> {
 
 } // namespace meta
 
+/* ------------------------------ OpenCL ------------------------------ */
+
+#ifdef _ENABLE_OPENCL
+namespace opencl {
+
+/** Singleton collection of opencl context information */
+class Info {
+public:
+  static Info &v(); /** Reference to Singleton */
+  static std::vector<cl::Platform> get_platforms();
+  void set_platform(cl::Platform const &platform);
+  cl::Platform const &platform() const { return platform_; }
+  static std::vector<cl::Device> get_devices(cl::Platform const& platform);
+  void set_device(cl::Device const &device);
+  cl::Device const &device() const { return device_; }
+  cl::Context const &context() const { return context_; }
+  void set(cl::Platform const &platform, cl::Device const &device);
+private:
+  Info();
+  cl::Platform platform_;
+  cl::Device device_;
+  cl::Context context_; 
+};
+
+inline Info &Info::v()
+{
+  static Info instance;
+  return instance;
+}
+
+inline void Info::set_platform(cl::Platform const &platform) 
+{ 
+  platform_ = platform; 
+  std::vector<cl::Device> devices = get_devices(platform);
+  assert(devices.size() && OPENCL_NO_DEVICES);
+  device_ = devices[0];
+  context_ = cl::Context({device_});
+}
+
+inline std::vector<cl::Platform> Info::get_platforms()
+{
+  std::vector<cl::Platform> platforms;
+  cl::Platform::get(&platforms);
+  assert(platforms.size() && OPENCL_NO_PLATFORMS);
+  return platforms;
+}
+
+inline void Info::set_device(cl::Device const &device) 
+{ 
+  device_ = device; 
+  context_ = cl::Context({device_});
+}
+
+inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
+{
+  std::vector<cl::Device> devices;
+  platform.getDevices(CL_DEVICE_TYPE_ALL, &devices); 
+  assert(devices.size() && OPENCL_NO_DEVICES);
+  return devices;
+}
+
+inline void Info::set(cl::Platform const &platform, cl::Device const &device)
+{
+  platform_ = platform;
+  device_ = device;
+  context_ = cl::Context({ device_ });
+}
+
+inline Info::Info() 
+{
+  // Defaults to the first platform, first device given by the OpenCL API
+  platform_ = get_platforms()[0];
+  device_ = get_devices(platform_)[0];
+  context_ = cl::Context({device_});
+}
+
+template <typename Expr> class Model;
+
+namespace details {
+
+// Keywords of OpenCL identifiers
+constexpr char cKernelIdentifier[]   = "kernel";
+constexpr char cGlobalIdentifier[]   = "global";
+constexpr char cLocalIdentifier[]    = "local";
+constexpr char cConstIdentifier[]    = "const";
+constexpr char cPointerIdentifier[]  = "*";
+
+// Keywords of OpenCL data types
+constexpr char cBoolType[]           = "bool";
+constexpr char cCharType[]           = "char";
+constexpr char cUCharType[]          = "uchar";
+constexpr char cShortType[]          = "short";
+constexpr char cUShortType[]         = "ushort";
+constexpr char cIntType[]            = "int";
+constexpr char cUIntType[]           = "uint";
+constexpr char cSizeTType[]          = "size_t";
+constexpr char cLongType[]           = "long";
+constexpr char cULongType[]          = "ulong";
+constexpr char cFloatType[]          = "float";
+constexpr char cVoidType[]           = "void";
+
+// Naming prefixes
+constexpr char cVariablePrefix[]     = "v";
+constexpr char cFunctionPrefix[]     = "f";
+constexpr char cKernelPrefix[]       = "k";
+constexpr char cLocalPrefix[]        = "l";
+constexpr char cForPrefix[]          = "i";
+
+// Variable names
+constexpr char cGlobalIdName[]       = "global_id";
+constexpr char cLocalIdName[]        = "local_id";
+constexpr char cGroupIdName[]        = "group_id";
+constexpr char cLocalSizeName[]      = "local_size";
+constexpr char cOutputName[]         = "o";
+constexpr char cInitialValueName[]   = "ival";
+constexpr char cReductionSize[]      = "N";
+constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
+
+// Thread ID functions
+constexpr char cGlobalIdFunction[]   = "get_global_id";
+constexpr char cLocalIdFunction[]    = "get_local_id";
+constexpr char cGroupIdFunction[]    = "get_group_id";
+constexpr char cLocalSizeFunction[]  = "get_local_size";
+
+// Synchronization functions
+constexpr char cBarrierFunction[]    = "barrier";
+
+// Operators
+constexpr char cAddOperator[]        = "+";
+constexpr char cSubOperator[]        = "-";
+constexpr char cMulOperator[]        = "*";
+constexpr char cDivOperator[]        = "/";
+
+template <typename T> 
+struct OpenCLType;
+
+template <>
+struct OpenCLType<bool> { constexpr static char const *value = cBoolType; };
+
+template <>
+struct OpenCLType<char> { constexpr static char const *value = cCharType; };
+
+template <>
+struct OpenCLType<unsigned char> { constexpr static char const *value = cUCharType; };
+
+template <>
+struct OpenCLType<short> { constexpr static char const *value = cShortType; };
+
+template <>
+struct OpenCLType<unsigned short> { constexpr static char const *value = cUShortType; };
+
+template <>
+struct OpenCLType<int> { constexpr static char const *value = cIntType; };
+
+template <>
+struct OpenCLType<unsigned> { constexpr static char const *value = cUIntType; };
+
+template <>
+struct OpenCLType<long> { constexpr static char const *value = cLongType; };
+
+template <>
+struct OpenCLType<unsigned long> { constexpr static char const *value = cULongType; };
+
+template <>
+struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
+
+template <typename T>
+cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+    std::string const &arg_list, std::string const &expr, size_t num_elems) 
+{
+  std::string kernel_code = 
+         std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
+         + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
+         + " " + cPointerIdentifier + cOutputName + ") {\n"
+         + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
+         + cOutputName + "[" + cGlobalIdName + "] = " + expr + ";\n"
+         + "}\n";
+
+  // FIXME
+  PRINTV(kernel_code);
+  cl_int err = 0;
+  cl::Buffer output_buffer(opencl::Info::v().context(), 
+      CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, 
+      num_elems * sizeof(T), nullptr, &err);
+
+  cl::Program::Sources sources({ kernel_code });
+  cl::Program program(Info::v().context(), sources);
+  err = program.build({ Info::v().device() });
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  cl::Kernel kernel(program, cKernelPrefix);
+  for (size_t i = 0; i < buffers.size(); ++i)
+    kernel.setArg(i, buffers[i]);
+  kernel.setArg(buffers.size(), output_buffer);
+  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_elems));
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  return output_buffer; 
+}
+
+/** Given a Tensor Expression node, create its output buffer */
+template <typename NodeType>
+cl::Buffer CreateBuffer(NodeType const& node)
+{
+  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
+  std::vector<cl::Buffer> buffers{};
+  std::string cl_arg_list{};
+  std::string cl_expr{};
+  node.pOpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
+  return node.pOpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
+}
+
+/** Creates the code, as a std::string, for a reduction kernel */
+template <size_t... Indices, typename ReturnType, typename Function, typename... Exprs>
+std::string CreateReductionKernelCode()
+{
+  std::string kernel_code =
+      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix + "(";
+
+  // The kernel recieves n + 4 arguments, the first n of which are input buffers
+  // that will be joined, n + 1 argument is a local buffer which is reduced, 
+  // the n + 2 argument is an output buffer which stores the result of the reduction,
+  // the n + 3 argument is the size of half of the reduction group, the n + 4
+  // argument is the initial value which is added to the output buffer at the end
+    
+  VARDIAC_MAP((kernel_code +=
+      std::string(cGlobalIdentifier) + " " + OpenCLType<typename Exprs::value_t>::value 
+      + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
+      + std::to_string(Indices) + ", "));
+  
+  kernel_code +=
+    std::string(cGlobalIdentifier) + " " +  + cPointerIdentifier
+  + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
+  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
+  + ", " + cGlobalIdentifier + " " + cPointerIdentifier + cOutputName
+  + ", " + cSizeTType + " " + cReductionSize + ", " + OpenCLType<ReturnType>::value
+  + " " + " " + cInitialValueName + ") {\n";
+
+  kernel_code +=
+    std::string("\t") + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction 
+  + "(0);\n" + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+  + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+  + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
+
+  kernel_code +=
+    std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
+  + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
+        "[" + cGlobalIdName + "]")...) + ";\n";
+
+
+  kernel_code +=
+    std::string(cBarrierFunction) + "(" + cLocalMemFence + ");"
+  + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
+  + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
+  + " >>= 1)\n {"
+  + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
+  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + " ) {\n"
+  + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
+      + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
+      + " + " + cForPrefix + " ]") + ";\n"
+  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");"
+  + "}\n"
+  + "\tif (" + cLocalIdName + " == 0)\n"
+  + "\t\t" + cOutputName + "[" + cGroupIdName + "] + " + cInitialValueName + ";\n"
+  + "\n";
+  
+  // FIXME
+  PRINTV(kernel_code);
+  return kernel_code;
+}
+
+template <size_t... Indices, typename ReturnType, typename Function, typename... Exprs>
+cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)])
+{
+  std::string kernel_code = CreateReductionKernelCode<Indices..., ReturnType,
+    Function, Exprs...>();
+  cl_int err = 0;
+  cl::Buffer output_buffer(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY 
+      | CL_MEM_ALLOC_HOST_PTR, sizeof(ReturnType), nullptr, &err);
+  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+  cl::Program::Sources sources({ kernel_code });
+  cl::Program program(Info::v().context(), sources);
+  err = program.build({ Info::v().device() });
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
+  cl::Kernel kernel(program, cKernelPrefix);
+  size_t index = 0;
+  for (; index < buffers.size(); ++index)
+    kernel.setArg(index, buffers[index]); // input buffers
+
+  // FIXME -- split into multiple work groups
+  size_t work_group_size;
+  size_t reduction_length;
+
+  return output_buffer;
+
+  kernel.setArg(index++, sizeof(int) * work_group_size, nullptr);
+  kernel.setArg(index++, output_buffer);
+  kernel.setArg(index++, reduction_length);
+  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(work_group_size)); 
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
+  return output_buffer;
+}
+
+} // namespace details
+} // namespace opencl
+
+#endif
+
 /* --------------------------- OpenCL Meta-Patterns --------------------------- */
 
 namespace opencl {
@@ -1036,21 +1060,21 @@ template <size_t N, size_t Count>
 void UpdateIndices(Indices<0> &, Shape<N> const &, size_t (&)[Count], 
     size_t const * const (&)[Count], size_t = 0) {}
 
-template <size_t M, size_t N, size_t Count>
-void UpdateIndices(Indices<M> &reference_indices, Shape<N> const &shape, size_t (&indices)[Count], 
-    size_t const * const (&strides)[Count], size_t quota_offset = 0)
+template <size_t N, size_t Count>
+void UpdateIndices(Indices<N> &reference_indices, Shape<N> const &shape, size_t (&indices)[Count], 
+    size_t const * const (&strides)[Count])
 {
-  static_assert(M, PANIC_ASSERTION);
-  int dim_index = M - 1;
+  static_assert(N, PANIC_ASSERTION);
+  int dim_index = N - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
     ++reference_indices[dim_index];
     for (size_t i = 0; i < Count; ++i)
-      indices[i] += strides[i][dim_index + quota_offset];
-    if (reference_indices[dim_index] == shape[dim_index + quota_offset]) {
+      indices[i] += strides[i][dim_index];
+    if (reference_indices[dim_index] == shape[dim_index]) {
       reference_indices[dim_index] = 0;
       for (size_t i = 0; i < Count; ++i)
-        indices[i] -= shape[dim_index + quota_offset] * strides[i][dim_index + quota_offset];
+        indices[i] -= shape[dim_index] * strides[i][dim_index];
     } else {
       propogate = false;
     }
@@ -1060,7 +1084,7 @@ void UpdateIndices(Indices<M> &reference_indices, Shape<N> const &shape, size_t 
 
 /** Fills `result` with the elements of `input`, skipping the element at position `Index` */
 template <size_t Index, size_t N>
-void FillExceptForIndex(size_t const (&input)[N], size_t (&result)[N - 1])
+void FillExceptForIndex(size_t const (&input)[N], size_t *result)
 {
   static_assert(N > Index, INDEX_OUT_OF_BOUNDS);
   std::copy_n(input, Index, result);
@@ -1388,6 +1412,9 @@ public:
    */
   size_t operator[](size_t index) const;
 
+  /** Const reference to the underlying size_t array */
+  size_t const (&dimensions() const noexcept)[N] { return dimensions_; }
+
   /* -------------------- Equality -------------------- */
 
   /** `true` iff every dimension is identical */
@@ -1406,7 +1433,8 @@ public:
 
   /* ----------------- Expressions ------------------ */
 
-  template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+  template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, 
+           template <class> class C1, template <class> class C2>
   friend Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2);
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat);
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 1, C_> &vec);
@@ -1552,6 +1580,11 @@ public:
    *  underflow, true o.w.
    */
   bool decrement(Shape<N> const &shape);
+
+  /* ------------------ Print ------------------ */
+
+  template <size_t M>
+  friend std::ostream &operator<<(std::ostream &os, Indices<M> const &indices);
   
 private:
   size_t indices_[N];
@@ -1627,6 +1660,15 @@ template <size_t N>
 Indices<N>::Indices(size_t const (&indices)[N])
 {
   std::copy_n(indices, N, indices_);
+}
+
+template <size_t M>
+std::ostream &operator<<(std::ostream &os, Indices<M> const &indices)
+{
+  os << "I{";
+  for (size_t i = 0; i < M - 1; ++i) os << indices[i] << ", ";
+  os << indices[M - 1] << "}";
+  return os;
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -1924,7 +1966,8 @@ public:
   template <typename RHS>
   Tensor<T, N, C> &operator-=(Expression<RHS> const &rhs);
 
-  template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+  template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, 
+           template <class> class C1, template <class> class C2>
   friend Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2);
 
   template <typename RHS>
@@ -3144,47 +3187,72 @@ Tensor<X, M, C_> hadarmard(Tensor<X, M, C_> const& tensor, Tensors const&... ten
 }
 
 /** Produces a Tensor which is the Tensor product of `tensor_1` and 
- *  `tensor_2`. Tensor multiplication is equivalent to matrix multiplication
- *  scaled to higher dimensions, i.e. shapes 2x3x4 * 4x3x2 -> 2x3x3x2
- *  The inner dimensions of `tensor_1` and `tensor_2` must match, or 
- *  std::logic error is thrown. Note: VERY EXPENSIVE, the time complexity
- *  to produce a N rank() Tensor with all dimensions m is O(m^(N+1)).
+ *  `tensor_2`. The inner dimensions of `tensor_1` and `tensor_2` must match, or 
+ *  std::logic error is thrown. The axis facing the multiplication can
+ *  be given as template arguments: `I1` is the facing axis of the LHS,
+ *  and `I2` of the right hand side. If not specified, I1 is `M1 - 1` and I2 is `0`.
+ *  Tensor multiplication is equivalent to matrix multiplication scaled to higher 
+ *  dimensions, i.e. with I1 = 2, I2 = 0: shapes 2x3x4 * 4x3x2 -> 2x3x3x2
+ *  Note: VERY EXPENSIVE, the time complexity to produce a N rank() Tensor 
+ *  with all dimensions equal to `m` is O(m^(N+1)).
  */
-template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
 Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2)
 {
   static_assert(M1, SCALAR_TENSOR_MULT);
   static_assert(M2, SCALAR_TENSOR_MULT);
-  assert((tensor_1.shape_[M1 - 1] == tensor_2.shape_[0]) && INNER_DIMENSION_MISMATCH);
+  assert((tensor_1.shape_[I1] == tensor_2.shape_[I2]) && INNER_DIMENSION_MISMATCH);
   auto shape = Shape<M1 + M2 - 2>();
-  std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
-  std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
+  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, shape.dimensions_);
+  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, shape.dimensions_ + M1 - 1);
+  //std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
+  //std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
   Tensor<X, M1 + M2 - 2, C1> prod_tensor(shape);
-  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[M1 - 1];
-  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[0];
+  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[I1];
+  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[I2];
   Indices<M1 - 1> reference_indices_1{};
   Indices<M2 - 1> reference_indices_2{};
   size_t index = 0;
+
+  // Set up strides and indices for tensor_1
+  size_t t1_strides[M1 - 1];
+  Shape<M1 - 1> t1_shape{};
+  details::FillExceptForIndex<I1>(tensor_1.strides_, t1_strides);
+  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, t1_shape.dimensions_);
+  size_t const * const t1_strides_array[] = { t1_strides };
   size_t t1_indices[1] = {};
-  size_t const * const t1_strides[] = { tensor_1.strides_ };
+
+  // Set up strides and indices for tensor_2
+  size_t t2_strides[M2 - 1];
+  Shape<M2 - 1> t2_shape{};
+  details::FillExceptForIndex<I2>(tensor_2.strides_, t2_strides);
+  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, t2_shape.dimensions_);
+  size_t const * const t2_strides_array[] = { t2_strides };
+
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
     size_t t2_indices[1] = {};
-    size_t const * const t2_strides[] = { tensor_2.strides_ };
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
       X value {};
-      for (size_t x = 0; x < tensor_1.shape_.dimensions_[M1 - 1]; ++x)
-          value += (*tensor_1.ref_)[tensor_1.offset_ + t1_indices[0] + tensor_1.strides_[M1 - 1] * x] *
-            (*tensor_2.ref_)[tensor_2.offset_ + t2_indices[0] + tensor_2.strides_[0] * x];
+      for (size_t x = 0; x < tensor_1.shape_.dimensions_[I1]; ++x)
+          value += (*tensor_1.ref_)[tensor_1.offset_ + t1_indices[0] + tensor_1.strides_[I1] * x] *
+            (*tensor_2.ref_)[tensor_2.offset_ + t2_indices[0] + tensor_2.strides_[I2] * x];
       (*prod_tensor.ref_)[index] = value;
-      details::UpdateIndices(reference_indices_2, tensor_2.shape(), t2_indices, t2_strides, 1);
+      details::UpdateIndices(reference_indices_2, t2_shape, t2_indices, t2_strides_array);
       ++index;
     }
-    details::UpdateIndices(reference_indices_1, tensor_1.shape(), t1_indices, t1_strides);
+    details::UpdateIndices(reference_indices_1, t1_shape, t1_indices, t1_strides_array);
   }
   return prod_tensor;
 }
 
-/** Eager Tensor multiplication with variable number of tensor arguments */
+/** Tensor multiplication with default axis, (defaults to M1 - 1 facing 0) */
+template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+inline Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2)
+{
+  return mul<M1 - 1, 0>(tensor_1, tensor_2);
+}
+
+/** Tensor multiplication with variable number of tensor arguments */
 template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, 
   template <class> class C2, typename... Tensors, typename = typename std::enable_if<(sizeof...(Tensors) >= 1)>::type>
 auto mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2, Tensors const&... tensors)
@@ -4895,14 +4963,14 @@ inline std::string plus::opencl_reduce(std::string const &accum, std::string con
 }
 
 template <typename... Args>
-static std::string plus::opencl_join(Args const&... args)
+std::string plus::opencl_join(Args const&... args)
 {
-  std::string str{}
+  std::string str{};
   VARDIAC_MAP((str += args + " + "));
   // remove trailing characters
-  str.pop();
-  str.pop();
-  str.pop();
+  str.pop_back();
+  str.pop_back();
+  str.pop_back();
   return str;
 }
 
@@ -6262,7 +6330,8 @@ void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers,
     std::string &arg_list, std::string &expr) const noexcept;
 
 template <size_t... TupleIndices>
-T pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>) const noexcept;
+cl::Buffer pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>, 
+    cl::CommandQueue &cqueue) const noexcept;
 
 cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
@@ -6358,14 +6427,12 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 #ifdef _ENABLE_OPENCL
 
 template <typename T, typename Function, typename... Exprs>
-void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &, 
+void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list, std::string &expr) const noexcept
 {
   buffers.push_back(pOpenCLBufferExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{}));
+      sizeof...(Exprs)>::sequence{}, cqueue));
   
-  // FIXME
-
   // add the new scalar to the argument list and the expression
   size_t arg_index = buffers.size() - 1;
 
@@ -6378,14 +6445,15 @@ void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &,
 
 template <typename T, typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>) const noexcept
+cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>,
+    cl::CommandQueue &cqueue) const noexcept
 {
   using namespace opencl::details; // WARNING -- using namespace
   auto const& shape = std::get<0>(exprs_).shape();
   cl::Buffer buffers[sizeof...(Exprs)];
   VARDIAC_MAP(assert(shape() == std::get<TupleIndices>(exprs_).shape() && SHAPE_MISMATCH));
   VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(std::get<TupleIndices>(exprs_)));
-   
+  return CreateReductionKernel<TupleIndices..., T, Function, Exprs...>(cqueue, buffers);
 }
 
 template <typename T, typename Function, typename... Exprs>
