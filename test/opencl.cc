@@ -14,8 +14,9 @@ int main(int argc, char **argv)
   Matrix<float> mat2({10, 10}, -10); 
   //Matrix<int> mat_ =  _reduce(0, [](int &x, int y) { x += y; }, mat).opencl();
   //Matrix<float> mat_ = (mat1 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2 + mat1 - mat2).opencl();
-  Matrix<float> mat_ = _map(math::tan{}, _map(math::sin{}, (_map(math::cos{}, mat1)))).opencl();
+  //Matrix<float> mat_ = _map(math::tan{}, _map(math::sin{}, (_map(math::cos{}, mat1)))).opencl();
   //Matrix<float> mat_ = _map(math::min{}, mat1, -mat2).opencl();
   //Matrix<float> mat_ = (mat1 + mat2).opencl();
-  cout << mat_ << endl;
+  /* Scalar<float> scalar = */ _reduce(0.0f, math::plus{}, mat1).opencl();
+  //cout << mat_ << endl;
 }

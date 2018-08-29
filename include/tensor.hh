@@ -944,16 +944,16 @@ cl::Buffer CreateBuffer(NodeType const& node)
   std::vector<cl::Buffer> buffers{};
   std::string cl_arg_list{};
   std::string cl_expr{};
-  node.pOpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
-  return node.pOpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
+  node.OpenCLBuffer(cqueue, buffers, cl_arg_list, cl_expr);
+  return node.OpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
-/** Creates the code, as a std::string, for a reduction kernel */
-template <size_t... Indices, typename ReturnType, typename Function, typename... Exprs>
-std::string CreateReductionKernelCode()
+/** Returns the OpenCL code, as std::string, for a reduction kernel */
+template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
+std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
 {
   std::string kernel_code =
-      std::string(cKernelIdentifier) + cVoidType + " " + cKernelPrefix + "(";
+      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
 
   // The kernel recieves n + 4 arguments, the first n of which are input buffers
   // that will be joined, n + 1 argument is a local buffer which is reduced, 
@@ -967,51 +967,50 @@ std::string CreateReductionKernelCode()
       + std::to_string(Indices) + ", "));
   
   kernel_code +=
-    std::string(cGlobalIdentifier) + " " +  + cPointerIdentifier
-  + OpenCLType<ReturnType>::value + ", " + cLocalIdentifier + " "
+    std::string(cLocalIdentifier) + " "
   + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
-  + ", " + cGlobalIdentifier + " " + cPointerIdentifier + cOutputName
-  + ", " + cSizeTType + " " + cReductionSize + ", " + OpenCLType<ReturnType>::value
-  + " " + " " + cInitialValueName + ") {\n";
+  + ", " + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
+  + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " 
+  + OpenCLType<ReturnType>::value + " " + cInitialValueName + ") {\n";
 
   kernel_code +=
-    std::string("\t") + cSizeTType + cGlobalIdName + " = " + cGlobalIdFunction 
-  + "(0);\n" + "\t" + cSizeTType + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
-  + "\t" + cSizeTType + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
-  + "\t" + cSizeTType + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
+    std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
+  + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
 
   kernel_code +=
     std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
   + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
         "[" + cGlobalIdName + "]")...) + ";\n";
 
-
   kernel_code +=
-    std::string(cBarrierFunction) + "(" + cLocalMemFence + ");"
+    std::string("\t") + cBarrierFunction + "(" + cLocalMemFence + ");\n"
   + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
   + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
-  + " >>= 1)\n {"
+  + " >>= 1) {\n"
   + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
-  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + " ) {\n"
+  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + ")\n"
   + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
       + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
       + " + " + cForPrefix + " ]") + ";\n"
-  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");"
-  + "}\n"
+  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");\n"
+  + "\t}\n"
   + "\tif (" + cLocalIdName + " == 0)\n"
   + "\t\t" + cOutputName + "[" + cGroupIdName + "] + " + cInitialValueName + ";\n"
-  + "\n";
+  + "}\n";
   
   // FIXME
   PRINTV(kernel_code);
   return kernel_code;
 }
 
-template <size_t... Indices, typename ReturnType, typename Function, typename... Exprs>
-cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)])
+template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
+cl::Buffer CreateReductionKernel(meta::Sequence<Indices...> sequence,
+    cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)])
 {
-  std::string kernel_code = CreateReductionKernelCode<Indices..., ReturnType,
-    Function, Exprs...>();
+  std::string kernel_code = CreateReductionKernelCode<ReturnType,
+    Function, Exprs...>(sequence);
   cl_int err = 0;
   cl::Buffer output_buffer(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY 
       | CL_MEM_ALLOC_HOST_PTR, sizeof(ReturnType), nullptr, &err);
@@ -1022,7 +1021,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue, cl::Buffer (&buffers)
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
   cl::Kernel kernel(program, cKernelPrefix);
   size_t index = 0;
-  for (; index < buffers.size(); ++index)
+  for (; index < sizeof...(Indices); ++index)
     kernel.setArg(index, buffers[index]); // input buffers
 
   // FIXME -- split into multiple work groups
@@ -1722,18 +1721,23 @@ public:
   /* ------------------ Constructors ------------------ */
 
   /** Creates a Tensor with dimensions described by `dimensions`.
-   *  Elements are zero initialized. Note: dimensions index from 1.
+   *  Elements are zero initialized. Note: dimensions index from 0.
    */
   explicit Tensor(std::initializer_list<size_t> dimensions);
 
   /** Creates a Tensor with dimensions described by `dimensions`.
-   *  Elements are copy initialized to value. Note: dimensions index from 1.
+   *  Elements are zero initialized. Note: dimensions index from 0.
+   */
+  explicit Tensor(size_t const (&dimensions)[N]);
+
+  /** Creates a Tensor with dimensions described by `dimensions`.
+   *  Elements are copy initialized to value. Note: dimensions index from 0.
    */
   Tensor(size_t const (&dimensions)[N], T const &value);
 
   /** Creates a Tensor with dimensions described by `dimensions`.
-   *  Elements are copy initialized to the values returned by `factory(args...)`
-   *  Note: dimensions index from 1.
+   *  Values returned by `factory(args...)` are forwarded to the elements in the Tensor
+   *  Note: dimensions index from 0.
    */
   template <typename FunctionType, typename... Arguments>
   Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args);
@@ -1746,18 +1750,18 @@ public:
   Tensor(CArrayProxy<Array> &&md_array);
 
   /** Creates a Tensor with dimensions described by `shape`.
-   *  Elements are zero initialized. Note: dimensions index from 1.
+   *  Elements are zero initialized. Note: dimensions index from 0.
    */
-  explicit Tensor(Shape<N> const &shape);
+  explicit Tensor(Shape<N> const &shape): Tensor(shape.dimensions_) {}
 
   /** Creates a Tensor with dimensions described by `shape`.
-   *  Elements are copy initialized to value. Note: dimensions index from 1.
+   *  Elements are copy initialized to value. Note: dimensions index from 0.
    */
   Tensor(Shape<N> const &shape, T const &value): Tensor(shape.dimensions_, value) {}
 
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are copy initialized to the values returned by `factory`
-   *  Note: dimensions index from 1.
+   *  Note: dimensions index from 0.
    */
   template <typename FunctionType, typename... Arguments>
   Tensor(Shape<N> const &shape, std::function<FunctionType> &f, Arguments&&... args)
@@ -1771,7 +1775,7 @@ public:
   Tensor(Tensor<U, N, C_> const &tensor); 
 
   /** Move construction, takes ownership of underlying data, `tensor` is destroyed */
-  Tensor(Tensor<T, N, C> &&tensor); 
+  Tensor(Tensor<T, N, C> &&tensor) noexcept; 
 
   /** Constructs a reference to the `proxy` tensor. The tensors share 
    *  the same underyling data, so changes will affect both tensors.
@@ -1787,6 +1791,14 @@ public:
   /** Constructs the tensor using the result from an OpenCL computation */
   template <typename NodeType>
   Tensor(opencl::Model<NodeType> const &model);
+
+  void OpenCLBuffer(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
   /* ------------------- Destructor ------------------- */
@@ -1844,6 +1856,22 @@ public:
   /** used to implement const_iterator-> */
   Tensor const *operator->() const { return this; } 
 
+  /** Returns a reference to the element at position `indices` */
+  T const &get(Indices<N> const &indices) const noexcept;
+
+  /* -------------------- Setters -------------------- */
+
+  /** Elements of `*this` are copy assigned by dereferencing from [`begin`, `end`) 
+   *  The number of elements between [`begin`, `end`) must be equivalent 
+   *  to the number of elements in the Tensor, or an assertion will fail.
+   */
+  template <typename It>
+  void assign(It begin, It const &end);
+
+  /** Forwards valye to the element at position `indices` */
+  template <typename U>
+  void set(Indices<N> const &indices, U&& value); 
+
   /* ------------------ Access To Data ----------------- */
 
   template <typename... Args>
@@ -1893,8 +1921,6 @@ public:
   template <size_t M,
       typename = typename std::enable_if<N == M>::type>
   T const &operator[](Indices<M> const &indices) const;
-
-  T const &get(Indices<N> const &indices) const;
 
   /** Slices denotate the dimensions which are left free, while indices
    *  fix the remaining dimensions at the specified index. I.e. calling
@@ -1952,16 +1978,8 @@ public:
   friend auto elemwise(FunctionType &&fn, Tensors&&... tensors)
     -> typename FirstTensor<Tensors...>::type;
 
-  template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-  friend Tensor<X, M, C1> add(
-      Tensor<X, M, C1> const& tensor_1, 
-      Tensor<Y, M, C2> const& tensor_2);
-
   template <typename RHS>
   Tensor<T, N, C> &operator+=(Expression<RHS> const &rhs);
-
-  template <typename X, typename Y, size_t M, template <class> class C_>
-  friend Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor_1, Tensor<Y, M, C_> const& tensor_2);
 
   template <typename RHS>
   Tensor<T, N, C> &operator-=(Expression<RHS> const &rhs);
@@ -2306,18 +2324,6 @@ private:
   friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
       FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors);
 
-  /* ------------------- OpenCL --------------------- */
-
-#ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-#endif 
-
   /* ------------------ Utility --------------------- */
 
   // Copy the dimensions of a C-array `Array` into `dimensions`
@@ -2379,6 +2385,19 @@ Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions)
 }
 
 template <typename T, size_t N, template <class> class C> 
+Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
+  : shape_(Shape<N>(dimensions)), offset_(0),
+  ref_(std::make_shared<C<T>>(shape_.index_product())) 
+{ 
+#ifdef _TEST
+ ++eDebugConstructorCounter;
+#endif
+  for (size_t i = 0; i < N; ++i)
+    assert(dimensions[i] && ZERO_ELEMENT); 
+  pInitializeStrides(); 
+}
+
+template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
   : shape_(Shape<N>(dimensions)), offset_(0) 
 { 
@@ -2428,17 +2447,6 @@ Tensor<T, N, C>::Tensor(CArrayProxy<Array> &&md_array): offset_(0)
 }
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(Shape<N> const &shape)
-   : shape_(shape), offset_(0), 
-   ref_(std::make_shared<C<T>>(shape_.index_product())) 
-{ 
-#ifdef _TEST
- ++eDebugConstructorCounter;
-#endif
-  pInitializeStrides(); 
-}
-
-template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
    : shape_(tensor.shape_), offset_(0) 
 {
@@ -2478,7 +2486,7 @@ Tensor<T, N, C>::Tensor(Tensor<U, N, C_> const &tensor)
 }
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(Tensor<T, N, C> &&tensor) 
+Tensor<T, N, C>::Tensor(Tensor<T, N, C> &&tensor) noexcept
   : shape_(tensor.shape_), offset_(tensor.offset_),
     ref_(std::move(tensor.ref_)) 
 {
@@ -2630,6 +2638,47 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(NoAliasProxy<NodeType> const &rhs)
   return *this;
 }
 
+/* ------------------------------- Getters ------------------------------- */
+
+template <typename T, size_t N, template <class> class C>
+T const &Tensor<T, N, C>::get(Indices<N> const &indices) const noexcept
+{
+  size_t cumul_index = 0;
+  for (size_t i = 0; i < N; ++i)
+    cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+  return (*static_cast<C<T> const*>(ref_.get()))[cumul_index + offset_];
+}
+
+/* ------------------------------- Setters ------------------------------- */
+
+template <typename T, size_t N, template <class> class C>
+template <typename It>
+void Tensor<T, N, C>::assign(It begin, It const &end)
+{
+  auto diff = std::distance(begin, end);
+  size_t cumul = shape_.index_product();
+  assert((diff > 0 && cumul == diff) &&  ELEMENT_COUNT_MISMATCH);
+  Indices<N> reference_indices{};
+  size_t indices[1] = {};
+  size_t const * const strides[1] = { strides_ };
+  for (size_t i = 0; i < shape_.index_product(); ++i) {
+    ref_->set(indices[0] + offset_, *(begin++));
+    details::UpdateIndices(reference_indices, this->shape_, indices, strides);
+  }
+}
+
+template <typename T, size_t N, template <class> class C>
+template <typename U>
+void Tensor<T, N, C>::set(Indices<N> const &indices, U&& value)
+{
+  size_t cumul_index = 0;
+  for (size_t i = 0; i < N; ++i)
+    cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+  ref_->set(cumul_index + offset_, std::forward<U>(value));
+}
+
+/* ------------------------------- Access ------------------------------- */
+
 template <typename T, size_t N, template <class> class C>
 template <typename... Args>
 Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
@@ -2735,15 +2784,6 @@ void Set(Tensor<U, M, C_> &tensor, Indices<M> const &indices, U&& value)
   for (size_t i = 0; i < M; ++i)
     cumul_index += tensor.strides_[M - i - 1] * indices[M - i - 1];
   tensor.ref_->set(cumul_index, std::forward<U>(value));
-}
-
-template <typename T, size_t N, template <class> class C>
-T const &Tensor<T, N, C>::get(Indices<N> const &indices) const
-{
-  size_t cumul_index = 0;
-  for (size_t i = 0; i < N; ++i)
-    cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-  return (*static_cast<C<T> const*>(ref_.get()))[cumul_index + offset_];
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3006,7 +3046,7 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t const *strides, size_t 
 #ifdef _ENABLE_OPENCL
 
 template <typename T, size_t N, template <class> class C>
-void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue&, 
+void Tensor<T, N, C>::OpenCLBuffer(cl::CommandQueue&, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -3043,7 +3083,7 @@ void Tensor<T, N, C>::pOpenCLBuffer(cl::CommandQueue&,
 }
 
 template <typename T, size_t N, template <class> class C>
-cl::Buffer Tensor<T, N, C>::pOpenCLKernel(cl::CommandQueue&, 
+cl::Buffer Tensor<T, N, C>::OpenCLKernel(cl::CommandQueue&, 
       std::vector<cl::Buffer> &buffers, std::string&,
       std::string&) const noexcept
 {
@@ -3110,6 +3150,30 @@ Tensor<X, M, C_> add(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
   return sum_tensor;
 }
 
+/** The elements of `tensor1` are assigned the elementwise sum of `tensor_1`
+ *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+ *  an assertion will fail during debug.
+ */
+template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
+void Add(Tensor<X, M, C1> &tensor_1, Tensor<Y, M, C2> const& tensor_2)
+{
+  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
+  auto elemwise_add = [](X &x, Y const &y) -> void {
+    x += y;
+  };
+  Map(elemwise_add, tensor_1, tensor_2);
+}
+
+/** Inplace addition with a variable amount of arguments */
+template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
+          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
+void Add(Tensor<X, M, C_> &tensor, Tensors const&... tensors)
+{
+  auto const &shape = tensor.shape();
+  VARDIAC_MAP(assert(shape = tensors.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(Add(tensor, tensors));
+}
+
 template <typename T, size_t N, template <class> class C>
 template <typename RHS>
 Tensor<T, N, C> &Tensor<T, N, C>::operator+=(Expression<RHS> const &rhs)
@@ -3124,11 +3188,11 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator+=(Expression<RHS> const &rhs)
  *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
  *  an assertion will fail during debug.
  */
-template <typename X, typename Y, size_t M, template <class> class C_>
-Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor_1, Tensor<Y, M, C_> const& tensor_2)
+template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
+Tensor<X, M, C1> sub(Tensor<X, M, C1> const& tensor_1, Tensor<Y, M, C2> const& tensor_2)
 {
   assert(tensor_1.shape() == tensor_2.shape() && DIMENSION_MISMATCH);
-  Tensor<X, M, C_> diff_tensor(tensor_1.shape());
+  Tensor<X, M, C1> diff_tensor(tensor_1.shape());
   auto elemwise_sub = [](X &x, X const &y, Y const &z) -> void {
     x = y - z;
   };
@@ -3147,6 +3211,30 @@ Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
   VARDIAC_MAP(assert(diff_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
   VARDIAC_MAP(diff_tensor = sub(diff_tensor, tensors));
   return diff_tensor;
+}
+
+/** The elements of `tensor1` are assigned the elementwise sum of `tensor_1`
+ *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+ *  an assertion will fail during debug.
+ */
+template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
+void Sub(Tensor<X, M, C1> &tensor_1, Tensor<Y, M, C2> const& tensor_2)
+{
+  assert(tensor_1.shape() == tensor_2.shape() && DIMENSION_MISMATCH);
+  auto elemwise_sub = [](X &x, Y const &y) -> void {
+    x -= y;
+  };
+  Map(elemwise_sub, tensor_1, tensor_2);
+}
+
+/** Inplace addition with a variable amount of arguments */
+template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
+          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
+Tensor<X, M, C_> Sub(Tensor<X, M, C_> &tensor, Tensors const&... tensors)
+{
+  auto const &shape = tensor.shape();
+  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(Sub(tensor, tensors));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5091,8 +5179,8 @@ Model<NodeType>::Model(Expression<NodeType> const &expr)
   std::vector<cl::Buffer> buffers{};
   std::string cl_arg_list{};
   std::string cl_expr{};
-  node_.pOpenCLBuffer(cqueue_, buffers, cl_arg_list, cl_expr);
-  buffer_ = node_.pOpenCLKernel(cqueue_, buffers, cl_arg_list, cl_expr);
+  node_.OpenCLBuffer(cqueue_, buffers, cl_arg_list, cl_expr);
+  buffer_ = node_.OpenCLKernel(cqueue_, buffers, cl_arg_list, cl_expr);
 }
 
 template <typename NodeType>
@@ -5167,6 +5255,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+  void OpenCLBuffer(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -5175,18 +5270,6 @@ private:
 
   BinaryAddExpr(LHS const &lhs, RHS const &rhs);
   BinaryAddExpr(BinaryAddExpr<LHS, RHS> const&) = default;
-
-  /* ----------------- OpenCL ----------------- */
-
-#ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-#endif
 
   /* ------------------ Data ------------------ */
 
@@ -5260,17 +5343,17 @@ BinaryAddExpr<LHS, RHS>::BinaryAddExpr(LHS const &lhs, RHS const &rhs)
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-void BinaryAddExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+void BinaryAddExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
-  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  lhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
   expr += std::string(" ") + opencl::details::cAddOperator + " ";
-  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  rhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryAddExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+cl::Buffer BinaryAddExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -5348,6 +5431,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+
+  void OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -5356,17 +5446,6 @@ private:
 
   BinarySubExpr(LHS const &lhs, RHS const &rhs);
   BinarySubExpr(BinarySubExpr<LHS, RHS> const&) = default;
-
-  /* ----------------- OpenCL ----------------- */
-
-#ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list, std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-#endif
 
   /* ------------------ Data ------------------ */
 
@@ -5432,17 +5511,17 @@ auto BinarySubExpr<LHS, RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-void BinarySubExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+void BinarySubExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
-  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  lhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
   expr += std::string(" ") + opencl::details::cSubOperator + " ";
-  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  rhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinarySubExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+cl::Buffer BinarySubExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -5832,6 +5911,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+
+  void OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -5840,17 +5926,6 @@ private:
 
   BinaryHadExpr(LHS const &lhs, RHS const &rhs);
   BinaryHadExpr(BinaryHadExpr<LHS, RHS> const&) = default;
-
-  /* ----------------- OpenCL ----------------- */
-
-#ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list, std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-#endif
 
   /* ------------------ Data ------------------ */
 
@@ -5927,17 +6002,17 @@ BinaryHadExpr<LHS, RHS>::BinaryHadExpr(LHS const &lhs, RHS const &rhs)
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-void BinaryHadExpr<LHS, RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+void BinaryHadExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
-  lhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  lhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
   expr += std::string(" ") + opencl::details::cMulOperator + " ";
-  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  rhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryHadExpr<LHS, RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+cl::Buffer BinaryHadExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -6013,6 +6088,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+  
+  void OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -6063,16 +6145,9 @@ private:
   /* ---------------------------- OpenCL ---------------------------- */
 
 #ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list, std::string &expr) const noexcept;
-
   template <size_t... TupleIndices>
   void pOpenCLBufferTupleExpansion(meta::Sequence<TupleIndices...>, 
       cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list, 
-      std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
       std::string &expr) const noexcept;
 #endif
 
@@ -6227,7 +6302,7 @@ typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
 #ifdef _ENABLE_OPENCL
 
 template <typename Function, typename... Exprs>
-void MapExpr<Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+void MapExpr<Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
     std::string &arg_list, std::string &expr) const noexcept
 {
   static_assert(sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
@@ -6243,14 +6318,14 @@ void MapExpr<Function, Exprs...>::pOpenCLBufferTupleExpansion(meta::Sequence<Tup
     cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list, 
     std::string &expr) const noexcept
 {
-  VARDIAC_MAP((std::get<TupleIndices>(exprs_).pOpenCLBuffer(cqueue, buffers, arg_list, expr), expr += ", "));
+  VARDIAC_MAP((std::get<TupleIndices>(exprs_).OpenCLBuffer(cqueue, buffers, arg_list, expr), expr += ", "));
   // Remove the last ", "
   expr.pop_back();
   expr.pop_back();
 }
 
 template <typename Function, typename... Exprs>
-cl::Buffer MapExpr<Function, Exprs...>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+cl::Buffer MapExpr<Function, Exprs...>::OpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
@@ -6309,6 +6384,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+
+  void OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -6326,16 +6408,9 @@ private:
   /* --------------------------- OpenCL ----------------------------- */
 
 #ifdef _ENABLE_OPENCL
-void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-    std::string &arg_list, std::string &expr) const noexcept;
-
-template <size_t... TupleIndices>
-cl::Buffer pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>, 
-    cl::CommandQueue &cqueue) const noexcept;
-
-cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept;
+  template <size_t... TupleIndices>
+  cl::Buffer pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>, 
+      cl::CommandQueue &cqueue) const noexcept;
 #endif
 
   /* ---------------------------- Data ------------------------------ */
@@ -6427,7 +6502,7 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 #ifdef _ENABLE_OPENCL
 
 template <typename T, typename Function, typename... Exprs>
-void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue, 
+void ReduceExpr<T, Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list, std::string &expr) const noexcept
 {
   buffers.push_back(pOpenCLBufferExpansion(typename meta::MakeIndexSequence<0, 
@@ -6445,19 +6520,19 @@ void ReduceExpr<T, Function, Exprs...>::pOpenCLBuffer(cl::CommandQueue &cqueue,
 
 template <typename T, typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...>,
+cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Sequence<TupleIndices...> sequence,
     cl::CommandQueue &cqueue) const noexcept
 {
   using namespace opencl::details; // WARNING -- using namespace
   auto const& shape = std::get<0>(exprs_).shape();
   cl::Buffer buffers[sizeof...(Exprs)];
-  VARDIAC_MAP(assert(shape() == std::get<TupleIndices>(exprs_).shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(assert(shape == std::get<TupleIndices>(exprs_).shape() && SHAPE_MISMATCH));
   VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(std::get<TupleIndices>(exprs_)));
-  return CreateReductionKernel<TupleIndices..., T, Function, Exprs...>(cqueue, buffers);
+  return CreateReductionKernel<T, Function, Exprs...>(sequence, cqueue, buffers);
 }
 
 template <typename T, typename Function, typename... Exprs>
-cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLKernel(cl::CommandQueue &, 
+cl::Buffer ReduceExpr<T, Function, Exprs...>::OpenCLKernel(cl::CommandQueue &, 
     std::vector<cl::Buffer> &buffers, std::string &, std::string &) const noexcept
 {
   return buffers.back();
@@ -6522,6 +6597,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+
+  void OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list, std::string &expr) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
 #endif
 
 private:
@@ -6530,17 +6612,6 @@ private:
 
   UnaryNegExpr(RHS const &rhs);
   UnaryNegExpr(UnaryNegExpr<RHS> const&) = default;
-
-  /* ---------------- OpenCL ----------------- */
-
-#ifdef _ENABLE_OPENCL
-  void pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list, std::string &expr) const noexcept;
-
-  cl::Buffer pOpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
-#endif
 
   /* ------------------ Data ------------------ */
 
@@ -6608,15 +6679,15 @@ auto UnaryNegExpr<RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename RHS>
-void UnaryNegExpr<RHS>::pOpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+void UnaryNegExpr<RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
     std::string &arg_list, std::string &expr) const noexcept
 {
   expr += "-";
-  rhs_.pOpenCLBuffer(cqueue, buffers, arg_list, expr);
+  rhs_.OpenCLBuffer(cqueue, buffers, arg_list, expr);
 }
 
 template <typename RHS>
-cl::Buffer UnaryNegExpr<RHS>::pOpenCLKernel(cl::CommandQueue &cqueue, 
+cl::Buffer UnaryNegExpr<RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list,
     std::string &expr) const noexcept
 {
