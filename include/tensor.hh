@@ -738,6 +738,98 @@ struct RankSum<> {
 
 } // namespace meta
 
+namespace details {
+
+template <size_t N, size_t Count>
+void UpdateIndices(Indices<0> &, Shape<N> const &, size_t (&)[Count], 
+    size_t const * const (&)[Count], size_t = 0) {}
+
+template <size_t N, size_t Count>
+void UpdateIndices(Indices<N> &reference_indices, Shape<N> const &shape, size_t (&indices)[Count], 
+    size_t const * const (&strides)[Count])
+{
+  static_assert(N, PANIC_ASSERTION);
+  int dim_index = N - 1;
+  bool propogate = true;
+  while (dim_index >= 0 && propogate) {
+    ++reference_indices[dim_index];
+    for (size_t i = 0; i < Count; ++i)
+      indices[i] += strides[i][dim_index];
+    if (reference_indices[dim_index] == shape[dim_index]) {
+      reference_indices[dim_index] = 0;
+      for (size_t i = 0; i < Count; ++i)
+        indices[i] -= shape[dim_index] * strides[i][dim_index];
+    } else {
+      propogate = false;
+    }
+    --dim_index;
+  }
+}
+
+/** Fills `result` with the elements of `input`, skipping the element at position `Index` */
+template <size_t Index, size_t N>
+void FillExceptForIndex(size_t const (&input)[N], size_t *result)
+{
+  static_assert(N > Index, INDEX_OUT_OF_BOUNDS);
+  std::copy_n(input, Index, result);
+  std::copy_n(input + Index + 1, N - Index - 1, result + Index);
+}
+
+/** Bit twiddle to get the nearest power of 2 larger than `x` */
+inline size_t NextPowerOfTwo(size_t x) 
+{
+  static_assert(sizeof(x) == 4 || sizeof(x) == 8, PANIC_ASSERTION);
+  x--;
+  x |= x >> 1;
+  x |= x >> 2;
+  x |= x >> 4;
+  x |= x >> 8;
+  x |= x >> 16;
+  if (sizeof(size_t) == 8)
+    x |= x >> 32;
+  return x + 1;
+}
+
+/* ------- Expansion for methods which take Tensors...  --------- */
+
+template <typename NodeType, typename... Tensors>
+Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Tensors const&...)
+{
+  return expr.self().shape();
+}
+
+template <typename FunctionType, size_t... I, typename... Tensors>
+inline void MapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
+{
+  fn(tensors.pGet(indices, I)...);
+}
+
+template <typename U, typename FunctionType, size_t... I, typename... Tensors>
+inline void ReduceForwardSequence(U &ret_val, FunctionType &&fn, size_t *indices, 
+    meta::Sequence<I...>, Tensors const&... tensors)
+{
+  ret_val = fn(ret_val, tensors.pGet(indices, I)...);
+}
+
+template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
+inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
+    FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors)
+{
+  tensor.pSet(index, fn(tensors.pGet(indices, I)...));
+}
+
+} // namespace details
+
+/* --------------------------- OpenCL Meta-Patterns --------------------------- */
+
+namespace opencl {
+namespace meta {
+
+// FIXME
+
+} // namespace meta
+} // namespace opencl
+
 /* ------------------------------ OpenCL ------------------------------ */
 
 #ifdef _ENABLE_OPENCL
@@ -845,6 +937,7 @@ constexpr char cFunctionPrefix[]     = "f";
 constexpr char cKernelPrefix[]       = "k";
 constexpr char cLocalPrefix[]        = "l";
 constexpr char cForPrefix[]          = "i";
+constexpr char cPointerOffsetPrefix[]  = "ptr_offset";
 
 // Variable names
 constexpr char cGlobalIdName[]       = "global_id";
@@ -854,6 +947,7 @@ constexpr char cLocalSizeName[]      = "local_size";
 constexpr char cOutputName[]         = "o";
 constexpr char cInitialValueName[]   = "ival";
 constexpr char cReductionSize[]      = "N";
+constexpr char cWorkGroupSize[]      = "WGS";
 constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
 
 // Thread ID functions
@@ -948,23 +1042,20 @@ cl::Buffer CreateBuffer(NodeType const& node)
   return node.OpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
-/** Returns the OpenCL code, as std::string, for a reduction kernel */
-template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
-std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
+/** Returns the OpenCL code, as std::string, for a reduction kernel with one input  */
+template <typename ReturnType, typename Function> 
+std::string CreateBasicReductionKernelCode()
 {
   std::string kernel_code =
       std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
 
-  // The kernel recieves n + 4 arguments, the first n of which are input buffers
-  // that will be joined, n + 1 argument is a local buffer which is reduced, 
-  // the n + 2 argument is an output buffer which stores the result of the reduction,
-  // the n + 3 argument is the size of half of the reduction group, the n + 4
-  // argument is the initial value which is added to the output buffer at the end
+  // The kernel's 1st argument is the input buffer, and the 2nd argument a local buffer,
+  // 3rd argument is an output buffer which stores the result of the reduction,
+  // 4th argument is the size of half of the reduction group.
     
-  VARDIAC_MAP((kernel_code +=
-      std::string(cGlobalIdentifier) + " " + OpenCLType<typename Exprs::value_t>::value 
-      + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
-      + std::to_string(Indices) + ", "));
+  kernel_code +=
+    std::string(cGlobalIdentifier) + " " + OpenCLType<ReturnType>::value 
+  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + ", ";
   
   kernel_code +=
     std::string(cLocalIdentifier) + " "
@@ -981,8 +1072,7 @@ std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
 
   kernel_code +=
     std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
-  + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
-        "[" + cGlobalIdName + "]")...) + ";\n";
+  + cVariablePrefix + "[" + cGlobalIdName + "];\n";
 
   kernel_code +=
     std::string("\t") + cBarrierFunction + "(" + cLocalMemFence + ");\n"
@@ -997,128 +1087,160 @@ std::string CreateReductionKernelCode(meta::Sequence<Indices...>)
   + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");\n"
   + "\t}\n"
   + "\tif (" + cLocalIdName + " == 0)\n"
-  + "\t\t" + cOutputName + "[" + cGroupIdName + "] + " + cInitialValueName + ";\n"
-  + "}\n";
+  + "\t\t" + cOutputName + "[" + cGroupIdName + "] = " + cLocalPrefix + "[0] + "
+  + cInitialValueName + ";\n" + "}\n";
   
   // FIXME
   PRINTV(kernel_code);
   return kernel_code;
 }
 
+/** Returns the OpenCL code, as std::string, for a reduction kernel */
 template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
-cl::Buffer CreateReductionKernel(meta::Sequence<Indices...> sequence,
-    cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)])
+std::string CreateReductionKernelCode(tensor::meta::Sequence<Indices...>)
 {
-  std::string kernel_code = CreateReductionKernelCode<ReturnType,
-    Function, Exprs...>(sequence);
+  std::string kernel_code =
+      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
+
+  // The kernel recieves n + 5 arguments, the first n of which are input buffers
+  // that will be joined, n + 1 argument is a local buffer which is reduced, 
+  // the n + 2 argument is an output buffer which stores the result of the reduction,
+  // the n + 3 argument is the size of half of the reduction group, the n + 4
+  // argument is the initial value which is added to the output buffer at the end
+  // the n + 5 argument is the pointer offset
+    
+  VARDIAC_MAP((kernel_code +=
+      std::string(cGlobalIdentifier) + " " + OpenCLType<typename Exprs::value_t>::value 
+      + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
+      + std::to_string(Indices) + ", "));
+  
+  kernel_code +=
+    std::string(cLocalIdentifier) + " "
+  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
+  + ", " + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
+  + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " 
+  + OpenCLType<ReturnType>::value + " " + cInitialValueName + ", "
+  + cSizeTType + " " + cPointerOffsetPrefix + ") {\n";
+
+  kernel_code +=
+    std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
+  + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n"
+  + "\t#define " + cWorkGroupSize + " 0\n";
+
+  kernel_code +=
+    std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
+  + Function::opencl_join((cVariablePrefix + std::to_string(Indices) +
+        "[" + cGlobalIdName + /* " +  " + cPointerOffsetPrefix + " * " + cWorkGroupSize 
+        + */ "]")...) + ";\n";
+
+  kernel_code +=
+    std::string("\t") + cBarrierFunction + "(" + cLocalMemFence + ");\n"
+  + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
+  + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
+  + " >>= 1) {\n"
+  + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
+  + cForPrefix + " + " + cLocalIdName + " < " + cReductionSize + ")\n"
+  + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
+      + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
+      + " + " + cForPrefix + " ]") + ";\n"
+  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");\n"
+  + "\t}\n"
+  + "\tif (" + cLocalIdName + " == 0)\n"
+  + "\t\t" + cOutputName + "[" + cGroupIdName + /* " + " + cPointerOffsetPrefix + */ "] = "
+  + cLocalPrefix + "[0] + " + cInitialValueName + ";\n" + "}\n";
+  
+  // FIXME
+  PRINTV(kernel_code);
+  return kernel_code;
+}
+
+
+template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
+cl::Buffer CreateReductionKernel(tensor::meta::Sequence<Indices...> sequence,
+    cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)], size_t cumul)
+{
+  std::string kernel_code = CreateReductionKernelCode<ReturnType, Function, Exprs...>(sequence);
+  std::string basic_kernel_code = CreateBasicReductionKernelCode<ReturnType, Function>();
   cl_int err = 0;
-  cl::Buffer output_buffer(CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY 
-      | CL_MEM_ALLOC_HOST_PTR, sizeof(ReturnType), nullptr, &err);
-  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
-  cl::Program::Sources sources({ kernel_code });
+  PRINTV(Info::v().device().getInfo<CL_DEVICE_NAME>());
+  cl::Program::Sources sources({ 
+      R"(
+      kernel void k(global int const *v, local int *l, global int *o, size_t N) {
+        l[get_local_id(0)] = v[get_global_id(0)];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (size_t i = N; i > 0; i >>= 1) {
+          if (get_local_id(0) < i && i + get_local_id(0) < get_local_size(0)) {
+            l[get_local_id(0)] += l[get_local_id(0) + i ];
+            barrier(CLK_LOCAL_MEM_FENCE);
+          }
+        }
+        if (get_local_id(0) == 0)
+          o[get_group_id(0)] = l[0];
+      }
+    )"});
   cl::Program program(Info::v().context(), sources);
   err = program.build({ Info::v().device() });
-  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
   cl::Kernel kernel(program, cKernelPrefix);
+
+  size_t kernel_work_group_size = kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
+  PRINTV(kernel_work_group_size);
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+
+
+  size_t num_work_groups = cumul / kernel_work_group_size;
+  size_t last_group_size = cumul % kernel_work_group_size;
+
+  size_t work_group_size = std::max(kernel_work_group_size, last_group_size);
+  size_t reduction_length = tensor::details::NextPowerOfTwo(last_group_size) >> 1;
+  cl::Buffer middle_buffer(CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY 
+      | CL_MEM_ALLOC_HOST_PTR, num_work_groups * sizeof(ReturnType), nullptr, &err);
+  assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+
   size_t index = 0;
   for (; index < sizeof...(Indices); ++index)
     kernel.setArg(index, buffers[index]); // input buffers
 
-  // FIXME -- split into multiple work groups
-  size_t work_group_size;
-  size_t reduction_length;
-
-  return output_buffer;
-
   kernel.setArg(index++, sizeof(int) * work_group_size, nullptr);
-  kernel.setArg(index++, output_buffer);
-  kernel.setArg(index++, reduction_length);
-  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(work_group_size)); 
+  kernel.setArg(index++, middle_buffer);
+  kernel.setArg(index++, work_group_size >> 1);
+
+  for (size_t i = 0; i + 1 < num_work_groups; ++i) {
+    kernel.setArg(index, i);
+    err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(work_group_size)); 
+    assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
+  }
+
+  // FIXME 
+  kernel.setArg(index - 1, reduction_length);
+  kernel.setArg(index, num_work_groups - 1);
+  err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(last_group_size)); 
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR); 
+  
+  return middle_buffer;
+
+  /*
+  if (num_work_groups == 1) return middle_buffer;
+
+  cl::output_buffer;
+  sources = { basic_kernel_code };
+  program 
+  
+  while (num_work_groups > 1) {
+    output_buffer = cl::Buffer(CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY 
+      | CL_MEM_ALLOC_HOST_PTR, num_work_groups * sizeof(ReturnType), nullptr, &err);
+  }
+
   return output_buffer;
+  */
 }
 
 } // namespace details
 } // namespace opencl
 
 #endif
-
-/* --------------------------- OpenCL Meta-Patterns --------------------------- */
-
-namespace opencl {
-namespace meta {
-
-// FIXME
-
-} // namespace meta
-} // namespace opencl
-
-namespace details {
-
-template <size_t N, size_t Count>
-void UpdateIndices(Indices<0> &, Shape<N> const &, size_t (&)[Count], 
-    size_t const * const (&)[Count], size_t = 0) {}
-
-template <size_t N, size_t Count>
-void UpdateIndices(Indices<N> &reference_indices, Shape<N> const &shape, size_t (&indices)[Count], 
-    size_t const * const (&strides)[Count])
-{
-  static_assert(N, PANIC_ASSERTION);
-  int dim_index = N - 1;
-  bool propogate = true;
-  while (dim_index >= 0 && propogate) {
-    ++reference_indices[dim_index];
-    for (size_t i = 0; i < Count; ++i)
-      indices[i] += strides[i][dim_index];
-    if (reference_indices[dim_index] == shape[dim_index]) {
-      reference_indices[dim_index] = 0;
-      for (size_t i = 0; i < Count; ++i)
-        indices[i] -= shape[dim_index] * strides[i][dim_index];
-    } else {
-      propogate = false;
-    }
-    --dim_index;
-  }
-}
-
-/** Fills `result` with the elements of `input`, skipping the element at position `Index` */
-template <size_t Index, size_t N>
-void FillExceptForIndex(size_t const (&input)[N], size_t *result)
-{
-  static_assert(N > Index, INDEX_OUT_OF_BOUNDS);
-  std::copy_n(input, Index, result);
-  std::copy_n(input + Index + 1, N - Index - 1, result + Index);
-}
-
-/* ------- Expansion for methods which take Tensors...  --------- */
-
-template <typename NodeType, typename... Tensors>
-Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Tensors const&...)
-{
-  return expr.self().shape();
-}
-
-template <typename FunctionType, size_t... I, typename... Tensors>
-inline void MapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
-{
-  fn(tensors.pGet(indices, I)...);
-}
-
-template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-inline void ReduceForwardSequence(U &ret_val, FunctionType &&fn, size_t *indices, 
-    meta::Sequence<I...>, Tensors const&... tensors)
-{
-  ret_val = fn(ret_val, tensors.pGet(indices, I)...);
-}
-
-template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
-inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-    FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors)
-{
-  tensor.pSet(index, fn(tensors.pGet(indices, I)...));
-}
-
-} // namespace details
 
 /* -------------------- Data Containers --------------------- */
 
@@ -6527,8 +6649,9 @@ cl::Buffer ReduceExpr<T, Function, Exprs...>::pOpenCLBufferExpansion(meta::Seque
   auto const& shape = std::get<0>(exprs_).shape();
   cl::Buffer buffers[sizeof...(Exprs)];
   VARDIAC_MAP(assert(shape == std::get<TupleIndices>(exprs_).shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(std::get<TupleIndices>(exprs_)));
-  return CreateReductionKernel<T, Function, Exprs...>(sequence, cqueue, buffers);
+  VARDIAC_MAP(buffers[TupleIndices] = opencl::details::CreateBuffer(
+        std::get<TupleIndices>(exprs_)));
+  return CreateReductionKernel<T, Function, Exprs...>(sequence, cqueue, buffers, shape.index_product());
 }
 
 template <typename T, typename Function, typename... Exprs>
