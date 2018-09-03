@@ -17,6 +17,6 @@ int main(int argc, char **argv)
   //Matrix<float> mat_ = _map(math::tan{}, _map(math::sin{}, (_map(math::cos{}, mat1)))).opencl();
   //Matrix<float> mat_ = _map(math::min{}, mat1, -mat2).opencl();
   //Matrix<float> mat_ = (mat1 + mat2).opencl();
-  /* Scalar<float> scalar = */ _reduce(0.0f, math::plus{}, mat1, mat2, mat1).opencl();
-  //cout << mat_ << endl;
+  Scalar<float> scalar = _reduce(0.0f, math::plus{}, mat1).opencl();
+  cout << scalar << endl;
 }

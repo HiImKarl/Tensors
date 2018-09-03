@@ -1113,7 +1113,6 @@ std::string CreateJoinKernelCode(tensor::meta::Sequence<Indices...>)
   return kernel_code;
 }
 
-
 template <typename ReturnType, typename Function, typename... Exprs, size_t... Indices>
 cl::Buffer CreateReductionKernel(tensor::meta::Sequence<Indices...> sequence,
     cl::CommandQueue &cqueue, cl::Buffer (&buffers)[sizeof...(Indices)], size_t cumul)
@@ -1132,28 +1131,16 @@ cl::Buffer CreateReductionKernel(tensor::meta::Sequence<Indices...> sequence,
   cl::Kernel kernel(program, cKernelPrefix);
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
 
-  // Join output buffer
-  cl::Buffer join_buffer(Info::v().context(), CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
+  // Join output buffer, which is used as the reduction output buffer as well
+  cl::Buffer output_buffer(Info::v().context(), CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
       cumul * sizeof(ReturnType), nullptr, &err);
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
   for (size_t index = 0; index < sizeof...(Indices); ++index)
     kernel.setArg(index, buffers[index]); // input buffers
-  kernel.setArg(sizeof...(Exprs), join_buffer);
+  kernel.setArg(sizeof...(Exprs), output_buffer);
 
   cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(cumul));
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-
-  /*
-  auto out_data = new ReturnType[cumul];
-  cqueue.enqueueReadBuffer(join_buffer, CL_TRUE, 0, sizeof(ReturnType) * cumul, out_data);
-
-  PRINT("");
-  for (size_t i = 0; i < cumul; ++i) std::cout << out_data[i] << " ";
-  PRINT("");
-  PRINT("");
-
-  delete[] out_data;
-  */
 
   sources = { reduction_kernel_code };
   program = cl::Program(Info::v().context(), sources);
@@ -1161,69 +1148,49 @@ cl::Buffer CreateReductionKernel(tensor::meta::Sequence<Indices...> sequence,
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
   kernel = cl::Kernel(program, cKernelPrefix);
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-  size_t kernel_work_group_size = kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
-  size_t num_work_groups = cumul / kernel_work_group_size;
-  size_t last_group_size = cumul % kernel_work_group_size;
-  size_t total_num_work_groups = num_work_groups + (last_group_size ? 1 : 0);
-
-  PRINTV(kernel_work_group_size);
-  PRINTV(num_work_groups);
-  PRINTV(last_group_size);
-  PRINTV(num_work_groups);
-  PRINTV(total_num_work_groups);
-
-  cl::Buffer output_buffer(Info::v().context(), CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | 
-      CL_MEM_ALLOC_HOST_PTR, total_num_work_groups * sizeof(ReturnType), nullptr, &err);
-
-  kernel.setArg(0, join_buffer);
-  kernel.setArg(1, sizeof(ReturnType) * cumul, nullptr);
+  size_t const kernel_work_group_size = kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
+  kernel.setArg(0, output_buffer);
   kernel.setArg(2, output_buffer);
   kernel.setArg(5, kernel_work_group_size);
 
-  for (size_t i = 0; i < num_work_groups; ++i) {
-    kernel.setArg(3, kernel_work_group_size >> 1);
-    kernel.setArg(4, i);
-    cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(kernel_work_group_size),
-        cl::NDRange(kernel_work_group_size));
-    assert((err == CL_SUCCESS) && PANIC_ASSERTION);
-  }
+  // the number of work groups of size `KERNEL_WORK_GROUP_SIZE` that fit the number of elements
+  size_t num_work_groups;  
+  // the modulus of the number of elements and `KERNEL_WORK_GROUP_SIZE`, i.e. the remainder
+  size_t last_group_size;
+  // the total number of work groups, including the remainder if it exists
+  size_t total_num_work_groups = cumul; 
 
-  if (last_group_size) {
-    kernel.setArg(3, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
-    kernel.setArg(4, num_work_groups);
-    kernel.setArg(1, sizeof(ReturnType) * last_group_size, nullptr);
-    cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(last_group_size),
-        cl::NDRange(last_group_size));
-    assert((err == CL_SUCCESS) && PANIC_ASSERTION);
-  }
+  // Perform reduction by reducing each data vector in segments of `KERNEL_WORK_GROUP_SIZE`
+  // After each reduction, the size of the remaining data will be the ceiling of the remaining 
+  // number of elements divided by the KERNEL_WORK_GROUP_SIZE
+  do {
 
-  auto out_data = new ReturnType[total_num_work_groups];
-  cqueue.enqueueReadBuffer(output_buffer, CL_TRUE, 0, sizeof(ReturnType) * total_num_work_groups, out_data);
-  assert((err == CL_SUCCESS) && PANIC_ASSERTION);
+    // Compute parameters for kernel 
+    num_work_groups = total_num_work_groups / kernel_work_group_size;
+    last_group_size = total_num_work_groups % kernel_work_group_size;
+    total_num_work_groups = num_work_groups + (last_group_size ? 1 : 0);
 
-  PRINTV((tensor::details::NextPowerOfTwo(last_group_size) >> 1));
+    for (size_t i = 0; i < num_work_groups; ++i) {
+      kernel.setArg(1, sizeof(ReturnType) * kernel_work_group_size, nullptr);
+      kernel.setArg(3, kernel_work_group_size >> 1);
+      kernel.setArg(4, i);
+      cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(kernel_work_group_size),
+          cl::NDRange(kernel_work_group_size));
+      assert((err == CL_SUCCESS) && PANIC_ASSERTION);
+    }
 
-  PRINT("");
-  for (size_t i = 0; i < total_num_work_groups; ++i) std::cout << out_data[i] << " ";
-  PRINT("");
+    if (last_group_size) {
+      kernel.setArg(1, sizeof(ReturnType) * last_group_size, nullptr);
+      kernel.setArg(3, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
+      kernel.setArg(4, num_work_groups);
+      cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(last_group_size),
+          cl::NDRange(last_group_size));
+      assert((err == CL_SUCCESS) && PANIC_ASSERTION);
+    }
 
-  delete[] out_data;
-  
-  assert(0);
-  /*
-  if (num_work_groups == 1) return middle_buffer;
-
-  cl::output_buffer;
-  sources = { reduction_kernel_code };
-  program 
-  
-  while (num_work_groups > 1) {
-    output_buffer = cl::Buffer(CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY 
-      | CL_MEM_ALLOC_HOST_PTR, num_work_groups * sizeof(ReturnType), nullptr, &err);
-  }
+  } while (total_num_work_groups != 1);
 
   return output_buffer;
-  */
 }
 
 } // namespace details
@@ -4612,12 +4579,12 @@ Tensor<T, 0, C>::Tensor(Expression<NodeType> const& expression)
 
 template <typename T, template <class> class C>
 template <typename NodeType>
-Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model)
+Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
 {
 #ifdef _TEST
   ++eDebugConstructorCounter;
 #endif
-  static_assert(decltype(model)::rank(), RANK_MISMATCH);
+  static_assert(!NodeType::rank(), RANK_MISMATCH);
   T data[1];
   model.template pFill<T>(data, 1);
   ref_ = std::make_shared<C<T>>(1, data[0]);
@@ -5342,6 +5309,7 @@ public:
   /* ------------- Getters -------------- */
 
   Shape<NodeType::rank()> const &shape() const noexcept { return node_.shape(); }
+  constexpr static size_t rank() { return NodeType::rank(); }
 
 private:
 
@@ -6699,6 +6667,7 @@ void ReduceExpr<T, Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue,
   size_t arg_index = buffers.size() - 1;
 
   using namespace opencl::details; // WARNING -- using namespace
+
   expr += cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
   arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<T>::value) + " " 
            +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
