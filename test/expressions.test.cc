@@ -246,7 +246,9 @@ void TensorArithmeticTests() {
 
     REQUIRE((tensor_3 - tensor_2 + (-tensor_1)).template slice<0, 1, 2>()[Indices<3>{1, 1, 1}] 
               == (int)(100 + 10 + 1)); 
-  }
+  }  
+
+
  
   SECTION("Assignment Arithmetic") { 
     tensor_1 = tensor_1 + tensor_2; 
@@ -359,6 +361,9 @@ void TensorMultiplicationTests() {
     for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
       for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
         tensor_2(i, j, k) = 1; 
+
+  auto tensor_3 = Tensor<int, 3, C>({4, 3, 2}, 1);
+  auto tensor_4 = Tensor<int, 3, C>({4, 3, 2}, 1);
  
   SECTION("Binary Multiplication") { 
  
@@ -506,6 +511,44 @@ void TensorMultiplicationTests() {
     REQUIRE((tensor_6 * tensor_6).template slice<1>(1)[Indices<1>{0}] == 12); 
     REQUIRE((tensor_6 * tensor_6).template slice<0, 1>()[Indices<2>{1, 1}] == 7); 
   } 
+
+  SECTION("Multiplication -- Specific Facing Indices") {
+    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(0) == 3);
+    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(1) == 2);
+    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(2) == 3);
+    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(3) == 2);
+
+    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(0) == 4);
+    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(1) == 2);
+    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(2) == 4);
+    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(3) == 2);
+
+    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(0) == 4);
+    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(1) == 3);
+    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(2) == 4);
+    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(3) == 3);
+
+    for (size_t i = 0; i < tensor_3.dimension(1); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(2); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(1); ++k) 
+          for (size_t l = 0; l < tensor_4.dimension(2); ++l) 
+            REQUIRE(_mul<0, 0>(tensor_3, tensor_4)(i, j, k, l) == 4);
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(2); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(0); ++k) 
+          for (size_t l = 0; l < tensor_4.dimension(2); ++l) 
+            REQUIRE(_mul<1, 1>(tensor_3, tensor_4)(i, j, k, l) == 3);
+
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(0); ++k) 
+          for (size_t l = 0; l < tensor_4.dimension(1); ++l) 
+            REQUIRE(_mul<2, 2>(tensor_3, tensor_4)(i, j, k, l) == 2);
+  }
  
   SECTION("Combined Multiplication and Addition/Subtraction") { 
  

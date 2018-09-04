@@ -124,6 +124,8 @@ extern int eDebugConstructorCounter;
   "Failed -- Cannot multiple tensors with scalars"
 #define NO_TENSORS_PROVIDED \
   "This method requires at least one tensor as an argument"
+#define SLICING_MULTIPLICATION_AXIS \
+  "Attempt to slice a multiplication expression along one of its axes"
 
 // OpenCL
 #define OPENCL_NO_PLATFORMS \
@@ -172,7 +174,7 @@ template <> class Indices<0>;
 template <typename T, size_t N, template <class> class C = data::Array> class Tensor;
 template <typename LHS, typename RHS> class BinaryAddExpr;
 template <typename LHS, typename RHS> class BinarySubExpr;
-template <typename LHS, typename RHS> class BinaryMulExpr;
+template <size_t I1, size_t I2, typename LHS, typename RHS> class BinaryMulExpr;
 template <typename LHS, typename RHS> class BinaryHadExpr;
 template <typename Function, typename... Exprs> class MapExpr;
 template <typename T, typename Function, typename... Exprs> class ReduceExpr;
@@ -266,8 +268,8 @@ struct IsNonCVRefExpression<BinaryAddExpr<LHS, RHS>>: std::true_type {};
 template <typename LHS, typename RHS>
 struct IsNonCVRefExpression<BinarySubExpr<LHS, RHS>>: std::true_type {};
 
-template <typename LHS, typename RHS> 
-struct IsNonCVRefExpression<BinaryMulExpr<LHS, RHS>>: std::true_type {};
+template <size_t I1, size_t I2, typename LHS, typename RHS> 
+struct IsNonCVRefExpression<BinaryMulExpr<I1, I2, LHS, RHS>>: std::true_type {};
 
 template <typename LHS, typename RHS> 
 struct IsNonCVRefExpression<BinaryHadExpr<LHS, RHS>>: std::true_type {};
@@ -361,6 +363,12 @@ constexpr size_t Max(size_t x, size_t y)
 constexpr bool LessThan(size_t x, size_t y)
 {
   return x < y;
+}
+
+/** Returns 1 if a < x < b, 0 o.w. */
+constexpr bool InBetween(size_t x, size_t a, size_t b)
+{
+  return (x >= a) && (x < b);
 }
 
 /** Combine std::remove_reference and std::remove_cv */
@@ -477,56 +485,45 @@ struct FillArgs {
  *  strictly increasing sequence of unsigned integers.
  */
 template <size_t...>
-struct IsIncreasingSequence;
+struct IsIncreasing;
+
+/** Member enum 'value' is 'true' iff 'I...' contains 'Index` */
+template <size_t...>
+struct ContainsIndex;
 
 /** Member enum `value` is `true` iff `I...` is a 
  *  strictly increasing sequence of unsigned integers.
- *  Recursive case.
  */
 template <size_t I1, size_t I2, size_t... I>
-struct IsIncreasingSequence<I1, I2, I...> {
-  enum: bool { value = ((I1 < I2) && IsIncreasingSequence<I2, I...>::value) };
+struct IsIncreasing<I1, I2, I...> {
+  enum: bool { value = ((I1 < I2) && IsIncreasing<I2, I...>::value) };
 };
 
 /** Member enum `value` is `true` iff `I...` is a 
  *  strictly increasing sequence of unsigned integers.
- *  Single value base case.
  */
 template <size_t Index>
-struct IsIncreasingSequence<Index>: std::true_type {};
+struct IsIncreasing<Index>: std::true_type {};
 
 /** Member enum `value` is `true` iff `I...` is a 
  *  strictly increasing sequence of unsigned integers.
- *  Empty sequence base case.
  */
 template <>
-struct IsIncreasingSequence<>: std::true_type {};
+struct IsIncreasing<>: std::true_type {};
 
-/** Member enum `value` contains the number of elements
- *  in `I...` strictly less than `Max`.
- */
-template <size_t, size_t...>
-struct CountLTMax;
-
-/** Member enum `value` contains the number of elements
- *  in `I...` strictly less than `Max`. Recursive case.
- */
-template <size_t Max, size_t Index, size_t... I>
-struct CountLTMax<Max, Index, I...> {
-  enum: size_t { value = LessThan(Index, Max) + CountLTMax<Max, I...>::value };
+/** Member enum 'value' is 'true' iff 'I...' contains 'Index` */
+template <size_t Index, size_t Next, size_t... I>
+struct ContainsIndex<Index, Next, I...> {
+  enum: bool { value = (Index == Next) || ContainsIndex<Index, I...>::value }; 
 };
 
-/** Member enum `value` contains the number of elements
- *  in `I...` strictly less than `Max`. Base case.
- */
-template <size_t Max>
-struct CountLTMax<Max> {
-  enum: size_t { value = 0 }; 
-};
+/** Member enum 'value' is 'true' iff 'I...' contains 'Index` */
+template <size_t Index>
+struct ContainsIndex<Index>: std::false_type {};
 
 /** Wrapper around a vardiac size_t pack */
-template <size_t...> 
-struct Sequence {};
+template <size_t... I> 
+struct Sequence { enum: size_t { size = sizeof...(I) }; };
 
 #ifndef _NDEBUG
 template <size_t... I>
@@ -541,43 +538,139 @@ void PrintSequence(Sequence<I...>)
 template <size_t Index, typename>
 struct Append;
 
+/** Extends `Sequence<I...>` by placing `Index` at the End */
+template <size_t Index, typename>
+struct AppendEnd;
+
+/** Concatenates `Sequence1` and `Sequence2` together */
+template <typename, typename>
+struct Concatenate;
+
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t, size_t...>
+struct CountLTMax;
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t, typename>
+struct CountLTMaxSequence;
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t Max, size_t Index, size_t... I>
+struct CountLTMax<Max, Index, I...> {
+  enum: size_t { value = LessThan(Index, Max) + CountLTMax<Max, I...>::value };
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t Max>
+struct CountLTMax<Max> {
+  enum: size_t { value = 0 }; 
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`.
+ */
+template <size_t Max, size_t... I>
+struct CountLTMaxSequence<Max, Sequence<I...>> {
+  enum: size_t { value = CountLTMax<Max, I...>::value };  
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`, and greater than or equal to `Min`.
+ */
+template <size_t, size_t, size_t...>
+struct CountInBetween;
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`, and greater than or equal to `Min`.
+ */
+template <size_t, size_t, typename>
+struct CountInBetweenSequence;
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`, and greater than or equal to `Min`.
+ */
+template <size_t Min, size_t Max, size_t Index, size_t... I>
+struct CountInBetween<Min, Max, Index, I...> {
+  enum: size_t { value = InBetween(Index, Min, Max) + 
+          CountInBetween<Min, Max, I...>::value };
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`, and greater than or equal to `Min`.
+ */
+template <size_t Min, size_t Max>
+struct CountInBetween<Min, Max> {
+  enum: size_t { value = 0 };
+};
+
+/** Member enum `value` contains the number of elements
+ *  in `I...` strictly less than `Max`, and greater than or equal to `Min`.
+ */
+template <size_t Min, size_t Max, size_t... I>
+struct CountInBetweenSequence<Min, Max, Sequence<I...>> {
+  enum: size_t { value = CountInBetween<Min, Max, I...>::value };
+};
+
+/** typedef `sequence` is `Index` inserted into ordered sequence `I...` */
+template <size_t...>
+struct InsertIntoOrderedSequence;
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element subtracted by `offset`.
+ */
+template <size_t...>
+struct SequenceNegativeOffset;
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element subtracted by `offset`.
+ */
+template <size_t...>
+struct SequencePositiveOffset;
+
 /** Transform Sequence */
 template <typename, template <size_t...> class, size_t...>
 struct SequenceTransformer;
 
 /** provides typedef `sequence` which is a sequence with each 
- *  element offset by `offset`.
- */
-template <size_t...>
-struct SequenceOffset;
-
-/** Creates a `Sequence<I...>` where `I...` is the integers [`Index`, `N`)  */
-template <size_t Index, size_t N>
-struct MakeIndexSequence {
-  using sequence = typename Append<Index, 
-                   typename MakeIndexSequence<Index + 1, N>::sequence>::sequence;
-};
-
-/** Creates a `Sequence<I...>` where `I...` is the natural numbers up to `N`  */
-template <size_t N>
-struct MakeIndexSequence<N, N> {
-  using sequence = Sequence<>;
-};
-
-/** provides typedef `sequence` which is a sequence with each 
- *  element offset by `offset`. Recursive case.
+ *  element subtracted by `offset`. Recursive case.
  */
 template <size_t Offset, size_t Index, size_t... I>
-struct SequenceOffset<Offset, Index, I...> {
+struct SequenceNegativeOffset<Offset, Index, I...> {
     using sequence = typename Append<Index - Offset, 
-                     typename SequenceOffset<Offset, I...>::sequence>::sequence;
+                     typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
 };
 
 /** provides typedef `sequence` which is a sequence with each 
- *  element offset by `offset`. Base case.
+ *  element subtracted by `offset`. Base case.
  */
 template <size_t Offset>
-struct SequenceOffset<Offset> {
+struct SequenceNegativeOffset<Offset> {
+    using sequence = Sequence<>;
+};
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element added by `offset`. Recursive case.
+ */
+template <size_t Offset, size_t Index, size_t... I>
+struct SequencePositiveOffset<Offset, Index, I...> {
+    using sequence = typename Append<Index + Offset, 
+                     typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
+};
+
+/** provides typedef `sequence` which is a sequence with each 
+ *  element added by `offset`. Base case.
+ */
+template <size_t Offset>
+struct SequencePositiveOffset<Offset> {
     using sequence = Sequence<>;
 };
 
@@ -595,19 +688,44 @@ struct Append<Index, Sequence<I...>> {
   using sequence = Sequence<Index, I...>;
 };
 
+/** Extends `Sequence<I...>` by placing `Index` at the end */
+template <size_t Index, size_t... I> 
+struct AppendEnd<Index, Sequence<I...>> {
+  using sequence = Sequence<I..., Index>;
+};
+
+/** Concatenates `Sequence1` and `Sequence2` together */
+template <size_t... I1, size_t... I2>
+struct Concatenate<Sequence<I1...>, Sequence<I2...>> {
+  using sequence = Sequence<I1..., I2...>;
+};
+
+/** Creates a `Sequence<I...>` where `I...` is the integers [`Index`, `N`)  */
+template <size_t Index, size_t N>
+struct MakeIndexSequence {
+  using sequence = typename Append<Index, 
+                   typename MakeIndexSequence<Index + 1, N>::sequence>::sequence;
+};
+
+/** Creates a `Sequence<I...>` where `I...` is the natural numbers up to `N`  */
+template <size_t N>
+struct MakeIndexSequence<N, N> {
+  using sequence = Sequence<>;
+};
+
 /** Typedef `sequence` is a `Sequence<X...>` where 
  *  `X...` are the first `ThreshHold` elements of `I...` 
  */
 template <size_t ThreshHold, size_t... I>
-struct MakeSequence1;
+struct MakeLeftSequence;
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
  *  `X...` are the first `ThreshHold` elements of `I...` 
  *  Recursive case.
  */
 template <size_t ThreshHold, size_t Index, size_t... I>
-struct MakeSequence1<ThreshHold, Index, I...> {
-  using sequence = typename Append<Index, typename MakeSequence1<ThreshHold - 1, I...>::sequence>::sequence;
+struct MakeLeftSequence<ThreshHold, Index, I...> {
+  using sequence = typename Append<Index, typename MakeLeftSequence<ThreshHold - 1, I...>::sequence>::sequence;
 };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
@@ -615,7 +733,7 @@ struct MakeSequence1<ThreshHold, Index, I...> {
  *  Base case.
  */
 template <size_t Index, size_t... I>
-struct MakeSequence1<0, Index, I...> {
+struct MakeLeftSequence<0, Index, I...> {
   using sequence = Sequence<>;
 };
 
@@ -624,7 +742,7 @@ struct MakeSequence1<0, Index, I...> {
  *  Base case.
  */
 template <>
-struct MakeSequence1<0> {
+struct MakeLeftSequence<0> {
   using sequence = Sequence<>;
 };
 
@@ -633,15 +751,27 @@ struct MakeSequence1<0> {
  *  `ThreshHold` elements. 
  */
 template <size_t ThreshHold, size_t... I>
-struct MakeSequence2;
+struct MakeRightSequence;
+
+/** Typedef `sequence` is a `Sequence<X...>` where the 
+ * elements of `I...` after the first `ThreshHold` elements.
+ */
+template <size_t, typename>
+struct RightSequence;
+
+/** Typedef `sequence` is a `Sequence<X...>` where `X...` are 
+ *  the first `ThreshHold` elements of `I...`
+ */
+template <size_t, typename>
+struct LeftSequence;
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
  *  `X...` are the  elements of `I...` after the first 
  *  `ThreshHold` elements. Recursive Case.
  */
 template <size_t ThreshHold, size_t Index, size_t... I>
-struct MakeSequence2<ThreshHold, Index, I...> {
-    using sequence = typename MakeSequence2<ThreshHold - 1, I...>::sequence;
+struct MakeRightSequence<ThreshHold, Index, I...> {
+    using sequence = typename MakeRightSequence<ThreshHold - 1, I...>::sequence;
 };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
@@ -649,17 +779,33 @@ struct MakeSequence2<ThreshHold, Index, I...> {
  *  `ThreshHold` elements. Recursive Case.
  */
 template <size_t Index, size_t... I>
-struct MakeSequence2<0, Index, I...> {
-    using sequence = typename Append<Index, typename MakeSequence2<0, I...>::sequence>::sequence;
+struct MakeRightSequence<0, Index, I...> {
+    using sequence = typename Append<Index, typename MakeRightSequence<0, I...>::sequence>::sequence;
 };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
  *  `X...` are the  elements of `I...` after the first 
- *  `ThreshHold` elements. Base Case.
+ *  `ThreshHold` elements.
  */
 template <>
-struct MakeSequence2<0> {
+struct MakeRightSequence<0> {
     using sequence = Sequence<>;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where `X...` are 
+ *  the first `ThreshHold` elements of `I...`
+ */
+template <size_t ThreshHold, size_t... I>
+struct LeftSequence<ThreshHold, Sequence<I...>> {
+  using sequence = typename MakeLeftSequence<ThreshHold, I...>::sequence;
+};
+
+/** Typedef `sequence` is a `Sequence<X...>` where `X...` are the 
+ *  elements of `I...` after the first `ThreshHold` elements.
+ */
+template <size_t ThreshHold, size_t... I>
+struct RightSequence<ThreshHold, Sequence<I...>> {
+  using sequence = typename MakeRightSequence<ThreshHold, I...>::sequence;
 };
 
 template <size_t Size, size_t... I>
@@ -1459,7 +1605,7 @@ public:
   template <typename X, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
-  template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
@@ -1626,7 +1772,7 @@ public:
   template <typename U, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
-  template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
@@ -1772,7 +1918,7 @@ public:
   template <typename X, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
-  template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
@@ -4099,7 +4245,7 @@ public:
   template <typename X, size_t M, template <class> class C> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
-  template <typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class BinaryMulExpr;
   template <typename LHS, typename RHS> friend class BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
@@ -5194,26 +5340,14 @@ struct plus {
 
   /** Creates the join expression for the given variable names */
   template <typename... Args>
-  static std::string opencl_join(Args const&... args);
+  static constexpr size_t map_arity() { return 0; }
+  static constexpr size_t reduce_arity() { return 1; }
 #endif
-  static constexpr size_t arity() { return 2; }
 };
 
 inline std::string plus::opencl_reduce(std::string const &accum, std::string const &v1)
 {
   return accum + " += " + v1;
-}
-
-template <typename... Args>
-std::string plus::opencl_join(Args const&... args)
-{
-  std::string str{};
-  VARDIAC_MAP((str += args + " + "));
-  // remove trailing characters
-  str.pop_back();
-  str.pop_back();
-  str.pop_back();
-  return str;
 }
 
 /** Wrapper around std::minus with OpenCL code emission */
@@ -5224,7 +5358,7 @@ struct minus {
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
 #endif
-  static constexpr size_t arity() { return 2; }
+  static constexpr size_t map_arity() { return 2; }
 };
 
 inline std::string minus::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5240,7 +5374,7 @@ struct sin {
   /** OpenCL built in function, along with a single left paranthesis */
   static std::string opencl_map() { return "sin("; } 
 #endif
-  static constexpr size_t arity() { return 1; }
+  static constexpr size_t map_arity() { return 1; }
 };
 
 /** Wrapper around std::cos with OpenCL code emission */
@@ -5251,7 +5385,7 @@ struct cos {
   /** OpenCL built in function, along with a single left paranthesis */
   static std::string opencl_map() { return "cos("; } 
 #endif
-  static constexpr size_t arity() { return 1; }
+  static constexpr size_t map_arity() { return 1; }
 };
 
 /** Wrapper around std::tan with OpenCL code emission */
@@ -5262,7 +5396,7 @@ struct tan {
   /** OpenCL built in function, along with a single left paranthesis */
   static std::string opencl_map() { return "tan("; } 
 #endif
-  static constexpr size_t arity() { return 1; }
+  static constexpr size_t map_arity() { return 1; }
 };
 
 /** Wrapper around std::max with OpenCL code emission */
@@ -5276,7 +5410,7 @@ struct min {
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
 #endif
-  static constexpr size_t arity() { return 2; }
+  static constexpr size_t map_arity() { return 2; }
 };
 
 inline std::string min::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5300,7 +5434,7 @@ public:
   template <typename X, size_t M, template <class> class C_> friend class tensor::Tensor;
   template <typename LHS, typename RHS> friend class tensor::BinaryAddExpr;
   template <typename LHS, typename RHS> friend class tensor::BinarySubExpr;
-  template <typename LHS, typename RHS> friend class tensor::BinaryMulExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class tensor::BinaryMulExpr;
   template <typename LHS, typename RHS> friend class tensor::BinaryHadExpr;
   template <typename Function, typename... Exprs> friend class tensor::MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class tensor::ReduceExpr;
@@ -5375,7 +5509,7 @@ public:
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
@@ -5551,7 +5685,7 @@ public:
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
@@ -5706,9 +5840,9 @@ std::ostream &operator<<(std::ostream &os, BinarySubExpr<LHS, RHS> const &binary
  * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor
  */
 
-template <typename LHS, typename RHS>
-class BinaryMulExpr: public Expression<BinaryMulExpr<LHS, RHS>> { 
-//   @BinaryMulExpr
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+class BinaryMulExpr: public Expression<BinaryMulExpr<I1, I2, LHS, RHS>> { 
+/*@BinaryMulExpr*/
 public:
 
   /* ---------------- typedefs --------------- */
@@ -5724,13 +5858,17 @@ public:
   /* ---------------- Friend ----------------- */
   
   template <typename LHS_, typename RHS_>
-  friend BinaryMulExpr<LHS_, RHS_> 
+  friend BinaryMulExpr<LHS_::rank() - 1, 0, LHS_, RHS_> 
     operator*(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
-  template <typename Expr> friend class opencl::Model;
 
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
+  friend BinaryMulExpr<I1_, I2_, LHS_, RHS_> 
+    _mul(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+  template <typename Expr> friend class opencl::Model;
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
@@ -5738,8 +5876,8 @@ public:
 
   /* ---------------- Getters ----------------- */
 
-  Shape<self_t::rank()> const &shape() const { return shape_; }
-  size_t dimension(size_t index) const; 
+  Shape<self_t::rank()> const &shape() const noexcept { return shape_; }
+  size_t dimension(size_t index) const noexcept; 
 
   template <typename... Args, typename = 
             typename std::enable_if<self_t::rank() != sizeof...(Args)>::type>
@@ -5776,7 +5914,7 @@ private:
   /* -------------- Constructors -------------- */
 
   BinaryMulExpr(LHS const &lhs, RHS const &rhs);
-  BinaryMulExpr(BinaryMulExpr<LHS, RHS> const&) = default;
+  BinaryMulExpr(BinaryMulExpr<I1, I2, LHS, RHS> const&) = default;
 
   /* ---------------- Utility ---------------- */
 
@@ -5809,72 +5947,70 @@ private:
 
 };
 
-template <typename LHS, typename RHS>
-BinaryMulExpr<LHS, RHS>::BinaryMulExpr(LHS const &lhs, RHS const &rhs)
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+BinaryMulExpr<I1, I2, LHS, RHS>::BinaryMulExpr(LHS const &lhs, RHS const &rhs)
   : lhs_(lhs), rhs_(rhs)
 {
   static_assert(LHS::rank(), PANIC_ASSERTION);
   static_assert(RHS::rank(), PANIC_ASSERTION);
-  constexpr size_t M1 = LHS::rank();
-  constexpr size_t M2 = RHS::rank();
-  // shape <- lhs.shape[:-1] :: rhs.shape[1:]
-  for (size_t i = 0; i < M1 - 1; ++i)
-    shape_[i] = lhs.dimension(i);
-  for (size_t i = 0; i < M2 - 1; ++i)
-    shape_[M1 - 1 + i] = rhs.dimension(i + 1);
+  static_assert(I1 < LHS::rank(), RANK_OUT_OF_BOUNDS);
+  static_assert(I2 < RHS::rank(), RANK_OUT_OF_BOUNDS);
+  // shape <- lhs.shape[:~I1] ++ rhs.shape[:~I2]
+  details::FillExceptForIndex<I1>(lhs.shape().dimensions_, shape_.dimensions_);
+  details::FillExceptForIndex<I2>(rhs.shape().dimensions_, shape_.dimensions_ + LHS::rank() - 1);
 }
 
-template <typename LHS, typename RHS>
-size_t BinaryMulExpr<LHS, RHS>::dimension(size_t index) const
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+size_t BinaryMulExpr<I1, I2, LHS, RHS>::dimension(size_t index) const noexcept
 {
   assert(index < self_t::rank() && INDEX_OUT_OF_BOUNDS);
   return shape_[index];
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <typename... Args, typename>
-auto BinaryMulExpr<LHS, RHS>::operator()(Args... args) const
+auto BinaryMulExpr<I1, I2, LHS, RHS>::operator()(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>()(args...))>::type
 {
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
-  return lhs_[Indices<left>(seperate_args.array1)] * 
-    rhs_.template slice<0>(Indices<right>(seperate_args.array2));
+  return lhs_.template slice<I1>(Indices<left>(seperate_args.array1)) * 
+         rhs_.template slice<I2>(Indices<right>(seperate_args.array2));
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <typename... Args, typename>
-typename BinaryMulExpr<LHS, RHS>::value_t
-  BinaryMulExpr<LHS, RHS>::operator()(Args... args) const
+typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
+  BinaryMulExpr<I1, I2, LHS, RHS>::operator()(Args... args) const
 {
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
-  auto lhs = lhs_[Indices<left>(seperate_args.array1)];
-  auto rhs = rhs_.template slice<0>(Indices<right>(seperate_args.array2));
+  auto lhs = lhs_.template slice<I1>(Indices<left>(seperate_args.array1));
+  auto rhs = rhs_.template slice<I2>(Indices<right>(seperate_args.array2));
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
   { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <typename... Args>
-auto BinaryMulExpr<LHS, RHS>::at(Args... args) const
+auto BinaryMulExpr<I1, I2, LHS, RHS>::at(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>().at(args...))>::type
 {
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate(args...);
-  return lhs_[Indices<left>(seperate.array1)] *
-     rhs_.template slice<0>(Indices<right>(seperate.array2));
+  return lhs_.template slice<I1>(Indices<left>(seperate.array1)) *
+     rhs_.template slice<I2>(Indices<right>(seperate.array2));
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t M, typename>
-auto BinaryMulExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
+auto BinaryMulExpr<I1, I2, LHS, RHS>::operator[](Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>()[indices])>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
@@ -5883,87 +6019,151 @@ auto BinaryMulExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return lhs_[Indices<left>(array1)] *
-      rhs_.template slice<0>(Indices<right>(array2));
+  return lhs_.template slice<I1>(Indices<left>(array1)) *
+      rhs_.template slice<I2>(Indices<right>(array2));
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t M, typename>
-typename BinaryMulExpr<LHS, RHS>::value_t
-  BinaryMulExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
+typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
+  BinaryMulExpr<I1, I2, LHS, RHS>::operator[](Indices<M> const &indices) const
 {
   constexpr size_t left = meta::Min(LHS::rank() - 1, M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1);
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  auto lhs = lhs_[Indices<left>(array1)];
-  auto rhs = rhs_.template slice<0>(Indices<right>(array2));
+  auto lhs = lhs_.template slice<I1>(Indices<left>(array1));
+  auto rhs = rhs_.template slice<I2>(Indices<right>(array2));
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
   { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices, typename... Args>
-auto BinaryMulExpr<LHS, RHS>::slice(Args... args) const
+auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
 {
   using namespace meta; // WARNING -- using namespace
-  static_assert(IsIncreasingSequence<Slices...>::value, SLICE_INDICES_DESCENDING);
-  constexpr size_t thresh_hold = CountLTMax<LHS::rank() - 1, Slices...>::value;
-  auto sequence1 = typename MakeSequence1<thresh_hold, Slices...>::sequence{};
-  // FIXME -- Very difficult to read
+  static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
+  //static_assert(ContainsIndex<I1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
+  //static_assert(ContainsIndex<I2 + LHS::rank() - 1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
+
+  constexpr size_t lhs_left_count = CountLTMax<I1, Slices...>::value;
+  constexpr size_t lhs_right_count = CountInBetween<I1, LHS::rank() - 1, Slices...>::value;
+  constexpr size_t lhs_count = lhs_left_count + lhs_right_count;
+
+  auto lhs_left_sequence = typename MakeLeftSequence<lhs_left_count, Slices...>::sequence{};
+  auto lhs_right_sequence = typename LeftSequence<lhs_right_count, typename MakeRightSequence<
+                    lhs_left_count, Slices...>::sequence>::sequence{};
+
+  auto lhs_sequence = typename Concatenate<typename AppendEnd<I1, decltype(lhs_left_sequence)>::sequence,
+                      typename SequenceTransformer<decltype(lhs_right_sequence), SequencePositiveOffset,
+                      1>::sequence>::sequence{};
+
+  auto rhs_raw_sequence = typename SequenceTransformer<typename 
+                          MakeRightSequence<lhs_count, Slices...>::sequence, SequenceNegativeOffset,
+                          Max(LHS::rank(), 2) - 2>::sequence{};
+
+  constexpr size_t rhs_left_count = CountLTMaxSequence<I2 + 1, decltype(rhs_raw_sequence)>::value;
+
+  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+  auto rhs_right_sequence = typename RightSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+
+  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, typename SequenceTransformer<
+                      decltype(rhs_left_sequence), SequenceNegativeOffset, 1>::sequence>::sequence,
+                      decltype(rhs_right_sequence)>::sequence{};
+
+  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
+
+  /*
   auto sequence2 = typename Append<0, typename SequenceTransformer<
-        typename MakeSequence2<thresh_hold, Slices...>::sequence,
-        SequenceOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
-  return pSliceSequences(sequence1, sequence2, args...);
+        typename MakeRightSequence<thresh_hold, Slices...>::sequence,
+        SequenceNegativeOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
+  */
+  return pSliceSequences(lhs_sequence, rhs_sequence, args...);
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices, size_t M>
-auto BinaryMulExpr<LHS, RHS>::slice(Indices<M> const &indices) const
+auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
 {
   using namespace meta; // WARNING -- using namespace
-  static_assert(IsIncreasingSequence<Slices...>::value, SLICE_INDICES_DESCENDING);
-  constexpr size_t thresh_hold = CountLTMax<LHS::rank() - 1, Slices...>::value;
-  auto sequence1 = typename MakeSequence1<thresh_hold, Slices...>::sequence{};
-  // FIXME -- Very difficult to read
+  static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
+  //static_assert(ContainsIndex<I1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
+  //static_assert(ContainsIndex<I2 + LHS::rank() - 1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
+
+  constexpr size_t lhs_left_count = CountLTMax<I1, Slices...>::value;
+  constexpr size_t lhs_right_count = CountInBetween<I1, LHS::rank() - 1, Slices...>::value;
+  constexpr size_t lhs_count = lhs_left_count + lhs_right_count;
+
+  auto lhs_left_sequence = typename MakeLeftSequence<lhs_left_count, Slices...>::sequence{};
+  auto lhs_right_sequence = typename LeftSequence<lhs_right_count, typename MakeRightSequence<
+                    lhs_left_count, Slices...>::sequence>::sequence{};
+
+  auto lhs_sequence = typename Concatenate<typename AppendEnd<I1, decltype(lhs_left_sequence)>::sequence,
+                      typename SequenceTransformer<decltype(lhs_right_sequence), SequencePositiveOffset,
+                      1>::sequence>::sequence{};
+
+  auto rhs_raw_sequence = typename SequenceTransformer<typename 
+                          MakeRightSequence<lhs_count, Slices...>::sequence, SequenceNegativeOffset,
+                          Max(LHS::rank(), 2) - 2>::sequence{};
+
+  constexpr size_t rhs_left_count = CountLTMaxSequence<I2, decltype(rhs_raw_sequence)>::value;
+
+  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+  auto rhs_right_sequence = typename RightSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+
+  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, typename SequenceTransformer<
+                      decltype(rhs_left_sequence), SequenceNegativeOffset, 1>::sequence>::sequence,
+                      decltype(rhs_right_sequence)>::sequence{};
+
+  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
+  /*
   auto sequence2 = typename Append<0, typename SequenceTransformer<
-        typename MakeSequence2<thresh_hold, Slices...>::sequence,
-        SequenceOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
-  return pSliceSequences(sequence1, sequence2, indices);
+        typename MakeRightSequence<thresh_hold, Slices...>::sequence,
+        SequenceNegativeOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
+  */
+
+  return pSliceSequences(lhs_sequence, rhs_sequence, indices);
 }
 
 template <typename LHS, typename RHS>
-BinaryMulExpr<LHS, RHS> operator*(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS> operator*(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
-  return BinaryMulExpr<LHS, RHS>(lhs.self(), rhs.self());
+  return BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS>(lhs.self(), rhs.self());
+}
+
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+BinaryMulExpr<I1, I2, LHS, RHS> _mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinaryMulExpr<I1, I2, LHS, RHS>(lhs.self(), rhs.self());
 }
 
 /* ------------------------------ Utility ------------------------------ */
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, typename... Args, typename>
-auto BinaryMulExpr<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
+auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
     meta::Sequence<Slices2...>, Args... args) const 
   -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), sizeof...(args));
-  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1 - sizeof...(Slices1));
+  constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), sizeof...(args));
+  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - sizeof...(Slices1));
   meta::FillArgs<left, right + left> seperate(args...);
   return lhs_.template slice<Slices1...>(Indices<left>(seperate.array1)) *
           rhs_.template slice<Slices2...>(Indices<right>(seperate.array2));
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, typename... Args, typename>
-typename BinaryMulExpr<LHS, RHS>::value_t 
-  BinaryMulExpr<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Args... args) const 
+typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t 
+  BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Args... args) const 
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), sizeof...(args));
-  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1 - sizeof...(Slices1));
+  constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), sizeof...(args));
+  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - sizeof...(Slices1));
   meta::FillArgs<left, right + left> seperate(args...);
   auto lhs = lhs_.template slice<Slices1...>(Indices<left>(seperate.array1));
   auto rhs = rhs_.template slice<Slices2...>(Indices<right>(seperate.array2));
@@ -5972,14 +6172,14 @@ typename BinaryMulExpr<LHS, RHS>::value_t
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, size_t M, typename>
-auto BinaryMulExpr<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
+auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
     meta::Sequence<Slices2...>, Indices<M> const &indices) const 
   -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), M);
-  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1 - sizeof...(Slices1));
+  constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
+  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
@@ -5987,14 +6187,14 @@ auto BinaryMulExpr<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>,
                rhs_.template slice<Slices2...>(Indices<right>(array2));
 }
 
-template <typename LHS, typename RHS>
+template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, size_t M, typename>
-typename BinaryMulExpr<LHS, RHS>::value_t 
-  BinaryMulExpr<LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
+typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t 
+  BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
   meta::Sequence<Slices2...>, Indices<M> const &indices) const 
 {
-  constexpr size_t left = meta::Min(LHS::rank() - 1 - sizeof...(Slices1), M);
-  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1 - sizeof...(Slices1));
+  constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
+  constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
   size_t array1[left], array2[right];
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
@@ -6009,7 +6209,7 @@ typename BinaryMulExpr<LHS, RHS>::value_t
 
 template <typename LHS, typename RHS> 
 class BinaryHadExpr: public Expression<BinaryHadExpr<LHS, RHS>> {
-/*@BinaryMulExpr*/
+/*@BinaryHadExpr*/
 public:
 
   /* ---------------- typedefs --------------- */
@@ -6031,7 +6231,7 @@ public:
   template <typename Expr> friend class opencl::Model;
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
@@ -6208,7 +6408,7 @@ public:
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
@@ -6460,7 +6660,7 @@ template <typename Function, typename... Exprs>
 void MapExpr<Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
     std::string &arg_list, std::string &expr) const noexcept
 {
-  static_assert(sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
+  static_assert(sizeof...(Exprs) == Function::map_arity(), OPENCL_ARITY_ERROR);
   expr += Function::opencl_map();
   pOpenCLBufferTupleExpansion(typename meta::MakeIndexSequence<0, 
       sizeof...(Exprs)>::sequence{}, cqueue, buffers, arg_list, expr);
@@ -6513,7 +6713,7 @@ public:
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
@@ -6720,7 +6920,7 @@ public:
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
-  template <typename LHS_, typename RHS_> friend class BinaryMulExpr;
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
@@ -6885,6 +7085,8 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 #undef INNER_DIMENSION_MISMATCH
 #undef ELEMENT_COUNT_MISMATCH
 #undef SCALAR_TENSOR_MULT
+#undef NO_TENSORS_PROVIDED
+#undef SLICING_MULTIPLICATION_AXIS
 #undef PANIC_ASSERTION
 #undef OPENCL_NO_PLATFORMS 
 #undef OPENCL_NO_DEVICES 
