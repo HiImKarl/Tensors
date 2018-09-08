@@ -44,7 +44,20 @@ void SimpleExpressionTests() {
 
 template <template <class> class Container>
 void CombinationExpressionTests() {
-  // FIXME
+  Matrix<float, Container> mat1({1000, 1000}, -1); 
+  Matrix<float, Container> mat2({1000, 1000}, 10); 
+
+  SECTION("Map") {
+    Matrix<float, Container> result = _map(math::div{}, mat1 + mat1, mat2 % mat1).opencl();
+    for (size_t i = 0; i < result.dimension(0); ++i)
+      for (size_t j = 0; j < result.dimension(1); ++j)
+        REQUIRE(result(i, j) == 0.2f);
+  }
+
+  SECTION("Reduce") {
+    Scalar<float, Container> result = _reduce(1e6f, math::sub{}, mat1 + mat1 % mat2).opencl();
+    REQUIRE(result() == 12e6f);
+  }
 }
 
 // Instantiate test cases
@@ -54,5 +67,13 @@ TEST_CASE(BeginTest("Simple Expressions", "Array")) {
 
 TEST_CASE(BeginTest("Simple Expressions", "HashMap")) { 
   SimpleExpressionTests<data::HashMap>();
+}
+
+TEST_CASE(BeginTest("Combination Expressions", "Array")) { 
+  CombinationExpressionTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Combination Expressions", "HashMap")) { 
+  CombinationExpressionTests<data::HashMap>();
 }
 

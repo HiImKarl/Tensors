@@ -72,7 +72,7 @@ void TensorAssignmentTest() {
       for (size_t j = 0; j < tensor_1.dimension(3); ++j) 
         REQUIRE(tensor_1(0, 1, i, j) == (int)(100 + 10 * i + j)); 
 
-    Tensor<int64_t, 4, Container> t3({1, 2, 3, 4}); 
+    Tensor<float, 4, Container> t3({1, 2, 3, 4}); 
     for (size_t i = 0; i < t3.dimension(0); ++i) 
       for (size_t j = 0; j < t3.dimension(1); ++j) 
         for (size_t k = 0; k < t3.dimension(2); ++k) 

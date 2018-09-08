@@ -85,9 +85,11 @@ void TensorArithmeticTests() {
   SECTION("Two Term Addition/Subtract") { 
     Tensor<int32_t, 3, C> tensor_3 = tensor_1 + tensor_2; 
     Tensor<int32_t, 3, C> tensor_4 = tensor_3 - tensor_1; 
+    Tensor<int32_t, 3, C> tensor_5 = tensor_2 % tensor_2; 
  
     REQUIRE(typeid(tensor_3) != typeid(tensor_1 + tensor_2)); 
     REQUIRE(typeid(tensor_4) != typeid(tensor_3 - tensor_1)); 
+    REQUIRE(typeid(tensor_5) != typeid(tensor_2 % tensor_2)); 
  
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
@@ -122,7 +124,7 @@ void TensorArithmeticTests() {
     for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
-          REQUIRE(tensor_4(i, j, k) == (int)(100 * i + 10 * j + 1 * k)); 
+          REQUIRE(tensor_4(i, j, k) == (int)(100 * i + 10 * j + k)); 
  
     for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
@@ -142,6 +144,34 @@ void TensorArithmeticTests() {
     for (size_t i = 0; i < tensor_4.dimension(0); ++i)
       for (size_t k = 0; k < tensor_4.dimension(2); ++k)
         REQUIRE((tensor_3 - tensor_1).template slice<0, 2>(2)[Indices<2>{i, k}] == (int)(100 * i + 20 + 1 * k)); 
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+          REQUIRE(tensor_5(i, j, k) == (int)((100 * i + 10 * j + k) * (100 * i + 10 * j + k)));
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+          REQUIRE((tensor_2 % tensor_2)(i, j, k) == 
+              (int)((100 * i + 10 * j + 1 * k) * (100 * i + 10 * j + 1 * k))); 
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+          REQUIRE((tensor_2 % tensor_2).template slice<>()(i, j, k) == 
+              (int)((100 * i + 10 * j + 1 * k) * (100 * i + 10 * j + 1 * k))); 
+ 
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+          REQUIRE((tensor_2 % tensor_2)[Indices<3>{i, j, k}] == 
+              (int)((100 * i + 10 * j + 1 * k) * (100 * i + 10 * j + 1 * k))); 
+
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i)
+      for (size_t k = 0; k < tensor_5.dimension(2); ++k)
+        REQUIRE((tensor_2 % tensor_2).template slice<0, 2>(2)[Indices<2>{i, k}] == 
+            (int)((100 * i + 20 + 1 * k) * (100 * i + 20 + 1 * k))); 
   } 
 
   SECTION("Negation") {

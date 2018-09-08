@@ -1099,12 +1099,6 @@ constexpr char cLocalSizeFunction[]  = "get_local_size";
 // Synchronization functions
 constexpr char cBarrierFunction[]    = "barrier";
 
-// Operators
-constexpr char cAddOperator[]        = "+";
-constexpr char cSubOperator[]        = "-";
-constexpr char cMulOperator[]        = "*";
-constexpr char cDivOperator[]        = "/";
-
 template <typename T> 
 struct OpenCLType;
 
@@ -1199,8 +1193,7 @@ std::string CreateReductionKernelCode()
     std::string(cLocalIdentifier) + " "
   + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
   + ", " + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
-  + cOutputName + ", " + OpenCLType<ReturnType>::value + " " + cConstIdentifier + " "
-  + cInitialValueName + ", " + cSizeTType + " " + cReductionSize + ", " + cSizeTType + " "
+  + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " + cSizeTType + " "
   + cConstIdentifier + " " + cOffsetName + ", " + cSizeTType + " " + cConstIdentifier 
   + " " + cWGSizeName + ") {\n";
 
@@ -1227,9 +1220,29 @@ std::string CreateReductionKernelCode()
   + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");\n"
   + "\t}\n"
   + "\tif (" + cLocalIdName + " == 0)\n"
-  + "\t\t" + cOutputName + "[" + cOffsetName + "] = " + Function::opencl_map(
-      std::string(cInitialValueName), std::string(cLocalPrefix) +  "[0]") 
-  + ";\n}\n";
+  + "\t\t" + cOutputName + "[" + cOffsetName + "] = " + std::string(cLocalPrefix) + "[0];\n" 
+  + "}\n";
+
+  return kernel_code;
+}
+
+/** Returns the OpenCL code, as std::string, for an offset kernel */
+template <typename ReturnType, typename Function> 
+std::string CreateOffsetKernelCode()
+{
+  std::string kernel_code =
+      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
+
+  // The kernel's 1st argument is the input buffer, containing one element,
+  // and the second argument is the initial value
+    
+  kernel_code += std::string(cGlobalIdentifier) 
+  + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
+  + cOutputName + ", " + OpenCLType<ReturnType>::value + " " + cConstIdentifier + " "
+  + cInitialValueName + ") {\n"
+  + "\t"  + cOutputName + "[0] = " + Function::opencl_map(std::string(cInitialValueName), 
+        std::string(cOutputName) + "[0]") + ";\n"
+  + "}\n";
 
   return kernel_code;
 }
@@ -1239,7 +1252,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
     cl::Buffer const &buffer, size_t cumul, ReturnType const &initial_value)
 {
   // Create the code for the reduction kernel
-  std::string reduction_kernel_code = CreateReductionKernelCode<ReturnType, Function>();
+  std::string kernel_code = CreateReductionKernelCode<ReturnType, Function>();
   cl_int err = 0;
 
   // Join output buffer, which is used as the reduction output buffer as well
@@ -1248,7 +1261,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
 
   // Set up the program and kernel
-  cl::Program program = cl::Program(Info::v().context(), { reduction_kernel_code });
+  cl::Program program = cl::Program(Info::v().context(), { kernel_code });
   err = program.build({ Info::v().device() });
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
   cl::Kernel kernel = cl::Kernel(program, cKernelPrefix);
@@ -1256,8 +1269,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
   size_t const kernel_work_group_size = kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
   kernel.setArg(0, buffer);
   kernel.setArg(2, output_buffer);
-  kernel.setArg(3, initial_value);
-  kernel.setArg(6, kernel_work_group_size);
+  kernel.setArg(5, kernel_work_group_size);
 
   // the number of work groups of size `KERNEL_WORK_GROUP_SIZE` that fit the number of elements
   size_t num_work_groups;  
@@ -1275,19 +1287,22 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
     last_group_size = total_num_work_groups % kernel_work_group_size;
     total_num_work_groups = num_work_groups + (last_group_size ? 1 : 0);
 
+    // Reduction of individual work groups that fit the kernel workgroup size
     for (size_t i = 0; i < num_work_groups; ++i) {
       kernel.setArg(1, sizeof(ReturnType) * kernel_work_group_size, nullptr);
-      kernel.setArg(4, kernel_work_group_size >> 1);
-      kernel.setArg(5, i);
+      kernel.setArg(3, kernel_work_group_size >> 1);
+      kernel.setArg(4, i);
       cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(kernel_work_group_size),
           cl::NDRange(kernel_work_group_size));
       assert((err == CL_SUCCESS) && PANIC_ASSERTION);
     }
 
+    // Reduction of the work group that does not fit the kernel workgroup size,
+    // if it exists
     if (last_group_size) {
       kernel.setArg(1, sizeof(ReturnType) * last_group_size, nullptr);
-      kernel.setArg(4, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
-      kernel.setArg(5, num_work_groups);
+      kernel.setArg(3, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
+      kernel.setArg(4, num_work_groups);
       cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(last_group_size),
           cl::NDRange(last_group_size));
       assert((err == CL_SUCCESS) && PANIC_ASSERTION);
@@ -1297,7 +1312,109 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
     kernel.setArg(0, output_buffer);
   } while (total_num_work_groups != 1);
 
+  // Transform, depending on the function, the reduced value with the specified initial value
+  kernel_code = CreateOffsetKernelCode<ReturnType, Function>();
+
+  // Recompile the program
+  program = cl::Program(Info::v().context(), { kernel_code });
+  err = program.build({ Info::v().device() });
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  kernel = cl::Kernel(program, cKernelPrefix);
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+
+  // The inputs to the kernel are the reduced buffer and the initial value
+  kernel.setArg(0, output_buffer);
+  kernel.setArg(1, initial_value);
+
+  // Run a single thread
+  cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(1));
+
   return output_buffer;
+}
+
+template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
+std::string CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape)
+{
+  // initialize contiguous strides
+  size_t lhs_strides[M1];
+  size_t rhs_strides[M2];
+  lhs_shape.pInitializeStrides(lhs_strides);
+  rhs_shape.pInitializeStrides(rhs_strides);
+
+  // Initialize cumulative dimensions, excluding the axes that being folded over
+  size_t lhs_cumul_dim[M1 - 1];
+  size_t rhs_cumul_dim[M2 - 1];
+  details::FillExceptForIndex<I1>(lhs_shape.dimensions_, lhs_cumul_dim);
+  details::FillExceptForIndex<I2>(rhs_shape.dimensions_, rhs_cumul_dim);
+
+  // Accumulate lhs
+  size_t accumulator = 1;
+  for (size_t i = 0; i < M1 - 1; ++i) {
+    size_t tmp = accumulator;
+    accumulator *= lhs_cumul_dim[M1 - 1 - (i + 1)];
+    lhs_cumul_dim[M1 - 1 - (i + 1)] = tmp;
+  }
+
+  // Accumulate rhs
+  accumulator = 1;
+  for (size_t i = 0; i < M2 - 1; ++i) {
+    size_t tmp = accumulator;
+    accumulator *= rhs_cumul_dim[M2 - 1 - (i + 1)];
+    rhs_cumul_dim[M2 - 1 - (i + 1)] = tmp;
+  }
+
+  // Size along the axes that are being folded over
+  assert(lhs_strides[I1] == rhs_strides[I2] && PANIC_ASSERTION);
+  size_t K = lhs_strides[I1];
+
+  // The kernel's 1st and 2nd arguments are the first and second input buffers. The
+  // third argument is the output buffer.
+
+  // First line -- argument list
+  std::string kernel_code =
+    std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "("
+  + cGlobalIdentifier + " " + OpenCLType<LHSType>::value 
+  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + "1, "
+  + cGlobalIdentifier + " " + OpenCLType<RHSType>::value + " " + cConstantIdentifier
+  + cPointerIdentifier + cVariablePrefix + "2, " + cGlobalIdentifier + " " 
+  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cOutputName + ") {\n";
+
+  // local and global size and id declerations
+  kernel_code +=
+    std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
+  + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
+  + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
+
+  // Matrix dimension definitions:
+  // K: dimensions of axis being folded over
+  // M: rank of LHS shape - 1
+  // N: rank of RHS shape - 1
+  kernel_code +=
+    std::string("\t#define K " + std::to_string(K) + "\n"
+  + std::string("\t#define M " + std::to_string(M1 - 1) + "\n"
+  + std::string("\t#define N " + std::to_string(M2 - 1) + "\n";
+
+  return kernel_code;
+}
+
+
+template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
+cl::Buffer CreateMultiplicationKernel(cl::CommandQueue &cqueue, cl::Buffer lhs_buffer, 
+    cl::Buffer rhs_buffer, Shape<M1> lhs_shape, Shape<M2> rhs_shape)
+{
+  // total number of elements
+  size_t lhs_cumul = lhs_.shape().index_product();
+  size_t rhs_cumul = rhs_.shape().index_product();
+  size_t output_cumul = lhs_cumul / lhs_.dimension(I1) + rhs_cumul / rhs_.dimension(I2);
+
+  // buffer to store multiplication result
+  cl::Buffer output_buffer(Info::v().context(), CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
+      output_cumul * sizeof(LHSType), nullptr, &err);
+
+  std::string kernel_code = CreateMultiplicationKernelCode<I1, I2, LHSType, RHSType>(
+      lhs_shape, rhs_shape);
+
 }
 
 } // namespace details
@@ -1636,15 +1753,21 @@ public:
   friend std::ostream &operator<<(std::ostream &os, Shape<M> const &shape);
 
 private:
+  
   /* ------------------ Data ------------------ */
 
   size_t dimensions_[N]; /**< Underlying data */
+
+  /* ----------------- Utility ----------------- */
+
+  void pInitializeStrides(size_t (&strides)[N]);
 
   /* --------------- Constructor --------------- */
 
   Shape(size_t const *dimensions);
   Shape() = default;                      
 };
+
 
 template <size_t N>
 Shape<N>::Shape(std::initializer_list<size_t> dimensions)
@@ -1710,6 +1833,16 @@ template <size_t N>
 size_t Shape<N>::index_product() const noexcept
 {
   return std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
+}
+
+template <size_t N>
+void Shape<N>::pInitializeStrides(size_t (&strides)[N])
+{
+  size_t accumulator = 1;
+  for (size_t i = 0; i < N; ++i) {
+    strides[N - i - 1] = accumulator;
+    accumulator *= dimensions_[N - i - 1];
+  }
 }
 
 template <size_t N>
@@ -2549,11 +2682,7 @@ private:
     void operator()(size_t (&)[N]) {}
   };
 
-  // Initialize strides :: DIMENSIONS MUST BE INITIALIZED FIRST
-  void pInitializeStrides();
-
-  // Declare all fields in the constructor, but initialize strides assuming no
-  // gaps
+  // Declare all fields in the constructor, but initialize strides assuming no gaps
   Tensor(size_t const *dimensions, size_t offset,
       std::shared_ptr<C<T>> &&_ref);
 
@@ -2573,7 +2702,7 @@ Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions)
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
 }
 
 template <typename T, size_t N, template <class> class C> 
@@ -2586,7 +2715,7 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
 #endif
   for (size_t i = 0; i < N; ++i)
     assert(dimensions[i] && ZERO_ELEMENT); 
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
 }
 
 template <typename T, size_t N, template <class> class C> 
@@ -2598,7 +2727,7 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
 #endif
   for (size_t i = 0; i < N; ++i)
     assert(dimensions[i] && ZERO_ELEMENT); 
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product(); 
   ref_ = std::make_shared<C<T>>(cumul, value); 
 }
@@ -2614,7 +2743,7 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N],
 #endif
   for (size_t i = 0; i < N; ++i) 
     assert(dimensions[i] && ZERO_ELEMENT); 
-  pInitializeStrides();
+  shape_.pInitializeStrides(strides_);
   auto value_setter = 
     [&f, &args...](T &lhs) -> void { lhs = f(args...); }; 
   ref_ = std::make_shared<C<T>>(shape_.index_product());
@@ -2631,7 +2760,7 @@ Tensor<T, N, C>::Tensor(CArrayProxy<Array> &&md_array): offset_(0)
   static_assert(std::rank<Array>::value == N, RANK_MISMATCH); 
   using ArrayType = typename std::remove_all_extents<Array>::type; 
   SetCArrayDimensions<Array, 0, N>{}(shape_.dimensions_); 
-  pInitializeStrides();
+  shape_.pInitializeStrides(strides_);
   // Make use of the fact C arrays are contiguously allocated
   ArrayType *ptr = (ArrayType *)md_array.value; 
   size_t cumul = shape_.index_product();
@@ -2645,7 +2774,7 @@ Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
   ref_ = std::make_shared<C<T>>(cumul); 
   Indices<N> reference_indices{};
@@ -2665,7 +2794,7 @@ Tensor<T, N, C>::Tensor(Tensor<U, N, C_> const &tensor)
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
   ref_ = std::make_shared<C<T>>(cumul); 
   Indices<N> reference_indices{};
@@ -2709,7 +2838,7 @@ NodeType, typename> Tensor<T, N, C>::Tensor(Expression<NodeType> const& rhs)
 #endif
   auto const &expression = rhs.self(); 
   shape_ = expression.shape(); 
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
   ref_ = std::make_shared<C<T>>(cumul);
   Indices<N> reference_indices{};
@@ -2732,7 +2861,7 @@ Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
 #endif
   static_assert(N == NodeType::rank() && RANK_MISMATCH);
   shape_ = model.shape(); 
-  pInitializeStrides(); 
+  shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
   T *data = new T[cumul];
   model.template pFill<T>(data, cumul);
@@ -3202,15 +3331,6 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(size_t (&placed_indices)[N]
 }
 
 /* -------------- Utility Methods --------------- */
-template <typename T, size_t N, template <class> class C>
-void Tensor<T, N, C>::pInitializeStrides()
-{
-  size_t accumulator = 1;
-  for (size_t i = 0; i < N; ++i) {
-    strides_[N - i - 1] = accumulator;
-    accumulator *= shape_.dimensions_[N - i - 1];
-  }
-}
 
 // private constructors
 template <typename T, size_t N, template <class> class C>
@@ -3220,7 +3340,7 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t offset, std::shared_ptr
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
-  pInitializeStrides();
+  shape_.pInitializeStrides(strides_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3487,8 +3607,7 @@ Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, 
   auto shape = Shape<M1 + M2 - 2>();
   details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, shape.dimensions_);
   details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, shape.dimensions_ + M1 - 1);
-  //std::copy_n(tensor_1.shape_.dimensions_, M1 - 1, shape.dimensions_);
-  //std::copy_n(tensor_2.shape_.dimensions_ + 1, M2 - 1, shape.dimensions_ + M1 - 1);
+
   Tensor<X, M1 + M2 - 2, C1> prod_tensor(shape);
   size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[I1];
   size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[I2];
@@ -5298,7 +5417,9 @@ namespace math {
 /** Vardiac wrapper around std::plus with OpenCL code emission */
 struct add {
   template <typename T, typename... Args>
-  inline T operator()(T const &arg1, Args const&... args); 
+  inline T operator()(T const &arg1, Args const&... args) const;
+  template <typename T, typename... Args>
+  inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
@@ -5308,11 +5429,17 @@ struct add {
 };
 
 template <typename T, typename... Args>
-inline T add::operator()(T const &arg1, Args const&... args)
+inline T add::operator()(T const &arg1, Args const&... args) const
 {
   T result = arg1;
   VARDIAC_MAP(result += args);
   return result;
+}
+
+template <typename T, typename... Args>
+inline void add::operator()(T &arg1, Args const&... args) const
+{
+  VARDIAC_MAP(arg1 += args);
 }
 
 inline std::string add::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5337,7 +5464,9 @@ inline std::string add::opencl_map(Args const&... args)
 /** Vardiac wrapper around std::minus with OpenCL code emission */
 struct sub {
   template <typename T, typename... Args>
-  inline T operator()(T const &arg1, Args const&... args); 
+  inline T operator()(T const &arg1, Args const&... args) const;
+  template <typename T, typename... Args>
+  inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
@@ -5347,11 +5476,17 @@ struct sub {
 };
 
 template <typename T, typename... Args>
-inline T sub::operator()(T const &arg1, Args const&... args)
+inline T sub::operator()(T const &arg1, Args const&... args) const
 {
   T result = arg1;
-  VARDIAC_MAP(arg1 -= args);
+  VARDIAC_MAP(result -= args);
   return result;
+}
+
+template <typename T, typename... Args>
+inline void sub::operator()(T &arg1, Args const&... args) const
+{
+  VARDIAC_MAP(arg1 -= args);
 }
 
 inline std::string sub::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5376,7 +5511,9 @@ inline std::string sub::opencl_map(Args const&... args)
 /** Vardiac wrapper around std::multiplies with OpenCL code emission */
 struct mul {
   template <typename T, typename... Args>
-  inline T operator()(T const &arg1, Args const&... args); 
+  inline T operator()(T const &arg1, Args const&... args) const;
+  template <typename T, typename... Args>
+  inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
@@ -5386,11 +5523,17 @@ struct mul {
 };
 
 template <typename T, typename... Args>
-inline T mul::operator()(T const &arg1, Args const&... args)
+inline T mul::operator()(T const &arg1, Args const&... args) const
 {
   T result = arg1;
   VARDIAC_MAP(result *= args);
   return result;
+}
+
+template <typename T, typename... Args>
+inline void mul::operator()(T &arg1, Args const&... args) const
+{
+  VARDIAC_MAP(arg1 *= args);
 }
 
 inline std::string mul::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5415,7 +5558,9 @@ inline std::string mul::opencl_map(Args const&... args)
 /** Vardiac wrapper around std::divides with OpenCL code emission */
 struct div {
   template <typename T, typename... Args>
-  inline T operator()(T const &arg1, Args const&... args);
+  inline T operator()(T const &arg1, Args const&... args) const;
+  template <typename T, typename... Args>
+  inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
@@ -5425,11 +5570,17 @@ struct div {
 };
 
 template <typename T, typename... Args>
-inline T div::operator()(T const &arg1, Args const&... args)
+inline T div::operator()(T const &arg1, Args const&... args) const
 {
   T result = arg1;
   VARDIAC_MAP(result /= args);
   return result;
+}
+
+template <typename T, typename... Args>
+inline void div::operator()(T &arg1, Args const&... args) const
+{
+  VARDIAC_MAP(arg1 /= args);
 }
 
 inline std::string div::opencl_reduce(std::string const &accum, std::string const &v1)
@@ -5723,9 +5874,8 @@ template <typename LHS, typename RHS>
 std::string BinaryAddExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
 {
-  std::string expr = lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " " + opencl::details::cAddOperator + " " 
-    + rhs_.OpenCLBuffer(cqueue, buffers, arg_list);
+  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
+    + " +  " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
@@ -5891,9 +6041,8 @@ template <typename LHS, typename RHS>
 std::string BinarySubExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
 {
-  std::string expr = lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " " + opencl::details::cSubOperator + " " 
-    + rhs_.OpenCLBuffer(cqueue, buffers, arg_list);
+  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
+    + " - " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
@@ -5997,6 +6146,19 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type;
 
+  /* --------------------------- OpenCL ----------------------------- */
+
+#ifdef _ENABLE_OPENCL
+  opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
+
+  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list) const noexcept;
+
+  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, std::string &arg_list,
+      std::string &expr) const noexcept;
+#endif
+
 private:
 
   /* -------------- Constructors -------------- */
@@ -6043,6 +6205,8 @@ BinaryMulExpr<I1, I2, LHS, RHS>::BinaryMulExpr(LHS const &lhs, RHS const &rhs)
   static_assert(RHS::rank(), PANIC_ASSERTION);
   static_assert(I1 < LHS::rank(), RANK_OUT_OF_BOUNDS);
   static_assert(I2 < RHS::rank(), RANK_OUT_OF_BOUNDS);
+  assert(lhs.dimension(I1) == rhs.dimension(I2) && DIMENSION_MISMATCH);
+
   // shape <- lhs.shape[:~I1] ++ rhs.shape[:~I2]
   details::FillExceptForIndex<I1>(lhs.shape().dimensions_, shape_.dimensions_);
   details::FillExceptForIndex<I2>(rhs.shape().dimensions_, shape_.dimensions_ + LHS::rank() - 1);
@@ -6135,8 +6299,6 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Args... args) const
 {
   using namespace meta; // WARNING -- using namespace
   static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
-  //static_assert(ContainsIndex<I1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
-  //static_assert(ContainsIndex<I2 + LHS::rank() - 1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
 
   constexpr size_t lhs_left_count = CountLTMax<I1, Slices...>::value;
   constexpr size_t lhs_right_count = CountInBetween<I1, LHS::rank() - 1, Slices...>::value;
@@ -6164,12 +6326,6 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Args... args) const
                       decltype(rhs_right_sequence)>::sequence{};
 
   static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
-
-  /*
-  auto sequence2 = typename Append<0, typename SequenceTransformer<
-        typename MakeRightSequence<thresh_hold, Slices...>::sequence,
-        SequenceNegativeOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
-  */
   return pSliceSequences(lhs_sequence, rhs_sequence, args...);
 }
 
@@ -6209,12 +6365,6 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
                       decltype(rhs_right_sequence)>::sequence{};
 
   static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
-  /*
-  auto sequence2 = typename Append<0, typename SequenceTransformer<
-        typename MakeRightSequence<thresh_hold, Slices...>::sequence,
-        SequenceNegativeOffset, Max(LHS::rank(), 2) - 2>::sequence>::sequence{};
-  */
-
   return pSliceSequences(lhs_sequence, rhs_sequence, indices);
 }
 
@@ -6293,6 +6443,39 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
+/* ----------------------------- OpenCL ----------------------------- */
+
+#ifdef _ENABLE_OPENCL
+
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+{
+  using namespace opencl::details; // WARNING -- using namespace
+  //using lhs_t = typename LHS::value_t;
+  //using rhs_t = typename RHS::value_t;
+
+  // Create the multiplication kernel
+  // lhs and rhs buffers
+  cl::Buffer lhs_buffer = opencl::details::CreateBuffer(lhs_);
+  cl::Buffer rhs_buffer = opencl::details::CreateBuffer(rhs_);
+
+  buffers.push_back(CreateMultiplicationKernel<I1, I2, lhs_t, rhs_t>(cqueue, lhs_buffer, rhs_buffer, lhs_.shape(), rhs_.shape());
+  
+  // add the new scalar to the argument list and the expression
+  size_t arg_index = buffers.size() - 1;
+
+  // Add pointer to the the buffer to the element list
+  arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<value_t>::value) + " " 
+           +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
+           +  std::to_string(arg_index) + ", ";
+
+  // return the name of the element
+  return cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
+}
+
+#endif
+
 /* --------------------------------------------------------------------- */
 
 template <typename LHS, typename RHS> 
@@ -6330,25 +6513,50 @@ public:
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHS::rank()> const &shape() const { return lhs_.shape(); }
 
-  template <typename... Args>
+  template <typename... Args, typename = 
+            typename std::enable_if<sizeof...(Args) != self_t::rank()>::type>
   auto operator()(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>()(args...))>::type;
 
-  template <typename... Args>
+  template <typename... Args, typename = 
+            typename std::enable_if<sizeof...(Args) == self_t::rank()>::type>
+  value_t operator()(Args... args) const;
+
+  template <typename... Args, typename =
+            typename std::enable_if<sizeof...(Args) != self_t::rank()>::type>
   auto at(Args... args) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>().at(args...))>::type;
 
-  template <size_t M>
+  template <typename... Args, typename =
+            typename std::enable_if<sizeof...(Args) == self_t::rank()>::type>
+  Tensor<value_t, 0, container_t> at(Args... args) const;
+
+  template <size_t M, typename =
+            typename std::enable_if<M != self_t::rank()>::type>
   auto operator[](Indices<M> const &indices) const 
     -> typename std::remove_reference<decltype(std::declval<LHS const>()[indices])>::type;
 
-  template <size_t... Slices, typename... Args>
+  template <size_t M, typename =
+            typename std::enable_if<M == self_t::rank()>::type>
+  value_t operator[](Indices<M> const &indices) const;
+
+  template <size_t... Slices, typename... Args, typename =
+            typename std::enable_if<sizeof...(Args) != self_t::rank()>::type>
   auto slice(Args... args) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type;
 
-  template <size_t... Slices, size_t M>
+  template <size_t... Slices, typename... Args, typename =
+            typename std::enable_if<sizeof...(Args) == self_t::rank()>::type>
+  value_t slice(Args... args) const;
+
+  template <size_t... Slices, size_t M, typename =
+            typename std::enable_if<M != self_t::rank()>::type>
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
+
+  template <size_t... Slices, size_t M, typename = 
+            typename std::enable_if<M == self_t::rank()>::type>
+  value_t slice(Indices<M> const &indices) const;
 
   /* ---------------- OpenCL ----------------- */
 
@@ -6390,7 +6598,7 @@ BinaryHadExpr<LHS, RHS> operator%(Expression<LHS> const &lhs, Expression<RHS> co
 /* ---------------- Getters ---------------- */
 
 template <typename LHS, typename RHS>
-template <typename... Args>
+template <typename... Args, typename>
 auto BinaryHadExpr<LHS, RHS>::operator()(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>()(args...))>::type
 {
@@ -6399,7 +6607,14 @@ auto BinaryHadExpr<LHS, RHS>::operator()(Args... args) const
 }
 
 template <typename LHS, typename RHS>
-template <typename... Args>
+template <typename... Args, typename>
+typename BinaryHadExpr<LHS, RHS>::value_t BinaryHadExpr<LHS, RHS>::operator()(Args... args) const
+{
+  return lhs_(args...) * rhs_(args...);
+}
+
+template <typename LHS, typename RHS>
+template <typename... Args, typename>
 auto BinaryHadExpr<LHS, RHS>::at(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>().at(args...))>::type
 {
@@ -6408,7 +6623,15 @@ auto BinaryHadExpr<LHS, RHS>::at(Args... args) const
 }
 
 template <typename LHS, typename RHS>
-template <size_t M>
+template <typename... Args, typename>
+Tensor<typename BinaryHadExpr<LHS, RHS>::value_t, 0, BinaryHadExpr<LHS, RHS>::template container_t> 
+  BinaryHadExpr<LHS, RHS>::at(Args... args) const
+{
+  return lhs_(args...) * rhs_(args...);
+}
+
+template <typename LHS, typename RHS>
+template <size_t M, typename>
 auto BinaryHadExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>()[indices])>::type
 {
@@ -6417,21 +6640,44 @@ auto BinaryHadExpr<LHS, RHS>::operator[](Indices<M> const &indices) const
 }
 
 template <typename LHS, typename RHS>
-template <size_t... Slices, typename... Args>
+template <size_t M, typename>
+typename BinaryHadExpr<LHS, RHS>::value_t BinaryHadExpr<LHS, RHS>::operator[](Indices<M> const &indices) const 
+{
+  return lhs_[indices] * rhs_[indices];
+}
+
+template <typename LHS, typename RHS>
+template <size_t... Slices, typename... Args, typename>
 auto BinaryHadExpr<LHS, RHS>::slice(Args... args) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type
 {
-  static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
+  static_assert(rank() >= sizeof...(Slices) + sizeof...(args), RANK_OUT_OF_BOUNDS);
   return lhs_.template slice<Slices...>(args...) % rhs_.template slice<Slices...>(args...);
 }
 
 template <typename LHS, typename RHS>
-template <size_t... Slices, size_t M>
+template <size_t... Slices, typename... Args, typename>
+typename BinaryHadExpr<LHS, RHS>::value_t BinaryHadExpr<LHS, RHS>::slice(Args... args) const
+{
+  static_assert(!sizeof...(Slices), RANK_OUT_OF_BOUNDS);
+  return lhs(args...) * rhs(args...);
+}
+
+template <typename LHS, typename RHS>
+template <size_t... Slices, size_t M, typename>
 auto BinaryHadExpr<LHS, RHS>::slice(Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type
 {
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   return lhs_.template slice<Slices...>(indices) % rhs_.template slice<Slices...>(indices);
+}
+
+template <typename LHS, typename RHS>
+template <size_t... Slices, size_t M, typename>
+typename BinaryHadExpr<LHS, RHS>::value_t BinaryHadExpr<LHS, RHS>::slice(Indices<M> const &indices) const
+{
+  static_assert(!sizeof...(Slices), RANK_OUT_OF_BOUNDS);
+  return lhs_[indices] * rhs_[indices];
 }
 
 /* -------------- Constructors -------------- */
@@ -6448,9 +6694,8 @@ template <typename LHS, typename RHS>
 std::string BinaryHadExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
 {
-  std::string expr = lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " " + opencl::details::cMulOperator + " " 
-    + rhs_.OpenCLBuffer(cqueue, buffers, arg_list);
+  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
+    + " * " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
