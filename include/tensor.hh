@@ -1078,17 +1078,30 @@ constexpr char cLocalPrefix[]        = "l";
 constexpr char cForPrefix[]          = "i";
 
 // Variable names
+// Group Ids
 constexpr char cGlobalIdName[]       = "global_id";
 constexpr char cLocalIdName[]        = "local_id";
 constexpr char cGroupIdName[]        = "group_id";
 constexpr char cLocalSizeName[]      = "local_size";
 constexpr char cOutputName[]         = "o";
+
+// Dimensions
 constexpr char cReductionSize[]      = "N";
 constexpr char cWorkGroupSize[]      = "WGS";
-constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
 constexpr char cOffsetName[]         = "offset";
 constexpr char cWGSizeName[]         = "wg_size";
 constexpr char cInitialValueName[]   = "ival";
+
+// Built in functions
+constexpr char cLocalMemFence[]      = "CLK_LOCAL_MEM_FENCE";
+
+// Multiplication specific
+constexpr char cLHSCumulDimsName[]   = "lhs_cdims";
+constexpr char cRHSCumulDimsName[]   = "rhs_cdims";
+constexpr char cLHSStridesName[]     = "lhs_strides";
+constexpr char cRHSStridesName[]     = "rhs_strides";
+constexpr char cLHSOffsetName[]      = "lhs_offset";
+constexpr char cRHSOffsetName[]      = "rhs_offset";
 
 // Thread ID functions
 constexpr char cGlobalIdFunction[]   = "get_global_id";
@@ -1177,26 +1190,23 @@ cl::Buffer CreateBuffer(NodeType const& node)
 template <typename ReturnType, typename Function> 
 std::string CreateReductionKernelCode()
 {
-  std::string kernel_code =
-      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
-
   // The kernel's 1st argument is the input buffer, and the 2nd argument a local buffer,
   // 3rd argument is an output buffer which stores the result of the reduction,
   // 4th argument is the size of half of the reduction group, the fifth argument is 
   // the offset, the sixth argument is the workgroup_size
     
-  kernel_code +=
-    std::string(cGlobalIdentifier) + " " + OpenCLType<ReturnType>::value 
-  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + ", ";
-  
-  kernel_code +=
-    std::string(cLocalIdentifier) + " "
-  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
+  // Kernel decleration & argument list
+  std::string kernel_code =
+    std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "("
+  + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value 
+  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + ", " 
+  + cLocalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
   + ", " + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
   + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " + cSizeTType + " "
   + cConstIdentifier + " " + cOffsetName + ", " + cSizeTType + " " + cConstIdentifier 
   + " " + cWGSizeName + ") {\n";
 
+  
   kernel_code +=
     std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
   + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
@@ -1344,8 +1354,8 @@ std::string CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2>
   // Initialize cumulative dimensions, excluding the axes that being folded over
   size_t lhs_cumul_dim[M1 - 1];
   size_t rhs_cumul_dim[M2 - 1];
-  details::FillExceptForIndex<I1>(lhs_shape.dimensions_, lhs_cumul_dim);
-  details::FillExceptForIndex<I2>(rhs_shape.dimensions_, rhs_cumul_dim);
+  tensor::details::FillExceptForIndex<I1>(lhs_shape.dimensions_, lhs_cumul_dim);
+  tensor::details::FillExceptForIndex<I2>(rhs_shape.dimensions_, rhs_cumul_dim);
 
   // Accumulate lhs
   size_t accumulator = 1;
@@ -1363,58 +1373,126 @@ std::string CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2>
     rhs_cumul_dim[M2 - 1 - (i + 1)] = tmp;
   }
 
-  // Size along the axes that are being folded over
-  assert(lhs_strides[I1] == rhs_strides[I2] && PANIC_ASSERTION);
-  size_t K = lhs_strides[I1];
-
   // The kernel's 1st and 2nd arguments are the first and second input buffers. The
   // third argument is the output buffer.
-
-  // First line -- argument list
-  std::string kernel_code =
-    std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "("
-  + cGlobalIdentifier + " " + OpenCLType<LHSType>::value 
-  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + "1, "
-  + cGlobalIdentifier + " " + OpenCLType<RHSType>::value + " " + cConstantIdentifier
-  + cPointerIdentifier + cVariablePrefix + "2, " + cGlobalIdentifier + " " 
-  + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cOutputName + ") {\n";
-
-  // local and global size and id declerations
-  kernel_code +=
-    std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
-  + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
-  + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
-  + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
-
+  
   // Matrix dimension definitions:
-  // K: dimensions of axis being folded over
-  // M: rank of LHS shape - 1
-  // N: rank of RHS shape - 1
-  kernel_code +=
-    std::string("\t#define K " + std::to_string(K) + "\n"
-  + std::string("\t#define M " + std::to_string(M1 - 1) + "\n"
-  + std::string("\t#define N " + std::to_string(M2 - 1) + "\n";
+  // K: dimensionality of axis being folded over
+  // S1: lhs stride of axis being folded over
+  // S2: rhs stride of axis being folded over
+  // N1: rank of LHS shape - 1
+  // N2: rank of RHS shape - 1
+  std::string kernel_code = 
+    std::string("#define K ") + std::to_string(lhs_shape[I1]) + "\n"
+  + "#define S1 " + std::to_string(lhs_strides[I1]) + "\n"
+  + "#define S2 " + std::to_string(rhs_strides[I2]) + "\n"
+  + "#define N1 " + std::to_string(M1 - 1) + "\n"
+  + "#define N2 " + std::to_string(M2 - 1) + "\n";
+
+  // lhs cumulative dimensions and strides 
+  kernel_code += "size_t constant lhs_cdims[N1] = {";
+  for (size_t i = 0; i < M1 - 1; ++i) 
+    kernel_code += std::to_string(lhs_cumul_dim[i]) + ", ";
+  kernel_code[kernel_code.size() - 2] = '}';
+  kernel_code[kernel_code.size() - 1] = ';';
+  kernel_code += "\nsize_t constant lhs_strides[N1] = {";
+  for (size_t i = 0; i < M1; ++i)  {
+    // skip the dimension of the axis being foleded over
+    if (i != I1) kernel_code += std::to_string(lhs_strides[i]) + ", ";
+  }
+  kernel_code[kernel_code.size() - 2] = '}';
+  kernel_code[kernel_code.size() - 1] = ';';
+
+  // rhs cumulative dimensions and strides 
+  kernel_code += "\nsize_t constant rhs_cdims[N2] = {";
+  for (size_t i = 0; i < M2 - 1; ++i) 
+    kernel_code += std::to_string(rhs_cumul_dim[i]) + ", ";
+  kernel_code[kernel_code.size() - 2] = '}';
+  kernel_code[kernel_code.size() - 1] = ';';
+  kernel_code += "\nsize_t constant rhs_strides[N2] = {";
+  for (size_t i = 0; i < M2; ++i)  {
+    // skip the dimension of the axis being foleded over
+    if (i != I2) kernel_code += std::to_string(rhs_strides[i]) + ", ";
+  }
+  kernel_code[kernel_code.size() - 2] = '}';
+  kernel_code[kernel_code.size() - 1] = ';';
+
+  // Kernel decleration & argument list
+  kernel_code += std::string("\nkernel void k(global ")
+  + OpenCLType<LHSType>::value + " const *lhs, global "
+  + OpenCLType<LHSType>::value + " const *rhs, global "
+  + OpenCLType<LHSType>::value + " *output) {\n";
+
+  // Global size and id declerations
+  kernel_code += R"(
+  size_t lhs_id = get_global_id(0);
+  size_t rhs_id = get_global_id(1);)";
+
+  // Compute the lhs offset
+  kernel_code += R"(
+  size_t lhs_offset = 0;
+  for (size_t i = 0; i < N1; ++i) {
+    size_t tmp = lhs_id / lhs_cdims[i];
+    lhs_id -= tmp * lhs_cdims[i];
+    lhs_offset += tmp * lhs_strides[i];
+  })";
+
+  // Compute the rhs offset
+  kernel_code += R"(
+  size_t rhs_offset = 0;
+  for (size_t i = 0; i < N2; ++i) {
+    size_t tmp = rhs_id / rhs_cdims[i];
+    rhs_id -= tmp * rhs_cdims[i];
+    rhs_offset += tmp * rhs_strides[i];
+  })";
+
+  // Accumulate and store the result
+  kernel_code += std::string("\n  ") + OpenCLType<LHSType>::value + " accum = 0;";
+  kernel_code += R"(
+  for (size_t i = 0; i < K; ++i)
+    accum += lhs[lhs_offset + i * S1] * rhs[rhs_offset + i * S2];
+  output[get_global_id(0) * get_global_size(1) + get_global_id(1)] = accum;
+})";
 
   return kernel_code;
 }
 
-
 template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
-cl::Buffer CreateMultiplicationKernel(cl::CommandQueue &cqueue, cl::Buffer lhs_buffer, 
-    cl::Buffer rhs_buffer, Shape<M1> lhs_shape, Shape<M2> rhs_shape)
+cl::Buffer CreateMultiplicationKernel(cl::CommandQueue &cqueue, cl::Buffer &lhs_buffer, 
+    cl::Buffer &rhs_buffer, Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape)
 {
   // total number of elements
-  size_t lhs_cumul = lhs_.shape().index_product();
-  size_t rhs_cumul = rhs_.shape().index_product();
-  size_t output_cumul = lhs_cumul / lhs_.dimension(I1) + rhs_cumul / rhs_.dimension(I2);
-
-  // buffer to store multiplication result
-  cl::Buffer output_buffer(Info::v().context(), CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
-      output_cumul * sizeof(LHSType), nullptr, &err);
+  size_t lhs_cumul = lhs_shape.index_product();
+  size_t rhs_cumul = rhs_shape.index_product();
+  size_t output_cumul = lhs_cumul / lhs_shape[I1] * rhs_cumul / rhs_shape[I2];
 
   std::string kernel_code = CreateMultiplicationKernelCode<I1, I2, LHSType, RHSType>(
       lhs_shape, rhs_shape);
 
+  cl_int status = 0;
+
+  // buffer to store multiplication result
+  cl::Buffer output_buffer(Info::v().context(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+      output_cumul * sizeof(LHSType), nullptr, &status);
+  assert((status == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+
+  // Create the program and kernel
+  cl::Program::Sources sources({ kernel_code });
+  cl::Program program(Info::v().context(), sources);
+  status = program.build({ Info::v().device() });
+  assert((status == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+  cl::Kernel kernel(program, cKernelPrefix);
+
+  kernel.setArg(0, lhs_buffer);
+  kernel.setArg(1, rhs_buffer);
+  kernel.setArg(2, output_buffer);
+
+  // Run the multiplication kernel
+  status = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, 
+      cl::NDRange(lhs_cumul / lhs_shape[I1], rhs_cumul / rhs_shape[I2]));
+  assert((status == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+
+  return output_buffer;
 }
 
 } // namespace details
@@ -1678,7 +1756,7 @@ public:
   typedef ptrdiff_t                 difference_type;
   typedef Shape<N>                  self_t;
 
-  /* ----------------- friend classes ----------------- */
+  /* -------------------- friends -------------------- */
 
   template <typename X, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
@@ -1689,6 +1767,10 @@ public:
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
+
+  template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
+  std::string friend opencl::details::CreateMultiplicationKernelCode(
+      Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape);
 
   /* ------------------ Constructors ------------------ */
 
@@ -1760,14 +1842,14 @@ private:
 
   /* ----------------- Utility ----------------- */
 
-  void pInitializeStrides(size_t (&strides)[N]);
+  /** Fills `strides` by accumulating over `dimensions_` */ 
+  void pInitializeStrides(size_t (&strides)[N]) const noexcept;
 
   /* --------------- Constructor --------------- */
 
   Shape(size_t const *dimensions);
   Shape() = default;                      
 };
-
 
 template <size_t N>
 Shape<N>::Shape(std::initializer_list<size_t> dimensions)
@@ -1836,7 +1918,7 @@ size_t Shape<N>::index_product() const noexcept
 }
 
 template <size_t N>
-void Shape<N>::pInitializeStrides(size_t (&strides)[N])
+void Shape<N>::pInitializeStrides(size_t (&strides)[N]) const noexcept
 {
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
@@ -3378,8 +3460,8 @@ std::string Tensor<T, N, C>::OpenCLBuffer(cl::CommandQueue&,
   // FIXME is there a more efficient way of copying over the memory?
   cl_int err = 0;
   buffers.push_back(cl::Buffer(opencl::Info::v().context(), 
-      CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | 
-      CL_MEM_COPY_HOST_PTR, cumul * sizeof(T), data, &err));
+      CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, 
+      cumul * sizeof(T), data, &err));
   assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
 
   using namespace opencl::details; // WARNING -- using namespace
@@ -6452,15 +6534,16 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cque
     std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
 {
   using namespace opencl::details; // WARNING -- using namespace
-  //using lhs_t = typename LHS::value_t;
-  //using rhs_t = typename RHS::value_t;
+  using lhs_t = typename LHS::value_t;
+  using rhs_t = typename RHS::value_t;
 
   // Create the multiplication kernel
   // lhs and rhs buffers
   cl::Buffer lhs_buffer = opencl::details::CreateBuffer(lhs_);
   cl::Buffer rhs_buffer = opencl::details::CreateBuffer(rhs_);
 
-  buffers.push_back(CreateMultiplicationKernel<I1, I2, lhs_t, rhs_t>(cqueue, lhs_buffer, rhs_buffer, lhs_.shape(), rhs_.shape());
+  buffers.push_back(CreateMultiplicationKernel<I1, I2, lhs_t, rhs_t>(
+        cqueue, lhs_buffer, rhs_buffer, lhs_.shape(), rhs_.shape()));
   
   // add the new scalar to the argument list and the expression
   size_t arg_index = buffers.size() - 1;
@@ -6472,6 +6555,13 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cque
 
   // return the name of the element
   return cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
+}
+
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+cl::Buffer BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernel(cl::CommandQueue &, 
+    std::vector<cl::Buffer> &buffers, std::string &, std::string &) const noexcept
+{
+  return buffers.back();
 }
 
 #endif
