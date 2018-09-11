@@ -1,9 +1,11 @@
+#ifdef _ENABLE_OPENCL
 #include <tensor.hh>
 #include <catch.hh>
 #include <CL/cl2.hpp>
 #include "test.hh"
 
 using namespace tensor;
+
 
 template <template <class> class Container>
 void SimpleExpressionTests() {
@@ -105,3 +107,4 @@ TEST_CASE(BeginTest("Combination Expressions", "HashMap")) {
   CombinationExpressionTests<data::HashMap>();
 }
 
+#endif

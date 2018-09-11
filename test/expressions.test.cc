@@ -658,8 +658,7 @@ void TensorManipulationTests()
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-        REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template 
-            slice<0, 2>(1)(i, k) == -(int)(i + 1 + k) * 2);
+        REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template slice<0, 2>(1)(i, k) == -(int)(i + 1 + k) * 2);
 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
       REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template 
@@ -710,14 +709,14 @@ void TensorManipulationTests()
     REQUIRE(x == -12);
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)() == 12);
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)[Indices<0>{}] == 12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice() == 12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice(Indices<0>{}) == 12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice<>() == 12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice<>(Indices<0>{}) == 12);
 
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_2)() == -24);
     REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, 
           tensor_1 + tensor_1 - tensor_1 + tensor_2)[Indices<0>{}] == 0);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2 - tensor_1).template slice() == 24);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_1 + tensor_1).template slice(Indices<0>{}) == -12);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2 - tensor_1).template slice<>() == 24);
+    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_1 + tensor_1).template slice<>(Indices<0>{}) == -12);
 
     x = _reduce(0, [](int &x, int y) { x += y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
     REQUIRE(x == -1056);
@@ -729,8 +728,8 @@ void TensorManipulationTests()
     REQUIRE(x == -468);
     REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)() == -444);
     REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)[Indices<0>{}] == -444);
-    REQUIRE(_reduce(-111, add, tensor_1, tensor_1, tensor_3).template slice() == -555);
-    REQUIRE(_reduce(111, add, tensor_1, tensor_1, tensor_3).template slice(Indices<0>{}) == -333);
+    REQUIRE(_reduce(-111, add, tensor_1, tensor_1, tensor_3).template slice<>() == -555);
+    REQUIRE(_reduce(111, add, tensor_1, tensor_1, tensor_3).template slice<>(Indices<0>{}) == -333);
   }
 
   SECTION("Combined Map/Reduce/Arithmetic") {

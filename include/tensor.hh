@@ -16,6 +16,7 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include <array>
 #include <unordered_map>
 
 #ifdef _ENABLE_OPENCL
@@ -187,6 +188,13 @@ namespace meta {
 template <typename T> struct RemoveCVRef;
 
 } // namespace meta
+
+namespace opencl {
+
+template <typename NodeType> class Model;
+
+} // namespace opencl
+
 
 /* ----------------- Type Definitions ---------------- */
 
@@ -388,7 +396,8 @@ struct LogicalAnd { static constexpr bool value = B1 && B2; };
 template <size_t Index, size_t Middle, size_t End>
 struct FillSecond {
   template <typename... Args>
-  FillSecond(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args&&... args)
+  FillSecond(std::array<size_t, Middle> &array1, std::array<size_t, End - Middle> &array2, 
+		size_t next, Args&&... args)
   {
     array2[Index - Middle] = next;
     FillSecond<Index + 1, Middle, End>(array1, array2, args...);
@@ -398,14 +407,14 @@ struct FillSecond {
 template <size_t Middle, size_t End>
 struct FillSecond<End, Middle, End> {
   template <typename... Args>
-  FillSecond(size_t (&)[Middle], size_t (&)[End - Middle]) {}
+  FillSecond(std::array<size_t, Middle>&, std::array<size_t, End - Middle>&) {}
 };
 
 // FIXME g++ 6.3 cannot pattern match this ???
 template <size_t End>
 struct FillSecond<End, 0, End> {
   template <typename... Args>
-  FillSecond(size_t (&)[0], size_t (&)[End]) {}
+  FillSecond(std::array<size_t, 0>&, std::array<size_t, End>&) {}
 };
 
 template <size_t, size_t, size_t>
@@ -414,7 +423,8 @@ struct FillFirst;
 template <size_t Index, size_t Middle, size_t End>
 struct FillFirst {
   template <typename... Args>
-  FillFirst(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args... args)
+  FillFirst(std::array<size_t, Middle> &array1, std::array<size_t, End - Middle> &array2,
+		size_t next, Args... args)
   {
     array1[Index] = next;
     FillFirst<Index + 1, Middle, End>(array1, array2, args...);
@@ -425,7 +435,8 @@ struct FillFirst {
 template <size_t Index, size_t Middle>
 struct FillFirst<Index, Middle, Middle> {
   template <typename... Args>
-  FillFirst(size_t (&array1)[Middle], size_t (&array2)[0], size_t next, Args... args)
+  FillFirst(std::array<size_t, Middle> &array1, std::array<size_t, 0> &array2,
+		size_t next, Args... args)
   {
     array1[Index] = next;
     FillFirst<Index + 1, Middle, Middle>(array1, array2, args...);
@@ -436,7 +447,8 @@ template <size_t Middle, size_t End>
 struct FillFirst<Middle, Middle, End> {
 
   template <typename... Args>
-  FillFirst(size_t (&array1)[Middle], size_t (&array2)[End - Middle], size_t next, Args... args)
+  FillFirst(std::array<size_t, Middle> &array1, std::array<size_t, End - Middle> &array2,
+		size_t next, Args... args)
   {
     array2[0] = next;
     FillSecond<Middle + 1, Middle, End>(array1, array2, args...);
@@ -447,7 +459,8 @@ struct FillFirst<Middle, Middle, End> {
 template <size_t End>
 struct FillFirst<0, 0, End> {
   template <typename... Args>
-  FillFirst(size_t (&array1)[0], size_t (&array2)[End], size_t next, Args... args)
+  FillFirst(std::array<size_t, 0> &array1, std::array<size_t, End> &array2,
+		size_t next, Args... args)
   {
     array2[0] = next;
     FillSecond<1, 0, End>(array1, array2, args...);
@@ -457,7 +470,7 @@ struct FillFirst<0, 0, End> {
 template <size_t End>
 struct FillFirst<End, End, End> {
   template <typename... Args>
-  FillFirst(size_t (&)[End], size_t (&)[0])
+  FillFirst(std::array<size_t, End>&, std::array<size_t, 0>&)
   {}
 };
 
@@ -465,14 +478,14 @@ struct FillFirst<End, End, End> {
 template <>
 struct FillFirst<0, 0, 0> {
   template <typename... Args>
-  FillFirst(size_t (&)[0], size_t (&)[0])
+  FillFirst(std::array<size_t, 0>&, std::array<size_t, 0>&)
   {}
 };
 
 template <size_t Middle, size_t End>
 struct FillArgs {
-  size_t array1[Middle];
-  size_t array2[meta::NonZeroDifference(End, Middle)];
+  std::array<size_t, Middle> array1;
+	std::array<size_t, meta::NonZeroDifference(End, Middle)> array2;
 
   template <typename... Args>
   FillArgs(Args... args)
@@ -931,8 +944,8 @@ inline size_t NextPowerOfTwo(size_t x)
 
 /* ------- Expansion for methods which take Tensors...  --------- */
 
-template <typename NodeType, typename... Tensors>
-Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Tensors const&...)
+template <typename NodeType, typename... Expressions>
+inline Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Expressions const&...)
 {
   return expr.self().shape();
 }
@@ -944,10 +957,10 @@ inline void MapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequenc
 }
 
 template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-inline void ReduceForwardSequence(U &ret_val, FunctionType &&fn, size_t *indices, 
-    meta::Sequence<I...>, Tensors const&... tensors)
+inline void ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices, 
+    meta::Sequence<I...>, Tensors&&... tensors)
 {
-  ret_val = fn(ret_val, tensors.pGet(indices, I)...);
+  ret_val = fn(std::forward<U>(ret_val), std::forward<Tensors>(tensors).pGet(indices, I)...);
 }
 
 template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
@@ -1044,8 +1057,6 @@ inline Info::Info()
   device_ = get_devices(platform_)[0];
   context_ = cl::Context({device_});
 }
-
-template <typename Expr> class Model;
 
 namespace details {
 
@@ -1768,9 +1779,10 @@ public:
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
-  template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
-  std::string friend opencl::details::CreateMultiplicationKernelCode(
-      Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape);
+#ifdef _ENABLE_OPENCL
+	template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
+	friend std::string opencl::details::CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape);
+#endif
 
   /* ------------------ Constructors ------------------ */
 
@@ -1988,8 +2000,8 @@ public:
 private:
   size_t indices_[N];
 
-  // private constructor
-  Indices(size_t const (&indices)[N]);
+  // private constructors
+	Indices(size_t const *indices);
 };
 
 template <size_t N>
@@ -2056,9 +2068,9 @@ bool Indices<N>::decrement(Shape<N> const &shape)
 }
 
 template <size_t N>
-Indices<N>::Indices(size_t const (&indices)[N])
+Indices<N>::Indices(size_t const *indices)
 {
-  std::copy_n(indices, N, indices_);
+	for (size_t i = 0; i < N; ++i) indices_[i] = indices[i];
 }
 
 template <size_t M>
@@ -2195,7 +2207,7 @@ public:
 
   /* ------------------- Destructor ------------------- */
 
-  ~Tensor() = default;
+	~Tensor() noexcept {};
 
   /* ------------------- Assignment ------------------- */
 
@@ -2651,8 +2663,8 @@ public:
    *  The resulting Tensor is filled by iterating through *this and copying
    *  over the values.
    */
-  template <size_t M, template <class> class C_ = C>
-  Tensor<T, M, C_> resize(Shape<M> const &shape) const;
+  template <size_t M, template <class> class C_ = self_t::container_t>
+  Tensor<T, M, C_> resize(Shape<M> const &shape) const noexcept;
 
   /** Returns a deep copy of this tensor, equivalent to calling copy constructor */
   Tensor<T, N, C> copy() const; 
@@ -2706,26 +2718,23 @@ private:
 
   /* ------- Expansion for methods which take Tensors --------- */
 
-  inline T const &pGet(size_t *indices, size_t index) const
-  { return (static_cast<C<T> const&>(*ref_))[offset_ + indices[index]]; }
+  inline T const &pGet(size_t *indices, size_t index) const noexcept
+		{ return (static_cast<C<T> const&>(*ref_))[offset_ + indices[index]]; }
 
   inline T &pGet(size_t *indices, size_t index)
-  { return (*ref_)[offset_ + indices[index]]; }
+    { return (*ref_)[offset_ + indices[index]]; }
 
   template <typename U>
   inline void pSet(size_t index, U&& value)
    { ref_->set(index, std::forward<U>(value)); }
-
-  template <typename U, size_t M, template <class> class C_, typename... Tensors>
-  friend inline Shape<M> const &details::GetShape(Tensor<U, M, C_> const &tensor, Tensors&&... tensors);
 
   template <typename FunctionType, size_t... I, typename... Tensors>
   friend inline void details::MapForwardSequence(
       FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors);
 
   template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-  friend inline void details::ReduceForwardSequence(U &ret_val,
-      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors);
+  friend inline void details::ReduceForwardSequence(U &&ret_val,
+      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors);
 
   template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
   friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
@@ -2941,7 +2950,7 @@ Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
 #ifdef _TEST
   ++eDebugConstructorCounter;
 #endif
-  static_assert(N == NodeType::rank() && RANK_MISMATCH);
+  static_assert(N == NodeType::rank(), RANK_MISMATCH);
   shape_ = model.shape(); 
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
@@ -3791,15 +3800,16 @@ X neg(X const &x)
 
 template <typename T, size_t N, template <class> class C>
 template <size_t M, template <class> class C_>
-Tensor<T, M, C_> Tensor<T, N, C>::resize(Shape<M> const &shape) const
+Tensor<T, M, C_> Tensor<T, N, C>::resize(Shape<M> const &shape) const noexcept
 {
   assert(shape_.index_product() == shape.index_product() && ELEMENT_COUNT_MISMATCH);
   Tensor<T, M, C_> resized_tensor(shape);
   Indices<N> indices = Indices<N>();
-  Indices<M> indices_resized = Indices<M>();
+	// make use of the fact that the new tensor is contiguous
+	size_t index = 0;
   do {
-    resized_tensor[indices_resized] = (*this)[indices];
-    indices_resized.increment(shape);
+    resized_tensor.pSet(index, (*this)[indices]);
+		++index;
   } while (indices.increment(shape_));
   return resized_tensor;
 }
@@ -3922,7 +3932,8 @@ void Map(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides_... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-    details::MapForwardSequence(fn, indices, sequence, tensors...);
+    details::MapForwardSequence(std::forward<FunctionType>(fn), (size_t *)indices, 
+			sequence, tensors...);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
 }
@@ -3941,7 +3952,8 @@ U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides_... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-    details::ReduceForwardSequence(ret_val, fn, indices, sequence, tensors...);
+    details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), 
+			(size_t *)indices, sequence, tensors...);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return ret_val;
@@ -4459,9 +4471,23 @@ class Indices<0> { /*@Indices<0>*/
    *  0-length arrays.
    */
 public:
+
+  /* --------------- Friend Classes ------------- */
+
+  template <typename U, size_t M, template <class> class C_> friend class Tensor;
+  template <typename LHS, typename RHS> friend class BinaryAddExpr;
+  template <typename LHS, typename RHS> friend class BinarySubExpr;
+  template <size_t I1, size_t I2, typename LHS, typename RHS> friend class BinaryMulExpr;
+  template <typename LHS, typename RHS> friend class BinaryHadExpr;
+  template <typename Function, typename... Exprs> friend class MapExpr;
+  template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
+  template <typename RHS> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
+
+  /* --------------- Constructors ------------- */
+
   template <typename U, size_t M, template <class> class C_> friend class Tensor;
   Indices() {}
-  Indices(size_t const (&)[0]) {}
 
   /** This method is only defined because MSVC++ requires a definition
    *  to be present, even if the method is never actually called.
@@ -4484,6 +4510,12 @@ public:
   /** See increment(Shape<0> const&) */
   bool decrement(Shape<0> const&) 
     { assert(0 && PANIC_ASSERTION); return true;  }
+
+private:
+
+	// private constructor to match Indices<N> interface
+	Indices(size_t const *) {}
+
 };
 
 // Scalar specialization
@@ -4547,7 +4579,7 @@ public:
 
   /* -------------- Destructor ------------- */
 
-  ~Tensor() = default;
+	~Tensor() noexcept {};
 
   /* ------------- Assignment ------------- */
 
@@ -4817,6 +4849,14 @@ private:
 
   /* ------------------ Utility ----------------- */
 
+	// Exists to match the Tensor<T, N, C> interface
+	inline T const &pGet(size_t *, size_t) const noexcept 
+		{ return (static_cast<C<T> const &>(*ref_))[offset_]; }
+
+	// Exists to match the Tensor<T, N, C> interface
+	inline T &pGet(size_t *, size_t) noexcept { return (*ref_)[offset_]; }
+
+	// Exists to match the Tensor<T, N, C> interface
   Tensor(size_t const *, size_t const *, size_t, std::shared_ptr<C<T>> &&ref);
 
 };
@@ -5504,7 +5544,8 @@ struct add {
   inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
-  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+	static std::string opencl_reduce(std::string const &accum, std::string const &v1)
+		{ return accum + " += " + v1; }
   static constexpr size_t arity() { return 0; }
   template <typename... Args> static std::string opencl_map(Args const&... args);
 #endif
@@ -5522,11 +5563,6 @@ template <typename T, typename... Args>
 inline void add::operator()(T &arg1, Args const&... args) const
 {
   VARDIAC_MAP(arg1 += args);
-}
-
-inline std::string add::opencl_reduce(std::string const &accum, std::string const &v1)
-{
-  return accum + " += " + v1;
 }
 
 template <typename... Args>
@@ -5551,9 +5587,24 @@ struct sub {
   inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
-  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+  static std::string opencl_reduce(std::string const &accum, std::string const &v1)
+		{ return accum + " += " + v1; }
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args);
+
+	// FIXME
+  template <typename... Args> static std::string opencl_map(Args const&... args)
+	{
+		// surround expression in brackets to give priority
+		std::string expr = "(";
+		VARDIAC_MAP((expr += args + " - "));
+		// remove last " - "
+		expr.pop_back();
+		expr.pop_back();
+		expr.pop_back();
+		expr += ")";
+		return expr;
+	}
+
 #endif
 };
 
@@ -5571,25 +5622,6 @@ inline void sub::operator()(T &arg1, Args const&... args) const
   VARDIAC_MAP(arg1 -= args);
 }
 
-inline std::string sub::opencl_reduce(std::string const &accum, std::string const &v1)
-{
-  return accum + " += " + v1;
-}
-
-template <typename... Args>
-inline std::string sub::opencl_map(Args const&... args)
-{
-  // surround expression in brackets to give priority
-  std::string expr = "(";
-  VARDIAC_MAP((expr += args + " - "));
-  // remove last " - "
-  expr.pop_back();
-  expr.pop_back();
-  expr.pop_back();
-  expr += ")";
-  return expr;
-}
-
 /** Vardiac wrapper around std::multiplies with OpenCL code emission */
 struct mul {
   template <typename T, typename... Args>
@@ -5598,9 +5630,21 @@ struct mul {
   inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
-  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+  inline static std::string opencl_reduce(std::string const &accum, std::string const &v1)
+	  { return accum + " *= " + v1; }
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args);
+  template <typename... Args> static std::string opencl_map(Args const&... args)
+	{
+		// surround expression in brackets to give priority
+		std::string expr = "(";
+		VARDIAC_MAP((expr += args + " * "));
+		// remove last " * "
+		expr.pop_back();
+		expr.pop_back();
+		expr.pop_back();
+		expr += ")";
+		return expr;
+	}
 #endif
 };
 
@@ -5618,25 +5662,6 @@ inline void mul::operator()(T &arg1, Args const&... args) const
   VARDIAC_MAP(arg1 *= args);
 }
 
-inline std::string mul::opencl_reduce(std::string const &accum, std::string const &v1)
-{
-  return accum + " *= " + v1;
-}
-
-template <typename... Args>
-inline std::string mul::opencl_map(Args const&... args)
-{
-  // surround expression in brackets to give priority
-  std::string expr = "(";
-  VARDIAC_MAP((expr += args + " * "));
-  // remove last " * "
-  expr.pop_back();
-  expr.pop_back();
-  expr.pop_back();
-  expr += ")";
-  return expr;
-}
-
 /** Vardiac wrapper around std::divides with OpenCL code emission */
 struct div {
   template <typename T, typename... Args>
@@ -5645,9 +5670,22 @@ struct div {
   inline void operator()(T &arg1, Args const&... args) const;
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
-  static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
+  static std::string opencl_reduce(std::string const &accum, std::string const &v1)
+		{ return accum + " *= " + v1; }
+
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args);
+  template <typename... Args> static std::string opencl_map(Args const&... args)
+	{
+		// surround expression in brackets to give priority
+		std::string expr = "(";
+		VARDIAC_MAP((expr += args + " / "));
+		// remove last " / "
+		expr.pop_back();
+		expr.pop_back();
+		expr.pop_back();
+		expr += ")";
+		return expr;
+	}
 #endif
 };
 
@@ -5663,25 +5701,6 @@ template <typename T, typename... Args>
 inline void div::operator()(T &arg1, Args const&... args) const
 {
   VARDIAC_MAP(arg1 /= args);
-}
-
-inline std::string div::opencl_reduce(std::string const &accum, std::string const &v1)
-{
-  return accum + " *= " + v1;
-}
-
-template <typename... Args>
-inline std::string div::opencl_map(Args const&... args)
-{
-  // surround expression in brackets to give priority
-  std::string expr = "(";
-  VARDIAC_MAP((expr += args + " / "));
-  // remove last " / "
-  expr.pop_back();
-  expr.pop_back();
-  expr.pop_back();
-  expr += ")";
-  return expr;
 }
 
 /** Wrapper around std::sin with OpenCL code emission */
@@ -5723,23 +5742,14 @@ struct min {
   T const &operator()(T const &x, T const &y) const { return std::min(x, y); }
 #ifdef _ENABLE_OPENCL
   /** OpenCL built in function, along with a single left paranthesis */
-  static std::string opencl_map(std::string const &arg1, std::string const &arg2); 
+  static std::string opencl_map(std::string const &accum, std::string const &v)
+		{ return accum + " = min(" + accum + ", " + v + ")"; }
 
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1); 
 #endif
   static constexpr size_t arity() { return 2; }
 };
-
-inline std::string min::opencl_map(std::string const &arg1, std::string const &arg2)
-{
-  return "fmin(" + arg1 + ", " + arg2 + ")";
-}
-
-inline std::string min::opencl_reduce(std::string const &accum, std::string const &v1)
-{
-  return accum + " = min(" + accum + ", " + v1 + ")";
-}
 
 } // namespace math
 
@@ -6310,8 +6320,8 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::operator()(Args... args) const
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
-  return lhs_.template slice<I1>(Indices<left>(seperate_args.array1)) * 
-         rhs_.template slice<I2>(Indices<right>(seperate_args.array2));
+  return lhs_.template slice<I1>(Indices<left>(seperate_args.array1.data())) * 
+         rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6322,8 +6332,8 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
-  auto lhs = lhs_.template slice<I1>(Indices<left>(seperate_args.array1));
-  auto rhs = rhs_.template slice<I2>(Indices<right>(seperate_args.array2));
+  auto lhs = lhs_.template slice<I1>(Indices<left>(seperate_args.array1.data()));
+  auto rhs = rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
   { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
@@ -6338,8 +6348,8 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::at(Args... args) const
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate(args...);
-  return lhs_.template slice<I1>(Indices<left>(seperate.array1)) *
-     rhs_.template slice<I2>(Indices<right>(seperate.array2));
+  return lhs_.template slice<I1>(Indices<left>(seperate.array1.data())) *
+     rhs_.template slice<I2>(Indices<right>(seperate.array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6350,11 +6360,13 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::operator[](Indices<M> const &indices) cons
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1);
-  size_t array1[left], array2[right];
+	// std::array to get around zero array size issue
+	std::array<size_t, left> array1{};
+	std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return lhs_.template slice<I1>(Indices<left>(array1)) *
-      rhs_.template slice<I2>(Indices<right>(array2));
+  return lhs_.template slice<I1>(Indices<left>(array1.data())) *
+      rhs_.template slice<I2>(Indices<right>(array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6364,11 +6376,12 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 {
   constexpr size_t left = meta::Min(LHS::rank() - 1, M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1);
-  size_t array1[left], array2[right];
+	std::array<size_t, left> array1{};
+	std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  auto lhs = lhs_.template slice<I1>(Indices<left>(array1));
-  auto rhs = rhs_.template slice<I2>(Indices<right>(array2));
+  auto lhs = lhs_.template slice<I1>(Indices<left>(array1.data()));
+  auto rhs = rhs_.template slice<I2>(Indices<right>(array2.data()));
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
   { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
@@ -6473,8 +6486,8 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - sizeof...(Slices1));
   meta::FillArgs<left, right + left> seperate(args...);
-  return lhs_.template slice<Slices1...>(Indices<left>(seperate.array1)) *
-          rhs_.template slice<Slices2...>(Indices<right>(seperate.array2));
+  return lhs_.template slice<Slices1...>(Indices<left>(seperate.array1.data())) *
+          rhs_.template slice<Slices2...>(Indices<right>(seperate.array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6485,8 +6498,8 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - sizeof...(Slices1));
   meta::FillArgs<left, right + left> seperate(args...);
-  auto lhs = lhs_.template slice<Slices1...>(Indices<left>(seperate.array1));
-  auto rhs = rhs_.template slice<Slices2...>(Indices<right>(seperate.array2));
+  auto lhs = lhs_.template slice<Slices1...>(Indices<left>(seperate.array1.data()));
+  auto rhs = rhs_.template slice<Slices2...>(Indices<right>(seperate.array2.data()));
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
     { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
@@ -6500,11 +6513,12 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
-  size_t array1[left], array2[right];
+	std::array<size_t, left> array1{}; 
+	std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return lhs_.template slice<Slices1...>(Indices<left>(array1)) *
-               rhs_.template slice<Slices2...>(Indices<right>(array2));
+  return lhs_.template slice<Slices1...>(Indices<left>(array1.data())) *
+               rhs_.template slice<Slices2...>(Indices<right>(array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6515,11 +6529,12 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
-  size_t array1[left], array2[right];
+	std::array<size_t, left> array1{}; 
+	std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  auto lhs = lhs_.template slice<Slices1...>(Indices<left>(array1));
-  auto rhs = rhs_.template slice<Slices2...>(Indices<right>(array2));
+  auto lhs = lhs_.template slice<Slices1...>(Indices<left>(array1.data()));
+  auto rhs = rhs_.template slice<Slices2...>(Indices<right>(array2).data());
   auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
     { return accum + x * y; };
   return reduce(value_t{}, mul_vals, lhs, rhs);
@@ -6824,8 +6839,8 @@ public:
 
   /* ------------------------------ Friend ------------------------------ */
 
-  template <typename Function_, typename... Exprs_> friend MapExpr<Function_, Exprs_...>
-    _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
+  template <typename Function_, typename... Exprs_> 
+	friend MapExpr<Function_, Exprs_...> _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
   template <typename Expr> friend class opencl::Model;
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
@@ -6967,7 +6982,7 @@ auto MapExpr<Function, Exprs...>::operator[](Indices<M> const &indices) const
 template <typename Function, typename... Exprs>
 template <size_t... Slices, typename... Args>
 auto MapExpr<Function, Exprs...>::slice(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().template slice(args...))>::type
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
 {
   static_assert(self_t::rank() >= sizeof...(Slices) + sizeof...(Args), SLICES_OUT_OF_BOUNDS);
   return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
@@ -6977,17 +6992,17 @@ auto MapExpr<Function, Exprs...>::slice(Args... args) const
 template <typename Function, typename... Exprs>
 template <size_t... Slices, size_t M>
 auto MapExpr<Function, Exprs...>::slice(Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().template slice(indices))>::type
+  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
 {
   static_assert(self_t::rank() >= M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
   return pMapSliceExpansion<Slices...>(typename meta::MakeIndexSequence<0,
       sizeof...(Exprs)>::sequence{}, indices); 
 }
 
-template <typename Function_, typename... Exprs_> 
-MapExpr<Function_, Exprs_...> _map(Function_ &&fn, Expression<Exprs_> const&... exprs)
+template <typename Function, typename... Exprs> 
+MapExpr<Function, Exprs...> _map(Function &&fn, Expression<Exprs> const&... exprs)
 {
-  return MapExpr<Function_, Exprs_...>(std::forward<Function_>(fn), exprs.self()...);
+  return MapExpr<Function, Exprs...>(std::forward<Function>(fn), exprs.self()...);
 }
 
 template <typename Function, typename... Exprs>

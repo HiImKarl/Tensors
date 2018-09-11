@@ -105,7 +105,7 @@ void ConstMethodTests() {
 
   SECTION("resize") { 
     Matrix<int32_t, Container> mat = tensor.template slice<1, 3>(1, 2); 
-    Vector<int32_t, Container> vec = mat.resize(Shape<1>({32})); 
+    Vector<int32_t, Container> vec = mat.template resize<1>(Shape<1>({32})); 
     REQUIRE(vec.rank() == 1); 
     REQUIRE(vec.dimension(0) == 32); 
     int32_t correct_number = 1020; 
@@ -117,9 +117,9 @@ void ConstMethodTests() {
       if (!countdown) { 
         correct_number += 92; 
         countdown = 8; 
-      } 
-    } 
-  } 
+      }
+    }
+  }
 
   SECTION("reduce") { 
     auto fn = [](size_t accum, size_t x) { 

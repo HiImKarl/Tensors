@@ -10,7 +10,7 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 find_package(benchmark QUIET)
-find_package(OpenCL)
+find_package(OpenCL QUIET)
 
 if (benchmark_FOUND)
 	add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
