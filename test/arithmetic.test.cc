@@ -237,10 +237,16 @@ template <template <class> class C>
 void MiscTests() {
   auto tensor_1 = Tensor<int32_t, 3, C>{2, 3, 4}; 
   auto tensor_2 = Tensor<int32_t, 3, C>{2, 3, 4}; 
+
   for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
       for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
         tensor_1(i, j, k) = 100000 * i + 10000 * j + 1000 * k; 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        tensor_2(i, j, k) = (int)(-100000 * i + -10000 * j + -1000 * k); 
 
   SECTION("Negation") { 
     auto tensor_3 = tensor_1.neg(); 
@@ -249,6 +255,51 @@ void MiscTests() {
         for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
           REQUIRE(tensor_3(i, j, k) == (int)(-100000 * i + -10000 * j + -1000 * k)); 
   } 
+
+  SECTION("Map") {
+    auto tensor_3 = map<int, data::Array>([](int y, int z) { return y - z; }, tensor_1, tensor_2);
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == (int)(200000 * i + 20000 * j + 2000 * k));
+  }
+
+  SECTION("Reduction") {
+    auto scalar = reduce(10, [](int &x, int y, int z) { return x + y + z + 1; }, tensor_1, tensor_2);
+    REQUIRE(scalar == 10 + 2 * 3 * 4);
+  }
+}
+
+template <template <class> class C>
+void ExpressionTests() {
+  auto tensor_1 = Tensor<int32_t, 3, C>{2, 3, 4}; 
+  auto tensor_2 = Tensor<int32_t, 3, C>{2, 3, 4}; 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        tensor_1(i, j, k) = 100000 * i + 10000 * j + 1000 * k; 
+
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        tensor_2(i, j, k) = (int)(-100000 * i + -10000 * j + -1000 * k); 
+
+  // FIXME
+  /*
+  SECTION("Map") {
+    auto tensor_3 = map<int, data::Array>([](int y, int z) { return y; }, tensor_1 - tensor_2);
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == (int)(100000 * i + 20000 * j + 2000 * k));
+  }
+
+  SECTION("Reduction") {
+    auto scalar = reduce(10, [](int &x, int y, int z) { return x + y + 1; }, tensor_1 + tensor_2);
+    REQUIRE(scalar == 10 + 2 * 3 * 4);
+  }
+  */
 }
 
 TEST_CASE(BeginTest("Add/Subtract", "Array")) {
@@ -283,3 +334,10 @@ TEST_CASE(BeginTest("Misc", "HashMap")) {
   MiscTests<data::HashMap>();
 }
 
+TEST_CASE(BeginTest("Expression", "Array")) {
+  ExpressionTests<data::Array>();
+}
+
+TEST_CASE(BeginTest("Expression", "HashMap")) {
+  ExpressionTests<data::HashMap>();
+}

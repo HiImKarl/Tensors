@@ -372,7 +372,6 @@ void ScalarArithmeticTests() {
   } 
  
   SECTION("Negation") { 
-    // FIXME
     REQUIRE(scalar_1.neg() == -10); 
   } 
 } 
@@ -705,25 +704,25 @@ void TensorManipulationTests()
   }
 
   SECTION("Single Tensor Reduce") {
-    Scalar<int> x = _reduce(0, [](int &x, int y) { x += y; }, tensor_1);
+    Scalar<int> x = _reduce(0, [](int x, int y) { return x + y; }, tensor_1);
     REQUIRE(x == -12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)() == 12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2)[Indices<0>{}] == 12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice<>() == 12);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2).template slice<>(Indices<0>{}) == 12);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2)() == 12);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2)[Indices<0>{}] == 12);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>() == 12);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>(Indices<0>{}) == 12);
 
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_2)() == -24);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, 
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_2)() == -24);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, 
           tensor_1 + tensor_1 - tensor_1 + tensor_2)[Indices<0>{}] == 0);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_2 - tensor_1).template slice<>() == 24);
-    REQUIRE(_reduce(0, [](int &x, int y) { x += y; }, tensor_1 - tensor_1 + tensor_1).template slice<>(Indices<0>{}) == -12);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2 - tensor_1).template slice<>() == 24);
+    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_1 + tensor_1).template slice<>(Indices<0>{}) == -12);
 
-    x = _reduce(0, [](int &x, int y) { x += y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
+    x = _reduce(0, [](int x, int y) { return x + y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
     REQUIRE(x == -1056);
   }
 
   SECTION("Multi Tensor Reduce") {
-    auto add = [](int &x, int y1, int y2, int y3) { x += y1 - y2 - y3; };
+    auto add = [](int x, int y1, int y2, int y3) { return x + y1 - y2 - y3; };
     Scalar<int> x = _reduce(0, add, tensor_1, tensor_2, tensor_3);
     REQUIRE(x == -468);
     REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)() == -444);
@@ -734,13 +733,13 @@ void TensorManipulationTests()
 
   SECTION("Combined Map/Reduce/Arithmetic") {
     auto fn1 = [](int x, int y) { return x * 2 - y * 2; };
-    auto fn2 = [](int &x, int y1, int y2) { x = y1 * 2 + y2 * 2; }; 
+    auto fn2 = [](int &x, int y1, int y2) { return x + y1 * 2 + y2 * 2; }; 
     // FIXME -- Manually compute the return value
     Scalar<int> x = _reduce(0, fn2, tensor_2 * tensor_1, _map(fn1, tensor_1 * tensor_1, tensor_2 * tensor_1)
           - tensor_2 * tensor_2);
 
     auto fn3 = [](int y1, int y2) { return y1 * 2 + y2 * 2; };
-    auto fn4 = [](int &x, int y1, int y2, int y3) { x += y1 + y2 + y3; };
+    auto fn4 = [](int &x, int y1, int y2, int y3) { return x + y1 + y2 + y3; };
     
     REQUIRE(_reduce(0, fn4, tensor_1, tensor_2, 
           _map(fn3, tensor_1, tensor_1) + tensor_2)() == -36);
