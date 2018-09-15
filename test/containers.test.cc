@@ -5,6 +5,8 @@
 using namespace tensor;
 using namespace std;
 
+// FIXME -- add more tests
+
 template <template <class> class C1, template <class> class C2>
 void CrossContainerOperations()
 {

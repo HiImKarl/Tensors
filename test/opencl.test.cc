@@ -6,7 +6,6 @@
 
 using namespace tensor;
 
-
 template <template <class> class Container>
 void SimpleExpressionTests() {
   Matrix<float, Container> mat1({1111, 100}, 1); 

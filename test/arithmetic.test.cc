@@ -278,28 +278,69 @@ void ExpressionTests() {
   for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
       for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
-        tensor_1(i, j, k) = 100000 * i + 10000 * j + 1000 * k; 
+        tensor_1(i, j, k) = 100 * i + 10 * j + k; 
 
   for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
       for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
-        tensor_2(i, j, k) = (int)(-100000 * i + -10000 * j + -1000 * k); 
+        tensor_2(i, j, k) = (int)(-100 * i + -10 * j + -1 * k); 
 
-  // FIXME
-  /*
-  SECTION("Map") {
-    auto tensor_3 = map<int, data::Array>([](int y, int z) { return y; }, tensor_1 - tensor_2);
+  SECTION("arithmetic") {
+    auto tensor_3 = add(-tensor_1, tensor_2 - tensor_1); 
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
-          REQUIRE(tensor_3(i, j, k) == (int)(100000 * i + 20000 * j + 2000 * k));
+          REQUIRE(tensor_3(i, j, k) == (int)(-300 * i - 30 * j - 3 * k));
+
+    auto tensor_4 = sub(-tensor_1, tensor_2 - tensor_1); 
+    for (size_t i = 0; i < tensor_4.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_4.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_4.dimension(2); ++k) 
+          REQUIRE(tensor_4(i, j, k) == (int)(100 * i + 10 * j + k));
+
+    auto tensor_5 = hadamard(-tensor_1, tensor_2 - tensor_1); 
+    for (size_t i = 0; i < tensor_5.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_5.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_5.dimension(2); ++k) 
+          REQUIRE(tensor_5(i, j, k) == 
+            (int)((-100 * i - 10 * j - k) * (-200 * i - 20 * j - 2 * k)));
+
+    auto tensor_6 = add(-tensor_1, tensor_2 - tensor_1, 
+        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+    for (size_t i = 0; i < tensor_6.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_6.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_6.dimension(2); ++k) 
+          REQUIRE(tensor_6(i, j, k) == (int)(-500 * i - 50 * j - 5 * k));
+
+    auto tensor_7 = sub(-tensor_1, tensor_2 - tensor_1,
+        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+    for (size_t i = 0; i < tensor_7.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_7.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_7.dimension(2); ++k) 
+          REQUIRE(tensor_7(i, j, k) == (int)(300 * i + 30 * j + 3 * k));
+
+    auto tensor_8 = hadamard(-tensor_1, tensor_2 - tensor_1,
+        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+    for (size_t i = 0; i < tensor_8.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_8.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_8.dimension(2); ++k) 
+          REQUIRE(tensor_8(i, j, k) == 
+            (int)((-100 * i - 10 * j - k) * (-200 * i - 20 * j - 2 * k)
+                * (-200 * i - 20 * j - 2 * k)));
   }
 
-  SECTION("Reduction") {
-    auto scalar = reduce(10, [](int &x, int y, int z) { return x + y + 1; }, tensor_1 + tensor_2);
+  SECTION("map") {
+    auto tensor_3 = map<int, data::Array>([](int y) { return 2 * y; }, tensor_1 - tensor_2);
+    for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_3.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == (int)(400 * i + 40 * j + 4 * k));
+  }
+
+  SECTION("reduction") {
+    auto scalar = reduce(10, [](int x, int y) { return x + y + 1; }, tensor_1 + tensor_2);
     REQUIRE(scalar == 10 + 2 * 3 * 4);
   }
-  */
 }
 
 TEST_CASE("Add/Subtract" " | "  "Array") {

@@ -992,7 +992,36 @@ void Map(FunctionType &&fn, Tensors&&... tensors)
   }
 }
 
-/** Reduce reciever after all Expressions have been converted to Tensors */
+/** map reciever after all Expressions have been converted to Tensors */
+template <typename U, template <class> class C_, typename FunctionType, typename... Tensors>
+Tensor<U, FirstExpression<Tensors...>::type::rank(), C_> 
+  map(FunctionType &&fn, Tensors const&... tensors)
+{
+  static_assert(sizeof...(Tensors), NO_TENSORS_PROVIDED);
+  static_assert(meta::AreExpressions<Tensors...>::value, EXPECTING_EXPRESSION);
+  auto const &shape = details::GetShape(tensors...);
+  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+  constexpr size_t M = FirstExpression<Tensors...>::type::rank();
+  Tensor<U, M, C_> tensor(shape);
+
+  size_t cumul_index = shape.index_product();
+  Indices<M> reference_indices {};
+  size_t indices[sizeof...(Tensors)] = {};
+  size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
+  auto sequence = 
+    typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+  
+  // Foward the values produced by `fn` to `tensor`
+  for (size_t i = 0; i < cumul_index; ++i) {
+    // `tensor`'s strides will be contiguous
+    tensor.pSet(i, details::MapForwardSequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
+      sequence, tensors...));
+    details::UpdateIndices(reference_indices, shape, indices, strides);
+  }
+  return tensor; 
+}
+
+/** reduce reciever after all Expressions have been converted to Tensors */
 template <typename U, typename FunctionType, typename... Tensors>
 U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
 {
@@ -1872,7 +1901,9 @@ public:
   template <typename Function, typename... Exprs> friend class MapExpr;
   template <typename U, typename Function, typename... Exprs> friend class ReduceExpr;
   template <typename RHS> friend class UnaryNegExpr;
+#if _ENABLE_OPENCL
   template <typename Expr> friend class opencl::Model;
+#endif
 
 #ifdef _ENABLE_OPENCL
   template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
@@ -2789,7 +2820,7 @@ public:
 
   template <typename U, template <class> class C_, typename FunctionType, typename... Expressions>
   friend Tensor<U, FirstExpression<Expressions...>::type::rank(), C_> 
-    map(FunctionType &&fn, Expressions const&... exprs);
+    details::map(FunctionType &&fn, Expressions const&... exprs);
 
   template <typename FunctionType, typename... Tensors>
   friend void details::Map(FunctionType &&fn, Tensors&&... tensors);
@@ -3654,7 +3685,7 @@ Tensor<X, LHS::rank(), C_> add(Expression<LHS> const &lhs, Expression<RHS> const
   using Y = typename LHS::value_t;
   using Z = typename RHS::value_t;
 
-  auto fn= [](X &x, Y const &y, Z const &z) 
+  auto fn = [](X &x, Y const &y, Z const &z) 
     -> void { x = y + z; };
   Map(fn, result, lhs.self(), rhs.self());
   return result;
@@ -3921,14 +3952,6 @@ Tensor<U, M, C_> neg(Tensor<U, M, C_> const &tensor)
   return neg_tensor;
 }
 
-/** For pattern matching during template expression evaluation */
-template <typename X, typename = typename 
-          std::enable_if<!IsTensor<X>::value>>
-X neg(X const &x)
-{
-  return -x;
-}
-
 /* --------------------------- Useful Functions ------------------------- */
 
 template <typename T, size_t N, template <class> class C>
@@ -4052,32 +4075,17 @@ U Tensor<T, N, C>::reduce(U&& initial_value, FunctionType&& fun) const
  *  to `fn` must have be const ref or value qualified, and return value
  *  that is trivially convertible to `T`. 
  */
+
 template <typename U, template <class> class C_, typename FunctionType, typename... Expressions>
-Tensor<U, FirstExpression<Expressions...>::type::rank(), C_>
+Tensor<U, FirstExpression<Expressions...>::type::rank(), C_> 
   map(FunctionType &&fn, Expressions const&... exprs)
 {
-  static_assert(sizeof...(exprs), NO_TENSORS_PROVIDED);
-  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
-  auto const &shape = details::GetShape(exprs...);
-  VARDIAC_MAP(assert(shape == exprs.shape() && SHAPE_MISMATCH));
-  constexpr size_t M = FirstExpression<Expressions...>::type::rank();
-  Tensor<U, M, C_> tensor(shape);
+  // static check to verify arguments are expressions
+  static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
 
-  size_t cumul_index = shape.index_product();
-  Indices<M> reference_indices {};
-  size_t indices[sizeof...(Expressions)] = {};
-  size_t const * const strides[sizeof...(Expressions)] = { exprs.strides()... };
-  auto sequence = 
-    typename meta::MakeIndexSequence<0, sizeof...(Expressions)>::sequence{};
-  
-  // Foward the values produced by `fn` to `tensor`
-  for (size_t i = 0; i < cumul_index; ++i) {
-    // `tensor`'s strides will be contiguous
-    tensor.pSet(i, details::MapForwardSequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
-      sequence, exprs...));
-    details::UpdateIndices(reference_indices, shape, indices, strides);
-  }
-  return tensor; 
+  // if expression, evaluate and forward as rvalue reference,
+  // if tensor, forward as lvalue reference
+  return details::map<U, C_>(std::forward<FunctionType>(fn), exprs.eval()...);
 }
 
 /** Given a function `fn` and a variable sequence of Expressions, `Expressions`,
@@ -4841,9 +4849,7 @@ public:
   /* ------------ Expressions ------------- */
 
   template <typename X, typename Y, template <class> class C1, template <class> class C2>
-  friend Tensor<X, 0, C1> add(
-      Tensor<X, 0, C1> const &tensor_1, 
-      Tensor<Y, 0, C2> const &tensor_2);
+  friend Tensor<X, 0, C1> add(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2);
 
   template <typename RHS>
   Tensor<T, 0, C> &operator+=(Expression<RHS> const &rhs);
@@ -5175,17 +5181,10 @@ bool Tensor<T, 0, C>::operator==(X val) const
 /* ----------------------- Expressions ----------------------- */
 
 template <typename X, typename Y, template <class> class C1, template <class> class C2>
-Tensor<X, 0, C1> add(
-    Tensor<X, 0, C1> const &tensor_1, 
-    Tensor<Y, 0, C2> const &tensor_2)
+Tensor<X, 0, C1> add(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
   return Tensor<X, 0, C1>(tensor_1() + tensor_2());
 }
-
-template <typename X, typename Y,
-         typename = typename std::enable_if
-         <meta::LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
-inline X add(X const& x, Y const & y) { return x + y; }
 
 template <typename T, template <class> class C>
 template <typename RHS>
@@ -5209,11 +5208,6 @@ Tensor<X, 0, C_> sub(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &t
 {
   return Tensor<X, 0, C_>(tensor_1() - tensor_2());
 }
-
-template <typename X, typename Y,
-         typename = typename std::enable_if<
-          meta::LogicalAnd<!IsTensor<X>::value, !IsTensor<Y>::value>::value>>
-inline X sub(X const& x, Y const & y) { return x - y; }
 
 template <typename T, template <class> class C>
 template <typename RHS>
@@ -5726,8 +5720,9 @@ inline T add::operator()(T const &arg1, Args const&... args) const
   return result;
 }
 
+#ifdef _ENABLE_OPENCL
 template <typename... Args>
-inline std::string add::opencl_map(Args const&... args)
+std::string add::opencl_map(Args const&... args)
 {
   // surround expression in brackets to give priority
   std::string expr = "(";
@@ -5739,6 +5734,7 @@ inline std::string add::opencl_map(Args const&... args)
   expr += ")";
   return expr;
 }
+#endif
 
 /** Vardiac wrapper around std::minus with OpenCL code emission */
 struct sub {
@@ -5749,21 +5745,7 @@ struct sub {
   static std::string opencl_reduce(std::string const &accum, std::string const &v1)
     { return accum + " += " + v1; }
   static constexpr size_t arity() { return 0; }
-
-  // FIXME
-  template <typename... Args> static std::string opencl_map(Args const&... args)
-  {
-    // surround expression in brackets to give priority
-    std::string expr = "(";
-    VARDIAC_MAP((expr += args + " - "));
-    // remove last " - "
-    expr.pop_back();
-    expr.pop_back();
-    expr.pop_back();
-    expr += ")";
-    return expr;
-  }
-
+  template <typename... Args> static std::string opencl_map(Args const&... args);
 #endif
 };
 
@@ -5775,6 +5757,22 @@ inline T sub::operator()(T const &arg1, Args const&... args) const
   return result;
 }
 
+#ifdef _ENABLE_OPENCL
+template <typename... Args> 
+std::string sub::opencl_map(Args const&... args)
+{
+  // surround expression in brackets to give priority
+  std::string expr = "(";
+  VARDIAC_MAP((expr += args + " - "));
+  // remove last " - "
+  expr.pop_back();
+  expr.pop_back();
+  expr.pop_back();
+  expr += ")";
+  return expr;
+}
+#endif
+
 /** Vardiac wrapper around std::multiplies with OpenCL code emission */
 struct mul {
   template <typename T, typename... Args>
@@ -5784,18 +5782,8 @@ struct mul {
   inline static std::string opencl_reduce(std::string const &accum, std::string const &v1)
     { return accum + " *= " + v1; }
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args)
-  {
-    // surround expression in brackets to give priority
-    std::string expr = "(";
-    VARDIAC_MAP((expr += args + " * "));
-    // remove last " * "
-    expr.pop_back();
-    expr.pop_back();
-    expr.pop_back();
-    expr += ")";
-    return expr;
-  }
+  template <typename... Args> 
+  static std::string opencl_map(Args const&... args);
 #endif
 };
 
@@ -5807,6 +5795,22 @@ inline T mul::operator()(T const &arg1, Args const&... args) const
   return result;
 }
 
+#ifdef _ENABLE_OPENCL
+template <typename... Args> 
+std::string mul::opencl_map(Args const&... args)
+{
+  // surround expression in brackets to give priority
+  std::string expr = "(";
+  VARDIAC_MAP((expr += args + " * "));
+  // remove last " * "
+  expr.pop_back();
+  expr.pop_back();
+  expr.pop_back();
+  expr += ")";
+  return expr;
+}
+#endif
+
 /** Vardiac wrapper around std::divides with OpenCL code emission */
 struct div {
   template <typename T, typename... Args>
@@ -5815,20 +5819,8 @@ struct div {
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1)
     { return accum + " *= " + v1; }
-
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args)
-  {
-    // surround expression in brackets to give priority
-    std::string expr = "(";
-    VARDIAC_MAP((expr += args + " / "));
-    // remove last " / "
-    expr.pop_back();
-    expr.pop_back();
-    expr.pop_back();
-    expr += ")";
-    return expr;
-  }
+  template <typename... Args> static std::string div::opencl_map(Args const&... args);
 #endif
 };
 
@@ -5839,6 +5831,22 @@ inline T div::operator()(T const &arg1, Args const&... args) const
   VARDIAC_MAP(result /= args);
   return result;
 }
+
+#ifdef _ENABLE_OPENCL
+template <typename... Args> 
+std::string div::opencl_map(Args const&... args)
+{
+  // surround expression in brackets to give priority
+  std::string expr = "(";
+  VARDIAC_MAP((expr += args + " / "));
+  // remove last " / "
+  expr.pop_back();
+  expr.pop_back();
+  expr.pop_back();
+  expr += ")";
+  return expr;
+}
+#endif
 
 /** Wrapper around std::sin with OpenCL code emission */
 struct sin {
@@ -5974,7 +5982,10 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinaryAddExpr<LHS_, RHS_> 
     operator+(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
-  template <typename Expr> friend class opencl::Model;
+
+  template <typename LHS_, typename RHS_>
+  friend BinaryAddExpr<LHS_, RHS_> 
+    _add(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -5982,7 +5993,8 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -6041,6 +6053,12 @@ private:
 
 template <typename LHS, typename RHS>
 BinaryAddExpr<LHS, RHS> operator+(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinaryAddExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
+
+template <typename LHS, typename RHS>
+BinaryAddExpr<LHS, RHS> _add(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
   return BinaryAddExpr<LHS, RHS>(lhs.self(), rhs.self());
 }
@@ -6142,8 +6160,8 @@ public:
   typedef typename LHS::value_t        value_t;
   template <typename X>
   using container_t = typename         LHS::template container_t<X>;
-  typedef BinarySubExpr                       self_t;
-  constexpr static size_t rank()          { return LHS::rank(); }
+  typedef BinarySubExpr                self_t;
+  constexpr static size_t rank()       { return LHS::rank(); }
   typedef typename LHS::return_t       return_t;
 
   /* ---------------- Friends ---------------- */
@@ -6151,7 +6169,10 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
     operator-(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
-  template <typename Expr> friend class opencl::Model;
+
+  template <typename LHS_, typename RHS_>
+  friend BinarySubExpr<LHS_, RHS_> 
+    _sub(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6159,7 +6180,8 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -6222,6 +6244,14 @@ BinarySubExpr<LHS, RHS> operator-(Expression<LHS> const &lhs, Expression<RHS> co
 {
   return BinarySubExpr<LHS, RHS>(lhs.self(), rhs.self());
 }
+
+template <typename LHS, typename RHS>
+BinarySubExpr<LHS, RHS> _sub(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinarySubExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
+
+/* ----------------- Getters ----------------- */
 
 template <typename LHS, typename RHS>
 template <typename... Args>
@@ -6327,7 +6357,7 @@ public:
   typedef 
   Tensor<value_t, self_t::rank(), container_t>  return_t;
 
-  /* ---------------- Friend ----------------- */
+  /* ---------------- Friends ---------------- */
   
   template <typename LHS_, typename RHS_>
   friend BinaryMulExpr<LHS_::rank() - 1, 0, LHS_, RHS_> 
@@ -6337,14 +6367,14 @@ public:
   friend BinaryMulExpr<I1_, I2_, LHS_, RHS_> 
     _mul(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
-  template <typename Expr> friend class opencl::Model;
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -6750,14 +6780,18 @@ public:
   friend BinaryHadExpr<LHS_, RHS_> 
     operator%(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
-  template <typename Expr> friend class opencl::Model;
+  template <typename LHS_, typename RHS_>
+  friend BinaryHadExpr<LHS_, RHS_> 
+    hadamard(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -6845,6 +6879,12 @@ private:
 
 template <typename LHS, typename RHS>
 BinaryHadExpr<LHS, RHS> operator%(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  return BinaryHadExpr<LHS, RHS>(lhs.self(), rhs.self());
+}
+
+template <typename LHS, typename RHS>
+BinaryHadExpr<LHS, RHS> _hadamard(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
   return BinaryHadExpr<LHS, RHS>(lhs.self(), rhs.self());
 }
@@ -6990,7 +7030,6 @@ public:
 
   template <typename Function_, typename... Exprs_> 
   friend MapExpr<Function_, Exprs_...> _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
-  template <typename Expr> friend class opencl::Model;
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6998,7 +7037,9 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+
+  template <typename Expr> friend class opencl::Model;
 
   /* ----------------------------- Getters ------------------------------ */
 
@@ -7291,7 +7332,6 @@ public:
 
   template <typename U, typename Function_, typename... Exprs_> friend ReduceExpr<U, Function_, Exprs_...>
     _reduce(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs);
-  template <typename Expr> friend class opencl::Model;
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -7299,7 +7339,9 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
-  template <typename RHS_> class UnaryNegExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+
+  template <typename Expr> friend class opencl::Model;
 
   /* ----------------------------- Getters ------------------------------ */
 
@@ -7491,6 +7533,8 @@ public:
   
   template <typename RHS_>
   friend UnaryNegExpr<RHS_> operator-(Expression<RHS_> const &rhs);
+  template <typename RHS_>
+  friend UnaryNegExpr<RHS_> _neg(Expression<RHS_> const &rhs);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -7498,6 +7542,8 @@ public:
   template <typename LHS_, typename RHS_> friend class BinaryHadExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
+  template <typename RHS_> friend class UnaryNegExpr;
+  template <typename Expr> friend class opencl::Model;
 
   /* ---------------- Getters ----------------- */
 
@@ -7553,10 +7599,16 @@ private:
 
 };
 
-template <typename RHS_>
-UnaryNegExpr<RHS_> operator-(Expression<RHS_> const &rhs)
+template <typename RHS>
+UnaryNegExpr<RHS> operator-(Expression<RHS> const &rhs)
 {
-  return UnaryNegExpr<RHS_>(rhs.self());
+  return UnaryNegExpr<RHS>(rhs.self());
+}
+
+template <typename RHS>
+UnaryNegExpr<RHS> _neg(Expression<RHS> const &rhs)
+{
+  return UnaryNegExpr<RHS>(rhs.self());
 }
 
 /* ------------------ Getters ------------------ */
@@ -7638,6 +7690,7 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 
 } // namespace tensor
 
+// undefine all of the debug messages
 #undef NTENSOR_0CONSTRUCTOR
 #undef NCONSTRUCTOR_0TENSOR
 #undef NELEMENTS
