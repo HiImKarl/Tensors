@@ -316,18 +316,18 @@ void ScalarAssignmentTest() {
   } 
 }
 
-TEST_CASE(BeginTest("Tensor Assignment", "Array")) {
+TEST_CASE("Tensor Assignment" " | "  "Array") {
   TensorAssignmentTest<data::Array>();  
 }
 
-TEST_CASE(BeginTest("Tensor Assignment", "HashMap")) {
+TEST_CASE("Tensor Assignment" " | "  "HashMap") {
   TensorAssignmentTest<data::HashMap>();  
 }
 
-TEST_CASE(BeginTest("Scalar Assignment", "Array")) {
+TEST_CASE("Scalar Assignment" " | "  "Array") {
   ScalarAssignmentTest<data::Array>();  
 }
 
-TEST_CASE(BeginTest("Scalar Assignment", "HashMap")) {
+TEST_CASE("Scalar Assignment" " | "  "HashMap") {
   ScalarAssignmentTest<data::HashMap>();  
 }

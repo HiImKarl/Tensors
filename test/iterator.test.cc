@@ -285,34 +285,34 @@ void ReverseConstIteratorTests() {
 
 // Instantiate test cases
 
-TEST_CASE(BeginTest("Iterator", "Array")) { 
+TEST_CASE("Iterator" " | "  "Array") { 
   IteratorTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Iterator", "HashMap")) { 
+TEST_CASE("Iterator" " | "  "HashMap") { 
   IteratorTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Const Iterator", "Array")) { 
+TEST_CASE("Const Iterator" " | "  "Array") { 
   ConstIteratorTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Const Iterator", "HashMap")) { 
+TEST_CASE("Const Iterator" " | "  "HashMap") { 
   ConstIteratorTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Reverse Iterator", "Array")) { 
+TEST_CASE("Reverse Iterator" " | "  "Array") { 
   ReverseIteratorTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Reverse Iterator", "HashMap")) { 
+TEST_CASE("Reverse Iterator" " | "  "HashMap") { 
   ReverseIteratorTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Reverse Const Iterator", "Array")) { 
+TEST_CASE("Reverse Const Iterator" " | "  "Array") { 
   ReverseConstIteratorTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Reverse Const Iterator", "HashMap")) { 
+TEST_CASE("Reverse Const Iterator" " | "  "HashMap") { 
   ReverseConstIteratorTests<data::HashMap>();
 }

@@ -70,10 +70,10 @@ void TensorShapeTests() {
   }
 }
 
-TEST_CASE(BeginTest("Shapes")) {
+TEST_CASE("Shapes") {
   ShapeTests();
 }
 
-TEST_CASE(BeginTest("Tensor Shapes")) {
+TEST_CASE("Tensor Shapes") {
   TensorShapeTests();
 }

@@ -194,19 +194,19 @@ void SlicingWithIndicesTests() {
   } 
 }
 
-TEST_CASE(BeginTest("Slicing With Args...", "Array")) { 
+TEST_CASE("Slicing With Args..." " | "  "Array") { 
   SlicingWithArgsTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Slicing With Args...", "HashMap")) { 
+TEST_CASE("Slicing With Args..." " | "  "HashMap") { 
   SlicingWithArgsTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Slicing With Indices", "Array")) { 
+TEST_CASE("Slicing With Indices" " | "  "Array") { 
   SlicingWithIndicesTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Slicing With Indices", "HashMap")) { 
+TEST_CASE("Slicing With Indices" " | "  "HashMap") { 
   SlicingWithIndicesTests<data::HashMap>();
 }
 

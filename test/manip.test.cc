@@ -158,27 +158,27 @@ void ElementwiseArithmeticTests() {
   }
 } 
 
-TEST_CASE(BeginTest("Methods", "Array")) { 
+TEST_CASE("Methods" " | "  "Array") { 
   MethodTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Methods", "HashMap")) { 
+TEST_CASE("Methods" " | "  "HashMap") { 
   MethodTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Const Methods", "Array")) { 
+TEST_CASE("Const Methods" " | "  "Array") { 
   ConstMethodTests<data::Array>(); 
 }
 
-TEST_CASE(BeginTest("Const Methods", "HashMap")) { 
+TEST_CASE("Const Methods" " | "  "HashMap") { 
   ConstMethodTests<data::HashMap>(); 
 }
 
-TEST_CASE(BeginTest("Elementwise Arithmetic", "Array")) { 
+TEST_CASE("Elementwise Arithmetic" " | "  "Array") { 
   ElementwiseArithmeticTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Elementwise Arithmetic", "HashMap")) { 
+TEST_CASE("Elementwise Arithmetic" " | "  "HashMap") { 
   ElementwiseArithmeticTests<data::HashMap>();
 }
 

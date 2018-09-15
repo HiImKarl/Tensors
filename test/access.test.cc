@@ -128,10 +128,10 @@ void TensorAccessTests() {
 
 // Instantiate test cases
 
-TEST_CASE(BeginTest("Tensor Access", "Array")) { 
+TEST_CASE("Tensor Access" " | " "Array") { 
   TensorAccessTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Tensor Access", "HashMap")) { 
+TEST_CASE("Tensor Access" " | "  "HashMap") { 
   TensorAccessTests<data::HashMap>();
 }

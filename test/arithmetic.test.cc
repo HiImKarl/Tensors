@@ -101,28 +101,28 @@ void HadarmardTests() {
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
-            REQUIRE(hadarmard(tensor_1, tensor_1)(i, j, k, l) == 4);
+            REQUIRE(hadamard(tensor_1, tensor_1)(i, j, k, l) == 4);
              
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
-            REQUIRE(hadarmard(tensor_2, hadarmard(tensor_2, hadarmard(tensor_1, tensor_1)))
+            REQUIRE(hadamard(tensor_2, hadamard(tensor_2, hadamard(tensor_1, tensor_1)))
                 (i, j, k, l) == 16);
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
-            REQUIRE(hadarmard(tensor_2, tensor_2, hadarmard(tensor_1, tensor_1))
+            REQUIRE(hadamard(tensor_2, tensor_2, hadamard(tensor_1, tensor_1))
                 (i, j, k, l) == 16);
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
-            REQUIRE(hadarmard(tensor_2, hadarmard(tensor_2, tensor_1, tensor_1), tensor_1)
+            REQUIRE(hadamard(tensor_2, hadamard(tensor_2, tensor_1, tensor_1), tensor_1)
                 (i, j, k, l) == 32);
   }
 }
@@ -302,42 +302,42 @@ void ExpressionTests() {
   */
 }
 
-TEST_CASE(BeginTest("Add/Subtract", "Array")) {
+TEST_CASE("Add/Subtract" " | "  "Array") {
   AddSubtractTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Add/Subtract", "HashMap")) {
+TEST_CASE("Add/Subtract" " | "  "HashMap") {
   AddSubtractTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Hadarmard", "Array")) {
+TEST_CASE("Hadarmard" " | "  "Array") {
   HadarmardTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Hadarmard", "HashMap")) {
+TEST_CASE("Hadarmard" " | "  "HashMap") {
   HadarmardTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Multiplication", "Array")) {
+TEST_CASE("Multiplication" " | "  "Array") {
   MultiplicationTests<data::Array>(); 
 }
 
-TEST_CASE(BeginTest("Multiplication", "HashMap")) {
+TEST_CASE("Multiplication" " | "  "HashMap") {
   MultiplicationTests<data::HashMap>(); 
 }
 
-TEST_CASE(BeginTest("Misc", "Array")) {
+TEST_CASE("Misc" " | "  "Array") {
   MiscTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Misc", "HashMap")) {
+TEST_CASE("Misc" " | "  "HashMap") {
   MiscTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Expression", "Array")) {
+TEST_CASE("Expression" " | "  "Array") {
   ExpressionTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Expression", "HashMap")) {
+TEST_CASE("Expression" " | "  "HashMap") {
   ExpressionTests<data::HashMap>();
 }

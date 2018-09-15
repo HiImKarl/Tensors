@@ -125,6 +125,8 @@ extern int eDebugConstructorCounter;
   "Failed -- Cannot multiple tensors with scalars"
 #define NO_TENSORS_PROVIDED \
   "This method requires at least one tensor as an argument"
+#define NO_EXPRESSIONS_PROVIDED \
+  "This method requires at least one tensor as an argument"
 #define SLICING_MULTIPLICATION_AXIS \
   "Attempt to slice a multiplication expression along one of its axes"
 
@@ -324,24 +326,18 @@ struct Rank<Tensor<T, N, C>> { enum: size_t { value = N }; };
 template <typename... Tensors>
 struct FirstTensor;
 
-/** Provides typedef 'type' as the type of the first Tensor 
- *  in `Tensors...`. 
- */
+/** Provides typedef 'type' as the type of the first Tensor in `Tensors...` */
 template <typename Tensor, typename... Tensors>
 struct FirstTensor<Tensor, Tensors...> {
   using type = typename std::remove_reference<Tensor>::type;
   static_assert(IsTensor<type>::value, EXPECTED_TENSOR);
 };
 
-/** Provides typedef 'type' as the type of the first Tensor 
- *  in `Tensors...`. 
- */
+/** Provides typedef 'type' as the type of the first Tensor in `Tensors...` */
 template <typename... Exprs>
 struct FirstExpression;
 
-/** Provides typedef 'type' as the type of the first Tensor 
- *  in `Tensors...`. 
- */
+/** Provides typedef 'type' as the type of the first Tensor in `Tensors...` */
 template <typename Expr, typename... Exprs>
 struct FirstExpression<Expr, Exprs...> {
   using type = typename std::remove_reference<Expr>::type;
@@ -975,6 +971,99 @@ inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
 {
   tensor.pSet(index, fn(tensors.pGet(indices, I)...));
 }
+
+/** Map reciever after all Expressions have been converted to Tensors */
+template <typename FunctionType, typename... Tensors>
+void Map(FunctionType &&fn, Tensors&&... tensors)
+{
+  static_assert(sizeof...(tensors), PANIC_ASSERTION);
+  auto const &shape = details::GetShape(tensors...);
+  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+  size_t cumul_index = shape.index_product();
+  Indices<M> reference_indices {};
+  size_t indices[sizeof...(Tensors)] = {};
+  size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
+  auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+  for (size_t i = 0; i < cumul_index; ++i) {
+    details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices, 
+      sequence, tensors...);
+    details::UpdateIndices(reference_indices, shape, indices, strides);
+  }
+}
+
+/** Reduce reciever after all Expressions have been converted to Tensors */
+template <typename U, typename FunctionType, typename... Tensors>
+U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
+{
+  static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
+  auto const &shape = details::GetShape(tensors...);
+  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+  U ret_val = std::forward<U>(initial_value);
+  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+  size_t cumul_index = shape.index_product();
+  Indices<M> reference_indices {};
+  size_t indices[sizeof...(Tensors)] = {};
+  size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
+  auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+  for (size_t i = 0; i < cumul_index; ++i) {
+    details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), 
+      (size_t *)indices, sequence, tensors...);
+    details::UpdateIndices(reference_indices, shape, indices, strides);
+  }
+  return ret_val;
+}
+
+/** Multiply reciever after expressions have been converted to tensors */
+template <typename X, template <class> class C_, size_t I1, size_t I2, 
+  typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, C2> const& tensor_2)
+{
+  static_assert(M1, SCALAR_TENSOR_MULT);
+  static_assert(M2, SCALAR_TENSOR_MULT);
+  assert((tensor_1.shape_[I1] == tensor_2.shape_[I2]) && PANIC_ASSERTION);
+  auto shape = Shape<M1 + M2 - 2>();
+  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, shape.dimensions_);
+  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, shape.dimensions_ + M1 - 1);
+
+  Tensor<X, M1 + M2 - 2, C_> prod_tensor(shape);
+  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[I1];
+  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[I2];
+  Indices<M1 - 1> reference_indices_1{};
+  Indices<M2 - 1> reference_indices_2{};
+  size_t index = 0;
+
+  // Set up strides and indices for tensor_1
+  size_t t1_strides[M1 - 1];
+  Shape<M1 - 1> t1_shape{};
+  details::FillExceptForIndex<I1>(tensor_1.strides_, t1_strides);
+  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, t1_shape.dimensions_);
+  size_t const * const t1_strides_array[] = { t1_strides };
+  size_t t1_indices[1] = {};
+
+  // Set up strides and indices for tensor_2
+  size_t t2_strides[M2 - 1];
+  Shape<M2 - 1> t2_shape{};
+  details::FillExceptForIndex<I2>(tensor_2.strides_, t2_strides);
+  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, t2_shape.dimensions_);
+  size_t const * const t2_strides_array[] = { t2_strides };
+
+  for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
+    size_t t2_indices[1] = {};
+    for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
+      X value {};
+      for (size_t x = 0; x < tensor_1.shape_.dimensions_[I1]; ++x)
+          value += (*tensor_1.ref_)[tensor_1.offset_ + t1_indices[0] + tensor_1.strides_[I1] * x] *
+            (*tensor_2.ref_)[tensor_2.offset_ + t2_indices[0] + tensor_2.strides_[I2] * x];
+      (*prod_tensor.ref_)[index] = value;
+      details::UpdateIndices(reference_indices_2, t2_shape, t2_indices, t2_strides_array);
+      ++index;
+    }
+    details::UpdateIndices(reference_indices_1, t1_shape, t1_indices, t1_strides_array);
+  }
+  return prod_tensor;
+}
+
 
 } // namespace details
 
@@ -1834,9 +1923,10 @@ public:
 
   /* ----------------- Expressions ------------------ */
 
-  template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, 
-           template <class> class C1, template <class> class C2>
-  friend Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2);
+  template <typename X, template <class> class C_, size_t I1, size_t I2, 
+    typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+  friend Tensor<X, M1 + M2 - 2, C_> details::mul(Tensor<Y, M1, C1> const& tensor_1, 
+      Tensor<Z, M2, C2> const& tensor_2);
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat);
   template <typename U, template <class> class C_> friend Tensor<U, 2, C_> transpose(Tensor<U, 1, C_> &vec);
 
@@ -2104,8 +2194,8 @@ public:
   typedef T const&                              const_reference;
   typedef size_t                                size_type;
   typedef ptrdiff_t                             difference_type;
-  typedef Tensor<T, N, C>           self_t;
-  typedef Tensor<T, N, C>           return_t;
+  typedef Tensor<T, N, C>                       self_t;
+  typedef Tensor<T, N, C>                       return_t;
 
   /* ----------------- Friend Classes ----------------- */
 
@@ -2248,6 +2338,12 @@ public:
   Tensor<T, N, C> &operator=(NoAliasProxy<NodeType> const &rhs);
 
   /* --------------------- Getters --------------------- */
+
+  /** Returns a reference to itself */
+  Tensor &eval() noexcept { return *this; }
+  
+  /** Returns a const reference to itself */
+  Tensor const &eval() const noexcept { return *this; }
 
   constexpr static size_t rank() { return N; } /**< Get `N` */
 
@@ -2394,9 +2490,10 @@ public:
   template <typename RHS>
   Tensor<T, N, C> &operator-=(Expression<RHS> const &rhs);
 
-  template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, 
-           template <class> class C1, template <class> class C2>
-  friend Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2);
+  template <typename X, template <class> class C_, size_t I1, size_t I2, 
+    typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
+  friend Tensor<X, M1 + M2 - 2, C_> details::mul(Tensor<Y, M1, C1> const& tensor_1, 
+      Tensor<Z, M2, C2> const& tensor_2);
 
   template <typename RHS>
   Tensor<T, N, C> &operator*=(Expression<RHS> const &rhs);
@@ -2695,13 +2792,13 @@ public:
     map(FunctionType &&fn, Expressions const&... exprs);
 
   template <typename FunctionType, typename... Tensors>
-  friend void Map(FunctionType &&fn, Tensors&&... tensors);
+  friend void details::Map(FunctionType &&fn, Tensors&&... tensors);
 
   template <typename U, typename FunctionType> 
   U reduce(U&& initial_value, FunctionType&& fun) const;
 
   template <typename U, typename FunctionType, typename... Tensors>
-  friend U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors);
+  friend U details::reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors);
 
 private:
   /* ---------------------- Data ---------------------- */
@@ -3541,57 +3638,69 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
   return result;
 }
 
-/** Creates a Tensor whose elements are the elementwise sum of `tensor1` 
- *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
- *  an assertion will fail during debug.
+/** Creates a Tensor whose elements are the elementwise sum of `lhs` 
+ *  and `rhs`. `lhs` and `rhs` must have equivalent shape, or
+ *  an assertion will fail during debug. The value type and the container
+ *  type of the resulting tensor can be supplied as template arguments,
+ *  and will default to copying the types of `LHS`.
  */
-template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-Tensor<X, M, C1> add(Tensor<X, M, C1> const& tensor_1, Tensor<Y, M, C2> const& tensor_2)
+template <typename LHS, typename RHS, typename X = typename LHS::value_t,
+         template <class> class C_ = LHS::template container_t>
+Tensor<X, LHS::rank(), C_> add(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
-  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
-  Tensor<X, M, C1> sum_tensor(tensor_1.shape());
-  auto elemwise_add = [](X &x, X const &y, Y const &z) -> void {
-    x = y + z;
-  };
-  Map(elemwise_add, sum_tensor, tensor_1, tensor_2);
-  return sum_tensor;
+  assert((lhs.self().shape() == rhs.self().shape()) && DIMENSION_MISMATCH);
+  Tensor<X, LHS::rank(), C_> result(lhs.self().shape());
+
+  using Y = typename LHS::value_t;
+  using Z = typename RHS::value_t;
+
+  auto fn= [](X &x, Y const &y, Z const &z) 
+    -> void { x = y + z; };
+  Map(fn, result, lhs.self(), rhs.self());
+  return result;
 }
 
-/** Creates a Tensor whose elements are the elementwise sum of `tensor`, and every Tensor in `Tensors...`,
- *  which must all have equivalent shape, or an assertion will fail during debug.
+/** Creates a Tensor whose elements are the elementwise sum of `lhs`, and every 
+ *  Expression in `exprs...`, which must all have equivalent shape, 
+ *  or an assertion will fail during debug.
  */
-template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
-          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
-Tensor<X, M, C_> add(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
+template <typename LHS, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+  add(Expression<LHS> const &lhs, Expressions const&... exprs)
 {
-  auto sum_tensor = tensor;
-  VARDIAC_MAP(assert(sum_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(sum_tensor = add(sum_tensor, tensors));
-  return sum_tensor;
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
+  Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+    result = lhs;
+  VARDIAC_MAP(assert(result.shape() == exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(result = add(result, exprs));
+  return result;
 }
 
-/** The elements of `tensor1` are assigned the elementwise sum of `tensor_1`
- *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+/** The elements of `tensor` are assigned the elementwise sum of `rhs`
+ *  and `tensor`. `tensor` and `rhs` must have equivalent shape, or
  *  an assertion will fail during debug.
  */
-template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-void Add(Tensor<X, M, C1> &tensor_1, Tensor<Y, M, C2> const& tensor_2)
+template <typename X, size_t M, template <class> class C_, typename RHS>
+void Add(Tensor<X, M, C_> &tensor, Expression<RHS> const &rhs)
 {
-  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
-  auto elemwise_add = [](X &x, Y const &y) -> void {
-    x += y;
-  };
-  Map(elemwise_add, tensor_1, tensor_2);
+  assert((tensor.shape() == rhs.shape()) && DIMENSION_MISMATCH);
+
+  using Y = typename RHS::value_t;
+  auto elemwise_add = [](X &x, Y const &y) 
+    -> void { x += y; };
+  Map(elemwise_add, tensor, rhs.self());
 }
 
 /** Inplace addition with a variable amount of arguments */
-template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
-          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
-void Add(Tensor<X, M, C_> &tensor, Tensors const&... tensors)
+template <typename X, size_t M, template <class> class C_, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+void Add(Tensor<X, M, C_> &tensor, Expressions const&... exprs)
 {
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
   auto const &shape = tensor.shape();
-  VARDIAC_MAP(assert(shape = tensors.shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(Add(tensor, tensors));
+  VARDIAC_MAP(assert(shape = exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(Add(tensor, exprs));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3604,57 +3713,68 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator+=(Expression<RHS> const &rhs)
   return *this;
 }
 
-/** Creates a Tensor whose elements are the elementwise difference of `tensor1` 
- *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
+/** Creates a Tensor whose elements are the elementwise difference of `lhs`
+ *  and `rhs`. `lhs` and `rhs` must have equivalent shape, or
+ *  an assertion will fail during debug. The value type and the container
+ *  type of the resulting tensor can be supplied as template arguments,
+ *  and will default to copying the types of `LHS`.
+ */
+template <typename LHS, typename RHS, typename X = typename LHS::value_t,
+         template <class> class C_ = LHS::template container_t>
+Tensor<X, LHS::rank(), C_> sub(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+{
+  assert((lhs.self().shape() == rhs.self().shape()) && DIMENSION_MISMATCH);
+  Tensor<X, LHS::rank(), C_> result(lhs.self().shape());
+
+  using Y = typename LHS::value_t;
+  using Z = typename RHS::value_t;
+
+  auto fn = [](X &x, Y const &y, Z const &z) 
+    -> void { x = y - z; };
+  Map(fn, result, lhs.self(), rhs.self());
+  return result;
+}
+
+/** Creates a Tensor whose elements are the elementwise difference 
+ * of `lhs`, and every expression in `exprs...`, which must all have 
+ * equivalent shape, or an assertion will fail during debug.
+ */
+template <typename LHS, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+  sub(Expression<LHS> const &lhs, Expressions const&... exprs)
+{
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
+  Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+    result = lhs.self();
+  VARDIAC_MAP(assert(result.shape() == exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(result = sub(result, exprs));
+  return result;
+}
+
+/** The elements of `tensor` are assigned the elementwise difference of 
+ *  `tensor` and `rhs`. `tensor` and `rhs` must have equivalent shape, or
  *  an assertion will fail during debug.
  */
-template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-Tensor<X, M, C1> sub(Tensor<X, M, C1> const& tensor_1, Tensor<Y, M, C2> const& tensor_2)
+template <typename X, size_t M, template <class> class C_, typename RHS>
+void Sub(Tensor<X, M, C_> &tensor, Expression<RHS> const &rhs)
 {
-  assert(tensor_1.shape() == tensor_2.shape() && DIMENSION_MISMATCH);
-  Tensor<X, M, C1> diff_tensor(tensor_1.shape());
-  auto elemwise_sub = [](X &x, X const &y, Y const &z) -> void {
-    x = y - z;
-  };
-  Map(elemwise_sub, diff_tensor, tensor_1, tensor_2);
-  return diff_tensor;
+  assert((tensor.shape() == rhs.shape()) && DIMENSION_MISMATCH);
+
+  using Y = typename RHS::value_t;
+  auto fn = [](X &x, Y const &y) 
+    -> void { x -= y; };
+  Map(fn, tensor, rhs.self());
 }
 
-/** Creates a Tensor whose elements are the elementwise difference of `tensor`, and the sum of `Tensors...`,
- *  which must all have equivalent shape, or an assertion will fail during debug.
- */
-template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
-          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
-Tensor<X, M, C_> sub(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
-{
-  auto diff_tensor = tensor;
-  VARDIAC_MAP(assert(diff_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(diff_tensor = sub(diff_tensor, tensors));
-  return diff_tensor;
-}
-
-/** The elements of `tensor1` are assigned the elementwise sum of `tensor_1`
- *  and `tensor2`. `tensor1` and `tensor2` must have equivalent shape, or
- *  an assertion will fail during debug.
- */
-template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-void Sub(Tensor<X, M, C1> &tensor_1, Tensor<Y, M, C2> const& tensor_2)
-{
-  assert(tensor_1.shape() == tensor_2.shape() && DIMENSION_MISMATCH);
-  auto elemwise_sub = [](X &x, Y const &y) -> void {
-    x -= y;
-  };
-  Map(elemwise_sub, tensor_1, tensor_2);
-}
-
-/** Inplace addition with a variable amount of arguments */
-template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
-          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
-Tensor<X, M, C_> Sub(Tensor<X, M, C_> &tensor, Tensors const&... tensors)
+/** Inplace subtraction with a variable amount of arguments */
+template <typename X, size_t M, template <class> class C_, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+void Sub(Tensor<X, M, C_> &tensor, Expressions const&... exprs)
 {
   auto const &shape = tensor.shape();
-  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(Sub(tensor, tensors));
+  VARDIAC_MAP(assert(shape = exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(Sub(tensor, exprs));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3667,31 +3787,66 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator-=(Expression<RHS> const &rhs)
   return *this;
 }
 
-/** Creates a Tensor which is the hadamard product between `tensor_1` and `tensor_2`
- *  (elementwise product), with shape equivalent to `tensor_1` and `tensor_2`, which 
- *  must have equivalent shape, or an assert will fail.
+/** Creates a Tensor whose elements are the elementwise product of `lhs`
+ *  and `rhs`. `lhs` and `rhs` must have equivalent shape, or
+ *  an assertion will fail during debug. The value type and the container
+ *  type of the resulting tensor can be supplied as template arguments,
+ *  and will default to copying the types of `LHS`.
  */
-template <typename X, typename Y, size_t M, template <class> class C1, template <class> class C2>
-Tensor<X, M, C1> hadarmard(Tensor<X, M, C1> const &tensor_1, Tensor<Y, M, C2> const &tensor_2)
+template <typename LHS, typename RHS, typename X = typename LHS::value_t,
+         template <class> class C_ = LHS::template container_t>
+Tensor<X, LHS::rank(), C_> hadamard(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
-  assert((tensor_1.shape() == tensor_2.shape())  && DIMENSION_MISMATCH);
-  Tensor<X, M, C1> hadarmard_tensor(tensor_1.shape());
-  auto mul = [](X &x, X const &y, Y const &z) -> void {
-    x = y * z;
-  };
-  Map(mul, hadarmard_tensor, tensor_1, tensor_2);
-  return hadarmard_tensor;
+  assert((lhs.self().shape() == rhs.self().shape()) && DIMENSION_MISMATCH);
+  Tensor<X, LHS::rank(), C_> result(lhs.self().shape());
+
+  using Y = typename LHS::value_t;
+  using Z = typename RHS::value_t;
+
+  auto fn = [](X &x, Y const &y, Z const &z) 
+    -> void { x = y * z; };
+  Map(fn, result, lhs.self(), rhs.self());
+  return result;
 }
 
-/** Eager Hadarmard product with variable number of tensor arguments */
-template <typename X, size_t M, template <class> class C_, typename... Tensors, typename =
-          typename std::enable_if<sizeof...(Tensors) >= 2>::type>
-Tensor<X, M, C_> hadarmard(Tensor<X, M, C_> const& tensor, Tensors const&... tensors)
+/** Creates a Tensor whose elements are the elementwise product of `lhs`, and every 
+ *  expression in `exprs...`, which must all have equivalent shape, 
+ *  or an assertion will fail during debug.
+ */
+template <typename LHS, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+  hadamard(Expression<LHS> const &lhs, Expressions const&... exprs)
 {
-  auto hadarmard_tensor = tensor;
-  VARDIAC_MAP(assert(hadarmard_tensor.shape() == tensors.shape() && SHAPE_MISMATCH));
-  VARDIAC_MAP(hadarmard_tensor = hadarmard(hadarmard_tensor, tensors));
-  return hadarmard_tensor;
+  Tensor<typename LHS::value_t, LHS::rank(), LHS::template container_t>
+    result = lhs;
+  VARDIAC_MAP(assert(result.shape() == exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(result = hadamard(result, exprs));
+  return result;
+}
+
+/** The elements of `tensor` are assigned the elementwise product of 
+ *  `tensor` and `rhs`. `tensor` and `rhs` must have equivalent shape, or
+ *  an assertion will fail during debug.
+ */
+template <typename X, size_t M, template <class> class C_, typename RHS>
+void Hadamard(Tensor<X, M, C_> &tensor, Expression<RHS> const &rhs)
+{
+  assert((tensor.shape() == rhs.self().shape()) && DIMENSION_MISMATCH);
+  using Y = typename RHS::value_t;
+  auto fn = [](X &x, Y const &y) 
+    -> void { x *= y; };
+  Map(fn, tensor, rhs.self());
+}
+
+/** Inplace hadamard with a variable amount of arguments */
+template <typename X, size_t M, template <class> class C_, typename... Expressions, typename =
+          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+void Hadamard(Tensor<X, M, C_> &tensor, Expressions const&... exprs)
+{
+  auto const &shape = tensor.shape();
+  VARDIAC_MAP(assert(shape = exprs.shape() && SHAPE_MISMATCH));
+  VARDIAC_MAP(Hadamard(tensor, exprs));
 }
 
 /** Produces a Tensor which is the Tensor product of `tensor_1` and 
@@ -3704,69 +3859,32 @@ Tensor<X, M, C_> hadarmard(Tensor<X, M, C_> const& tensor, Tensors const&... ten
  *  Note: VERY EXPENSIVE, the time complexity to produce a N rank() Tensor 
  *  with all dimensions equal to `m` is O(m^(N+1)).
  */
-template <size_t I1, size_t I2, typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
-Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2)
+template <size_t I1, size_t I2, typename LHS, typename RHS, typename X = typename LHS::value_t,
+          template <class> class C_ = LHS::template container_t>
+Tensor<X, LHS::rank() + RHS::rank() - 2, C_> mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
-  static_assert(M1, SCALAR_TENSOR_MULT);
-  static_assert(M2, SCALAR_TENSOR_MULT);
-  assert((tensor_1.shape_[I1] == tensor_2.shape_[I2]) && INNER_DIMENSION_MISMATCH);
-  auto shape = Shape<M1 + M2 - 2>();
-  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, shape.dimensions_);
-  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, shape.dimensions_ + M1 - 1);
-
-  Tensor<X, M1 + M2 - 2, C1> prod_tensor(shape);
-  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[I1];
-  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[I2];
-  Indices<M1 - 1> reference_indices_1{};
-  Indices<M2 - 1> reference_indices_2{};
-  size_t index = 0;
-
-  // Set up strides and indices for tensor_1
-  size_t t1_strides[M1 - 1];
-  Shape<M1 - 1> t1_shape{};
-  details::FillExceptForIndex<I1>(tensor_1.strides_, t1_strides);
-  details::FillExceptForIndex<I1>(tensor_1.shape_.dimensions_, t1_shape.dimensions_);
-  size_t const * const t1_strides_array[] = { t1_strides };
-  size_t t1_indices[1] = {};
-
-  // Set up strides and indices for tensor_2
-  size_t t2_strides[M2 - 1];
-  Shape<M2 - 1> t2_shape{};
-  details::FillExceptForIndex<I2>(tensor_2.strides_, t2_strides);
-  details::FillExceptForIndex<I2>(tensor_2.shape_.dimensions_, t2_shape.dimensions_);
-  size_t const * const t2_strides_array[] = { t2_strides };
-
-  for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
-    size_t t2_indices[1] = {};
-    for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
-      X value {};
-      for (size_t x = 0; x < tensor_1.shape_.dimensions_[I1]; ++x)
-          value += (*tensor_1.ref_)[tensor_1.offset_ + t1_indices[0] + tensor_1.strides_[I1] * x] *
-            (*tensor_2.ref_)[tensor_2.offset_ + t2_indices[0] + tensor_2.strides_[I2] * x];
-      (*prod_tensor.ref_)[index] = value;
-      details::UpdateIndices(reference_indices_2, t2_shape, t2_indices, t2_strides_array);
-      ++index;
-    }
-    details::UpdateIndices(reference_indices_1, t1_shape, t1_indices, t1_strides_array);
-  }
-  return prod_tensor;
+  assert(lhs.self().dimension(I1) == lhs.self().dimension(I1) && SHAPE_MISMATCH);
+  return details::mul<X, C_, I1, I2>(lhs.self().eval(), rhs.self().eval());
 }
 
 /** Tensor multiplication with default axis, (defaults to M1 - 1 facing 0) */
-template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
-inline Tensor<X, M1 + M2 - 2, C1> mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2)
+template <typename LHS, typename RHS, typename X = typename LHS::value_t,
+          template <class> class C_ = LHS::template container_t>
+inline Tensor<X, LHS::rank() + RHS::rank() - 2, C_> mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
-  return mul<M1 - 1, 0>(tensor_1, tensor_2);
+  return mul<LHS::rank() - 1, 0>(lhs.self(), rhs.self());
 }
 
 /** Tensor multiplication with variable number of tensor arguments */
-template <typename X, typename Y, size_t M1, size_t M2, template <class> class C1, 
-  template <class> class C2, typename... Tensors, typename = typename std::enable_if<(sizeof...(Tensors) >= 1)>::type>
-auto mul(Tensor<X, M1, C1> const& tensor_1, Tensor<Y, M2, C2> const& tensor_2, Tensors const&... tensors)
-  -> Tensor<X, M1 + M2 + meta::RankSum<Tensors...>::value - 2 * (sizeof...(Tensors) + 1), C1>
+template <typename LHS, typename RHS, typename... Expressions, 
+  typename = typename std::enable_if<(sizeof...(Expressions) >= 1)>::type>
+auto mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs, Expressions const&... exprs)
+  -> Tensor<typename LHS::value_t, LHS::rank() + RHS::rank() + meta::RankSum<Expressions...>::value - 
+            2 * (sizeof...(Expressions) + 1), LHS::template container_t>
 {
-  auto prod_tensor = mul(tensor_1, tensor_2);
-  return mul(prod_tensor, tensors...);
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
+  auto prod_tensor = mul(lhs, rhs);
+  return mul(prod_tensor, exprs...);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3939,6 +4057,7 @@ Tensor<U, FirstExpression<Expressions...>::type::rank(), C_>
   map(FunctionType &&fn, Expressions const&... exprs)
 {
   static_assert(sizeof...(exprs), NO_TENSORS_PROVIDED);
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
   auto const &shape = details::GetShape(exprs...);
   VARDIAC_MAP(assert(shape == exprs.shape() && SHAPE_MISMATCH));
   constexpr size_t M = FirstExpression<Expressions...>::type::rank();
@@ -3961,51 +4080,36 @@ Tensor<U, FirstExpression<Expressions...>::type::rank(), C_>
   return tensor; 
 }
 
-/** Given a function `fn` and a variable sequence of Expressions, `Tensors`,
- *  apply the function to each element of `Tensors`simultaneously. Thus, 
- *  `fn` must have arity equivalent to `sizeof...(Tensors)` and each argument
+/** Given a function `fn` and a variable sequence of Expressions, `Expressions`,
+ *  each element of `Expressions` is forwarded as arguments to `fn`. Thus, 
+ *  `fn` must have arity equivalent to `sizeof...(Expressions)` and each argument
  *  to `fn` must have the same cv-qualified ref-unqualified type as the 
  *  corresponding Tensor. Mutates `Tensors` in place; if `fn` has a 
  *  return type it is discarded.
  */
-template <typename FunctionType, typename... Tensors>
-void Map(FunctionType &&fn, Tensors&&... tensors)
+template <typename FunctionType, typename... Expressions>
+void Map(FunctionType &&fn, Expressions&&... exprs)
 {
-  static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
-  auto const &shape = details::GetShape(tensors...);
-  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
-  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
-  size_t cumul_index = shape.index_product();
-  Indices<M> reference_indices {};
-  size_t indices[sizeof...(Tensors)] = {};
-  size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
-  auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
-  for (size_t i = 0; i < cumul_index; ++i) {
-    details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices, 
-      sequence, tensors...);
-    details::UpdateIndices(reference_indices, shape, indices, strides);
-  }
+  // static check to verify arguments are expressions
+  static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
+
+  // if expression, evaluate and forward as rvalue reference,
+  // if tensor, forward as lvalue reference
+  details::Map(std::forward<FunctionType>(fn), exprs.eval()...);
 }
 
-template <typename U, typename FunctionType, typename... Tensors>
-U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
+// FIXME documentation
+template <typename U, typename FunctionType, typename... Expressions>
+U reduce(U&& initial_value, FunctionType &&fn, Expressions const&... exprs)
 {
-  static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
-  auto const &shape = details::GetShape(tensors...);
-  VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
-  U ret_val = std::forward<U>(initial_value);
-  constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
-  size_t cumul_index = shape.index_product();
-  Indices<M> reference_indices {};
-  size_t indices[sizeof...(Tensors)] = {};
-  size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
-  auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
-  for (size_t i = 0; i < cumul_index; ++i) {
-    details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), 
-      (size_t *)indices, sequence, tensors...);
-    details::UpdateIndices(reference_indices, shape, indices, strides);
-  }
-  return ret_val;
+  // static check to verify arguments are expressions
+  static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
+  static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
+
+  // if expression, evaluate and forward as rvalue reference,
+  // if tensor, forward as lvalue reference
+  return details::reduce(std::forward<U>(initial_value), 
+      std::forward<FunctionType>(fn), exprs.eval()...);
 }
 
 /* ------------------------------- Iterator ----------------------------- */
@@ -4577,7 +4681,7 @@ class Tensor<T, 0, C>: public Expression<Tensor<T, 0, C>> {
    */
 public:
   typedef T                                       value_t;
-  template <typename X> using container_t =    C<X>;
+  template <typename X> using container_t =       C<X>;
   typedef T&                                      reference_type;
   typedef T const&                                const_reference_type;
   typedef Tensor<T, 0, C>                         self_t;
@@ -4640,23 +4744,39 @@ public:
 
   /* -------------- Getters -------------- */
 
+  /** Returns a reference to itself */
+  Tensor &eval() noexcept { return *this; }
+
+  /** Returns a const reference to itself */
+  Tensor const &eval() const noexcept { return *this; }
+
+  /** Get the rank: compile time constant 0 */
   constexpr static size_t rank() { return 0; }  
+
+  /** Get the shape: 0-size shape (sizeof(Shape<0>) is 1) */
   Shape<0> shape() const noexcept { return shape_; } 
+
   /** Returns the data as a reference */
   value_t &operator()() { return (*ref_)[offset_]; } 
+
   /** Returns the data as a const reference */
   value_t const &operator()() const { return (*ref_)[offset_]; }
+
   /** Creates a Scalar with the same underlying data */
   Tensor<T, 0, C> at() { return Tensor<T, 0, C>(this->ref()); }
+
   /** Creates a const Scalar with the same underlying data */
   Tensor<T, 0, C> const at() const { return Tensor<T, 0, C>(this->ref()); }
+
   /** Creates a Scalar with the same underlying data */
   Tensor<T, 0, C> slice() { return Tensor<T, 0, C>(this->ref()); }
+
   /** Creates a const Scalar with the same underlying data */
   Tensor<T, 0, C> const slice() const { return Tensor<T, 0, C>(this->ref()); }
 
   /** Used to implement iterator->, should not be used explicitly */
   Tensor *operator->() { return this; } 
+
   /** Used to implement const_iterator->, should not be used explicitly */
   Tensor const *operator->() const { return this; }
 
@@ -5869,6 +5989,9 @@ public:
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHS::rank()> const &shape() const { return lhs_.shape(); }
 
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const { return (*this)(); }
+
   template <typename... Args>
   auto operator()(Args... args) const
     -> typename std::remove_reference<decltype(std::declval<LHS const>()(args...))>::type;
@@ -6042,6 +6165,9 @@ public:
 
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHS::rank()> const &shape() const { return lhs_.shape(); }
+
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const { return (*this)(); }
 
   template <typename... Args>
   auto operator()(Args... args) const
@@ -6224,6 +6350,9 @@ public:
 
   Shape<self_t::rank()> const &shape() const noexcept { return shape_; }
   size_t dimension(size_t index) const noexcept; 
+
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const { return (*this)(); }
 
   template <typename... Args, typename = 
             typename std::enable_if<self_t::rank() != sizeof...(Args)>::type>
@@ -6635,6 +6764,9 @@ public:
   size_t dimension(size_t index) const { return lhs_.dimension(index); }
   Shape<LHS::rank()> const &shape() const { return lhs_.shape(); }
 
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const noexcept { return (*this)(); }
+
   template <typename... Args, typename = 
             typename std::enable_if<sizeof...(Args) != self_t::rank()>::type>
   auto operator()(Args... args) const
@@ -6872,6 +7004,9 @@ public:
 
   size_t dimension(size_t index) const { return std::get<0>(exprs_).dimension(index); }
   Shape<self_t::rank()> const &shape() const { return std::get<0>(exprs_).shape(); }
+
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const { return (*this)(); }
 
   template <typename... Args>
   auto operator()(Args... args) const
@@ -7150,7 +7285,7 @@ public:
   using container_t = typename                        first_t::template container_t<X>;
   constexpr static size_t rank()                      { return 0; }
   typedef ReduceExpr                                  self_t;
-  typedef T                                           return_t;
+  typedef Tensor<T, 0, container_t>                   return_t;
 
   /* ------------------------------ Friend ------------------------------ */
 
@@ -7170,10 +7305,11 @@ public:
 
   Shape<0> shape() const { return Shape<0>(); }
 
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const noexcept { return (*this)(); }
+
   T operator()() const;
-
   auto at() const -> Tensor<T, 0, container_t>;
-
   T operator[](Indices<0> const &indices) const;
 
   template <size_t... Slices>
@@ -7367,6 +7503,9 @@ public:
 
   size_t dimension(size_t index) const { return rhs_.dimension(index); }
   Shape<RHS::rank()> const &shape() const { return rhs_.shape(); }
+
+  /** Evaluate and return the resulting Tensor */
+  return_t eval() const noexcept { return (*this)(); }
 
   template <typename... Args>
   auto operator()(Args... args) const

@@ -91,19 +91,19 @@ void CombinationExpressionTests() {
 }
 
 // Instantiate test cases
-TEST_CASE(BeginTest("Simple Expressions", "Array")) { 
+TEST_CASE("Simple Expressions" " | "  "Array") { 
   SimpleExpressionTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Simple Expressions", "HashMap")) { 
+TEST_CASE("Simple Expressions" " | "  "HashMap") { 
   SimpleExpressionTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Combination Expressions", "Array")) { 
+TEST_CASE("Combination Expressions" " | "  "Array") { 
   CombinationExpressionTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Combination Expressions", "HashMap")) { 
+TEST_CASE("Combination Expressions" " | "  "HashMap") { 
   CombinationExpressionTests<data::HashMap>();
 }
 

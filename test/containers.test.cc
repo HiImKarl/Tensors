@@ -36,7 +36,7 @@ void CrossContainerOperations()
   }
 }
 
-TEST_CASE(BeginTest("CrossContainer")) {
+TEST_CASE("CrossContainer") {
   CrossContainerOperations<data::Array, data::HashMap>();
   CrossContainerOperations<data::HashMap, data::Array>();
 }

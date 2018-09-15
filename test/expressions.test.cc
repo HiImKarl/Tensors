@@ -746,43 +746,43 @@ void TensorManipulationTests()
   }
 }
 
-TEST_CASE(BeginTest("Raw Expressions", "Array")) { 
+TEST_CASE("Raw Expressions" " | "  "Array") { 
   RawExpressionTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Raw Expressions", "HashMap")) { 
+TEST_CASE("Raw Expressions" " | "  "HashMap") { 
   RawExpressionTests<data::HashMap>();
 }
    
-TEST_CASE(BeginTest("Basic Tensor Arithmetic", "Array")) { 
+TEST_CASE("Basic Tensor Arithmetic" " | "  "Array") { 
   TensorArithmeticTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Basic Tensor Arithmetic", "HashMap")) { 
+TEST_CASE("Basic Tensor Arithmetic" " | "  "HashMap") { 
   TensorArithmeticTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Scalar Arithmetic", "Array")) { 
+TEST_CASE("Scalar Arithmetic" " | "  "Array") { 
   ScalarArithmeticTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Scalar Arithmetic", "HashMap")) { 
+TEST_CASE("Scalar Arithmetic" " | "  "HashMap") { 
   ScalarArithmeticTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Tensor Multplication", "Array")) { 
+TEST_CASE("Tensor Multplication" " | "  "Array") { 
   TensorMultiplicationTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Tensor Multplication", "HashMap")) { 
+TEST_CASE("Tensor Multplication" " | "  "HashMap") { 
   TensorMultiplicationTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Tensor Manipulation", "Array")) {
+TEST_CASE("Tensor Manipulation" " | "  "Array") {
   TensorManipulationTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Tensor Manipulation", "HashMap")) {
+TEST_CASE("Tensor Manipulation" " | "  "HashMap") {
   TensorManipulationTests<data::HashMap>();
 }
 

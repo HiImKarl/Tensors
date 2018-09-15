@@ -32,18 +32,18 @@ void ScalarTests() {
 
 // Instantiate Tests
 
-TEST_CASE(BeginTest("Tensor", "Array")) { 
+TEST_CASE("Tensor" " | "  "Array") { 
   TensorTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Tensor", "HashMap")) { 
+TEST_CASE("Tensor" " | "  "HashMap") { 
   TensorTests<data::HashMap>();
 }
 
-TEST_CASE(BeginTest("Scalar", "Array")) { 
+TEST_CASE("Scalar" " | "  "Array") { 
   ScalarTests<data::Array>();
 }
 
-TEST_CASE(BeginTest("Scalar", "HashMap")) { 
+TEST_CASE("Scalar" " | "  "HashMap") { 
   ScalarTests<data::HashMap>();
 }
