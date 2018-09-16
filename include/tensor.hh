@@ -946,30 +946,37 @@ inline Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr,
   return expr.self().shape();
 }
 
-template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-inline U MapForwardSequence(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
+template <typename U, typename FunctionType, typename Tuple, size_t... I>
+inline U details::MapForwardSequence(FunctionType &&fn, size_t *indices, 
+	 Tuple &&tensors, meta::Sequence<I...>)
 {
-  return fn(tensors.pGet(indices, I)...);
+  return std::forward<FunctionType>(fn)(
+		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
-template <typename FunctionType, size_t... I, typename... Tensors>
-inline void MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors)
+template <typename FunctionType, typename Tuple, size_t... I>
+inline void MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices, 
+	Tuple &&tensors, meta::Sequence<I...>)
 {
-  fn(tensors.pGet(indices, I)...);
+  std::forward<FunctionType>(fn)(
+		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
-template <typename U, typename FunctionType, size_t... I, typename... Tensors>
+template <typename U, typename FunctionType, typename Tuple, size_t... I>
 inline void ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices, 
-    meta::Sequence<I...>, Tensors&&... tensors)
+    Tuple &&tensors, meta::Sequence<I...>)
 {
-  ret_val = fn(std::forward<U>(ret_val), std::forward<Tensors>(tensors).pGet(indices, I)...);
+	ret_val = std::forward<FunctionType>(fn)(std::forward<U>(ret_val),
+		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
-template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
-inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-    FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors)
+template <typename U, size_t M, template <class> class C_, 
+	typename FunctionType, typename Tuple, size_t... I>
+inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
+		FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>)
 {
-  tensor.pSet(index, fn(tensors.pGet(indices, I)...));
+  tensor.pSet(index, std::forward<FunctionType>(fn)(
+		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...));
 }
 
 /** Map reciever after all Expressions have been converted to Tensors */
@@ -986,8 +993,8 @@ void Map(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-    details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices, 
-      sequence, tensors...);
+		details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices,
+			std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
 }
@@ -1015,7 +1022,7 @@ Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
   for (size_t i = 0; i < cumul_index; ++i) {
     // `tensor`'s strides will be contiguous
     tensor.pSet(i, details::MapForwardSequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
-      sequence, tensors...));
+			std::forward_as_tuple(tensors...), sequence));
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return tensor; 
@@ -1037,7 +1044,7 @@ U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
     details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), 
-      (size_t *)indices, sequence, tensors...);
+      (size_t *)indices, std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return ret_val;
@@ -2866,21 +2873,22 @@ private:
   inline void pSet(size_t index, U&& value)
    { ref_->set(index, std::forward<U>(value)); }
 
-  template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-  friend U details::MapForwardSequence(
-      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors);
+  template <typename U, typename FunctionType, typename Tuple, size_t... I>
+  friend inline U details::MapForwardSequence(FunctionType &&fn, size_t *indices, 
+		 Tuple &&tensors, meta::Sequence<I...>);
 
-  template <typename FunctionType, size_t... I, typename... Tensors>
-  friend inline void details::MapForwardSequenceInPlace(
-      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors);
+	template <typename FunctionType, typename Tuple, size_t... I>
+	friend inline void details::MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices,
+		Tuple &&tensors, meta::Sequence<I...>);
 
-  template <typename U, typename FunctionType, size_t... I, typename... Tensors>
-  friend inline void details::ReduceForwardSequence(U &&ret_val,
-      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors&&... tensors);
+	template <typename U, typename FunctionType, typename Tuple, size_t... I>
+	friend inline void details::ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices,
+		Tuple &&tensors, meta::Sequence<I...>);
 
-  template <typename U, size_t M, template <class> class C_, typename FunctionType, size_t... I, typename... Tensors>
-  friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-      FunctionType &&fn, size_t *indices, meta::Sequence<I...>, Tensors const&... tensors);
+	template <typename U, size_t M, template <class> class C_,
+		typename FunctionType, typename Tuple, size_t... I>
+	friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
+			FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>);
 
   /* ------------------ Utility --------------------- */
 
@@ -3663,7 +3671,8 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors) + 1] = { result.strides_, tensors.strides_... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-    details::ElemWiseForwardSequence(result, indices[0], fn, (size_t*)indices + 1, sequence, tensors...);
+		details::ElemWiseForwardSequence(result, indices[0], fn, (size_t*)indices + 1,
+			std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return result;
