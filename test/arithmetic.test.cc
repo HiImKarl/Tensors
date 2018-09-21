@@ -343,42 +343,27 @@ void ExpressionTests() {
   }
 }
 
-TEST_CASE("Add/Subtract" " | "  "Array") {
+TEST_CASE("Add/Subtract") {
   AddSubtractTests<data::Array>();
-}
-
-TEST_CASE("Add/Subtract" " | "  "HashMap") {
   AddSubtractTests<data::HashMap>();
 }
 
-TEST_CASE("Hadarmard" " | "  "Array") {
+TEST_CASE("Hadarmard") {
   HadarmardTests<data::Array>();
-}
-
-TEST_CASE("Hadarmard" " | "  "HashMap") {
   HadarmardTests<data::HashMap>();
 }
 
-TEST_CASE("Multiplication" " | "  "Array") {
+TEST_CASE("Multiplication") {
   MultiplicationTests<data::Array>(); 
-}
-
-TEST_CASE("Multiplication" " | "  "HashMap") {
   MultiplicationTests<data::HashMap>(); 
 }
 
-TEST_CASE("Misc" " | "  "Array") {
+TEST_CASE("Misc") {
   MiscTests<data::Array>();
-}
-
-TEST_CASE("Misc" " | "  "HashMap") {
   MiscTests<data::HashMap>();
 }
 
-TEST_CASE("Expression" " | "  "Array") {
+TEST_CASE("Expression") {
   ExpressionTests<data::Array>();
-}
-
-TEST_CASE("Expression" " | "  "HashMap") {
   ExpressionTests<data::HashMap>();
 }

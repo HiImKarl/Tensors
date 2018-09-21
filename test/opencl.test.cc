@@ -90,20 +90,13 @@ void CombinationExpressionTests() {
 }
 
 // Instantiate test cases
-TEST_CASE("Simple Expressions" " | "  "Array") { 
+TEST_CASE("Simple Expressions") { 
   SimpleExpressionTests<data::Array>();
-}
-
-TEST_CASE("Simple Expressions" " | "  "HashMap") { 
   SimpleExpressionTests<data::HashMap>();
 }
 
-TEST_CASE("Combination Expressions" " | "  "Array") { 
+TEST_CASE("Combination Expressions") { 
   CombinationExpressionTests<data::Array>();
-}
-
-TEST_CASE("Combination Expressions" " | "  "HashMap") { 
   CombinationExpressionTests<data::HashMap>();
 }
-
 #endif
