@@ -268,9 +268,6 @@ struct IsScalar {
 template <typename T>
 struct IsNonCVRefExpression: std::false_type {};
 
-/** Expression specialization, boolean enum 
- * `value` is true.
- */
 template <typename T, size_t N, template <class> class C>
 struct IsNonCVRefExpression<Tensor<T, N, C>>: std::true_type {};
 
@@ -295,8 +292,8 @@ struct IsNonCVRefExpression<ReduceExpr<T, Function, Exprs...>>: std::true_type {
 template <typename RHS> 
 struct IsNonCVRefExpression<UnaryNegExpr<RHS>>: std::true_type {};
 
-/** Boolean member `value` is true if T is an Expression of any NodeType
- *  ignoring cv, ref qualification, false o.w.  
+/** Boolean member `value` is true if T is an Expression, 
+ *  regardless of cv/ref qualification, false o.w.  
  */
 template <typename T>
 struct IsExpression {
@@ -389,6 +386,7 @@ struct RemoveCVRef {
 template <bool B1, bool B2>
 struct LogicalAnd { static constexpr bool value = B1 && B2; };
 
+/** Fills `array2` with the values of `args...` between [Middle, End) */
 template <size_t Index, size_t Middle, size_t End>
 struct FillSecond {
   template <typename... Args>
@@ -413,6 +411,7 @@ struct FillSecond<End, 0, End> {
   FillSecond(std::array<size_t, 0>&, std::array<size_t, End>&) {}
 };
 
+/** Fills `array1` with the values of `args...` between [0, Middle) */
 template <size_t, size_t, size_t>
 struct FillFirst; 
 
@@ -451,7 +450,7 @@ struct FillFirst<Middle, Middle, End> {
   }
 };
 
-// FIXME g++ 6.3 cannot pattern match this ???
+// FIXME g++ 6.3 can't pattern match this ???
 template <size_t End>
 struct FillFirst<0, 0, End> {
   template <typename... Args>
@@ -478,6 +477,9 @@ struct FillFirst<0, 0, 0> {
   {}
 };
 
+/** Member STL arrays `array1` and `array2` hold the values of `args...` between 
+ *  [0, Middle) and [Middle, End) respectively. `Args...` must be of type size_t
+ */
 template <size_t Middle, size_t End>
 struct FillArgs {
   std::array<size_t, Middle> array1;
@@ -818,6 +820,7 @@ struct RightSequence<ThreshHold, Sequence<I...>> {
   using sequence = typename MakeRightSequence<ThreshHold, I...>::sequence;
 };
 
+/** Sets `indices` at every index in `I...` to zero */
 template <size_t Size, size_t... I>
 struct InsertZeros;
 
@@ -871,6 +874,7 @@ struct AreExpressions<Arg, Args...> {
 template <>
 struct AreExpressions<>: std::true_type {};
 
+/** Member `value` is the sum of the ranks of every Expression in `Exprs...` */
 template <typename... Exprs>
 struct RankSum;
 
@@ -1050,7 +1054,7 @@ U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
   return ret_val;
 }
 
-/** Multiply reciever after expressions have been converted to tensors */
+/** Multiply reciever after Expressions have been converted to tensors */
 template <typename X, template <class> class C_, size_t I1, size_t I2, 
   typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
 Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, C2> const& tensor_2)
@@ -1099,7 +1103,6 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, 
   }
   return prod_tensor;
 }
-
 
 } // namespace details
 
@@ -1287,10 +1290,15 @@ struct OpenCLType<unsigned long> { constexpr static char const *value = cULongTy
 template <>
 struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
 
+/** Creates a kernel accepting `buffers.size()` arguments and writes to a new
+ *  buffer with size `num_elems`. The values of the new buffer are obtained by
+ *  evaluating `expr`, an OpenCL expression.
+ */
 template <typename T>
 cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
     std::string const &arg_list, std::string const &expr, size_t num_elems) 
 {
+  /* FIXME -- remove commented code after testing
   std::string kernel_code = 
          std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
          + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
@@ -1298,6 +1306,13 @@ cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &
          + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
          + cOutputName + "[" + cGlobalIdName + "] = " + expr + ";\n"
          + "}\n";
+   */
+	
+  std::string kernel_code = 
+    std::string("\nkernel void k(" + arg_list + "global "
+    + OpenCLType<T>::value + " *output) {\n"
+    + "size_t gid = get_global_id(0);\n"
+    + "output[gid] = " + expr + ";\n}\n";
 
   cl_int err = 0;
   cl::Buffer output_buffer(opencl::Info::v().context(), 
@@ -1337,7 +1352,8 @@ std::string CreateReductionKernelCode()
   // 4th argument is the size of half of the reduction group, the fifth argument is 
   // the offset, the sixth argument is the workgroup_size
     
-  // Kernel decleration & argument list
+  // FIXME -- remove commented code after testing
+  /*
   std::string kernel_code =
     std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "("
   + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value 
@@ -1347,18 +1363,39 @@ std::string CreateReductionKernelCode()
   + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " + cSizeTType + " "
   + cConstIdentifier + " " + cOffsetName + ", " + cSizeTType + " " + cConstIdentifier 
   + " " + cWGSizeName + ") {\n";
+  */
 
+  // Kernel decleration & argument list
+  std::string kernel_code = 
+    std::string("kernel void k(global ") + OpenCLType<ReturnType>::value
+    + " const *v, local " + OpenCLType<ReturnType::value + " *l, global "
+    + OpenCLType<ReturnType>::value + " *output, size_t const N, size_t const offset,"
+    + " size_t const wg_size) {";
   
+  /*
   kernel_code +=
     std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
   + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
   + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
   + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
+  */
 
+  kernel_code += R"(
+  size_t global_id = get_global_id(0);
+  size_t group_id = get_group_id(0);
+  size_t local_id = get_local_id(0);
+  size_t local_size = get_local_size(0);)";
+
+  /*
   kernel_code +=
     std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
   + cVariablePrefix + "[" + cGlobalIdName + " + " + cOffsetName + " * " + cWGSizeName + "];\n";
+  */
 
+  kernel_code += R"(
+  l[local_id] = v[global_id + offset * wg_size];)";
+
+  /*
   kernel_code +=
     std::string("\t") + cBarrierFunction + "(" + cLocalMemFence + ");\n"
   + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
@@ -1374,6 +1411,19 @@ std::string CreateReductionKernelCode()
   + "\tif (" + cLocalIdName + " == 0)\n"
   + "\t\t" + cOutputName + "[" + cOffsetName + "] = " + std::string(cLocalPrefix) + "[0];\n" 
   + "}\n";
+  */
+	
+  kernel_code += R"(
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for (size_t i = N; i > 0; i >>= 1) {
+    if (local_id < i && i + local_id < local_size)
+      )"; 
+  kernel_code += Function::opencl_reduce("l[local_id]", "l[local_id + i]") + ";";
+  kernel_code += R"(
+    barrier(CLK_LOCAL_MEM_FENCE);
+  };
+  if (local_id == 0) output[offset] = l[0];
+})";
 
   return kernel_code;
 }
@@ -1382,19 +1432,19 @@ std::string CreateReductionKernelCode()
 template <typename ReturnType, typename Function> 
 std::string CreateOffsetKernelCode()
 {
-  std::string kernel_code =
-      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
-
   // The kernel's 1st argument is the input buffer, containing one element,
   // and the second argument is the initial value
     
-  kernel_code += std::string(cGlobalIdentifier) 
-  + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
-  + cOutputName + ", " + OpenCLType<ReturnType>::value + " " + cConstIdentifier + " "
-  + cInitialValueName + ") {\n"
-  + "\t"  + cOutputName + "[0] = " + Function::opencl_map(std::string(cInitialValueName), 
-        std::string(cOutputName) + "[0]") + ";\n"
-  + "}\n";
+  /*
+  std::string kernel_code =
+      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
+  */
+
+  std::string kernel_code = R"(kernel void k(global )";
+  kernel_code += std::string(OpenCLType<ReturnType>::value) + " *output, "
+  + OpenCLType<ReturnType>::value + " const ival) {";
+  kernel_code += "\n\toutput[0] = ";
+  kernel_code += Function::opencl_map("ival", "output[0]") + ";\n}";
 
   return kernel_code;
 }
@@ -1845,6 +1895,7 @@ T const &HashMap<T>::operator[](size_t index) const
 /** Proxy object used to construct Tensors with C-arrays */
 template <typename Array>
 struct CArrayProxy {
+  /** Capture C-array by reference */
   CArrayProxy(Array const &_value);
   Array const &value;
 };
@@ -1855,6 +1906,7 @@ CArrayProxy<Array>::CArrayProxy(Array const &_value): value(_value)
   static_assert(std::is_array<Array>::value, EXPECTING_C_ARRAY);
 }
 
+/** Shorthand proxxy wrapper function */
 template <typename Array>
 CArrayProxy<Array> _C(Array const &value)
 {
@@ -1864,6 +1916,7 @@ CArrayProxy<Array> _C(Array const &value)
 /** Proxy object used to avoid alias restrictions for tensor assignment */
 template <typename NodeType>
 struct NoAliasProxy {
+  /** Capture Expression by reference */
   NoAliasProxy(Expression<NodeType> const &_expr);
   Expression<NodeType> const &expr;
 };
@@ -1871,6 +1924,7 @@ struct NoAliasProxy {
 template <typename NodeType>
 NoAliasProxy<NodeType>::NoAliasProxy(Expression<NodeType> const &_expr): expr(_expr) {}
 
+/** Shorthand proxxy wrapper function */
 template <typename NodeType>
 NoAliasProxy<NodeType> _NA(Expression<NodeType> const& expr)
 {
@@ -2073,6 +2127,7 @@ void Shape<N>::pInitializeStrides(size_t (&strides)[N]) const noexcept
   }
 }
 
+/** Streams shape in S{dim1, dim2, ... dimN} format */
 template <size_t N>
 std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
 {
