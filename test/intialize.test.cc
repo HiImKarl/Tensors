@@ -149,19 +149,12 @@ void InitializingScalarTests() {
   } 
 }
 
-TEST_CASE("Intializing Tensors" " | "  "Array") { 
+TEST_CASE("Intializing Tensors") { 
   InitializingTensorTests<data::Array>();
-}
-
-TEST_CASE("Intializing Tensors" " | "  "HashMap") { 
   InitializingTensorTests<data::HashMap>();
 }
 
-TEST_CASE("Initializing Scalars" " | "  "Array") { 
+TEST_CASE("Initializing Scalars") { 
   InitializingScalarTests<data::Array>();
-}
-
-TEST_CASE("Initializing Scalars" " | "  "HashMap") { 
   InitializingScalarTests<data::HashMap>();
 }
- 

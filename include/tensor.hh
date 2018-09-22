@@ -951,7 +951,7 @@ inline Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr,
 }
 
 template <typename U, typename FunctionType, typename Tuple, size_t... I>
-inline U details::MapForwardSequence(FunctionType &&fn, size_t *indices, 
+inline U MapForwardSequence(FunctionType &&fn, size_t *indices, 
 	 Tuple &&tensors, meta::Sequence<I...>)
 {
   return std::forward<FunctionType>(fn)(
@@ -976,7 +976,7 @@ inline void ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indice
 
 template <typename U, size_t M, template <class> class C_, 
 	typename FunctionType, typename Tuple, size_t... I>
-inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
+inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
 		FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>)
 {
   tensor.pSet(index, std::forward<FunctionType>(fn)(

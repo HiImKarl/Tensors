@@ -235,42 +235,27 @@ void TensorConstructionDestructionTests() {
   } 
 }
 
-TEST_CASE("Single Tensor" " | "  "Array") { 
+TEST_CASE("Single Tensor") { 
   SingleTensorTest<data::Array>(16);
-}
-
-TEST_CASE("Single Tensor" " | "  "HashMap") { 
   SingleTensorTest<data::HashMap>(1);
 }
 
-TEST_CASE("Multiple Tensors" " | "  "Array") { 
+TEST_CASE("Multiple Tensors") { 
   MultipleTensorTest<data::Array>(16);
-}
-
-TEST_CASE("Multiple Tensors" " | "  "HashMap") { 
   MultipleTensorTest<data::HashMap>(1);
 }
 
-TEST_CASE("Explicit Copy Method" " | "  "Array") { 
+TEST_CASE("Explicit Copy Method") { 
   ExplicitCopyTest<data::Array>(16);
-}
-
-TEST_CASE("Explicit Copy Method" " | "  "HashMap") { 
   ExplicitCopyTest<data::HashMap>(1);
 }
 
-TEST_CASE("Arithmetic" " | "  "Array") { 
+TEST_CASE("Arithmetic") { 
   ArithmeticTest<data::Array>(16); 
-}
-
-TEST_CASE("Arithmetic" " | "  "HashMap") { 
   ArithmeticTest<data::HashMap>(1);
 }
 
-TEST_CASE("Tensor Constructions/Destructions" " | "  "Array") { 
+TEST_CASE("Tensor Constructions/Destructions") { 
   TensorConstructionDestructionTests<data::Array>();
-}
-
-TEST_CASE("Tensor Constructions/Destructions" " | "  "HashMap") { 
   TensorConstructionDestructionTests<data::HashMap>();
 }
