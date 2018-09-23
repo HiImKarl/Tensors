@@ -952,35 +952,35 @@ inline Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr,
 
 template <typename U, typename FunctionType, typename Tuple, size_t... I>
 inline U MapForwardSequence(FunctionType &&fn, size_t *indices, 
-	 Tuple &&tensors, meta::Sequence<I...>)
+   Tuple &&tensors, meta::Sequence<I...>)
 {
   return std::forward<FunctionType>(fn)(
-		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
+    std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
 template <typename FunctionType, typename Tuple, size_t... I>
 inline void MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices, 
-	Tuple &&tensors, meta::Sequence<I...>)
+  Tuple &&tensors, meta::Sequence<I...>)
 {
   std::forward<FunctionType>(fn)(
-		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
+    std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
 template <typename U, typename FunctionType, typename Tuple, size_t... I>
 inline void ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices, 
     Tuple &&tensors, meta::Sequence<I...>)
 {
-	ret_val = std::forward<FunctionType>(fn)(std::forward<U>(ret_val),
-		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
+  ret_val = std::forward<FunctionType>(fn)(std::forward<U>(ret_val),
+    std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
 template <typename U, size_t M, template <class> class C_, 
-	typename FunctionType, typename Tuple, size_t... I>
+  typename FunctionType, typename Tuple, size_t... I>
 inline void ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-		FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>)
+    FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>)
 {
   tensor.pSet(index, std::forward<FunctionType>(fn)(
-		std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...));
+    std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...));
 }
 
 /** Map reciever after all Expressions have been converted to Tensors */
@@ -997,8 +997,8 @@ void Map(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-		details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices,
-			std::forward_as_tuple(tensors...), sequence);
+    details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices,
+      std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
 }
@@ -1026,7 +1026,7 @@ Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
   for (size_t i = 0; i < cumul_index; ++i) {
     // `tensor`'s strides will be contiguous
     tensor.pSet(i, details::MapForwardSequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
-			std::forward_as_tuple(tensors...), sequence));
+      std::forward_as_tuple(tensors...), sequence));
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return tensor; 
@@ -1298,21 +1298,11 @@ template <typename T>
 cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
     std::string const &arg_list, std::string const &expr, size_t num_elems) 
 {
-  /* FIXME -- remove commented code after testing
   std::string kernel_code = 
-         std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + 
-         + "(" + arg_list + cGlobalIdentifier + " " + OpenCLType<T>::value
-         + " " + cPointerIdentifier + cOutputName + ") {\n"
-         + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction + "(0);\n"
-         + cOutputName + "[" + cGlobalIdName + "] = " + expr + ";\n"
-         + "}\n";
-   */
-	
-  std::string kernel_code = 
-    std::string("\nkernel void k(" + arg_list + "global "
-    + OpenCLType<T>::value + " *output) {\n"
-    + "size_t gid = get_global_id(0);\n"
-    + "output[gid] = " + expr + ";\n}\n";
+    std::string("kernel void k(") + arg_list + "global "
+    + OpenCLType<T>::value + " *output) {";
+  kernel_code += "\n\tsize_t global_id = get_global_id(0);";
+  kernel_code += std::string("\noutput[global_id] = ") + expr + ";\n}\n";
 
   cl_int err = 0;
   cl::Buffer output_buffer(opencl::Info::v().context(), 
@@ -1368,7 +1358,7 @@ std::string CreateReductionKernelCode()
   // Kernel decleration & argument list
   std::string kernel_code = 
     std::string("kernel void k(global ") + OpenCLType<ReturnType>::value
-    + " const *v, local " + OpenCLType<ReturnType::value + " *l, global "
+    + " const *v, local " + OpenCLType<ReturnType>::value + " *l, global "
     + OpenCLType<ReturnType>::value + " *output, size_t const N, size_t const offset,"
     + " size_t const wg_size) {";
   
@@ -1412,13 +1402,16 @@ std::string CreateReductionKernelCode()
   + "\t\t" + cOutputName + "[" + cOffsetName + "] = " + std::string(cLocalPrefix) + "[0];\n" 
   + "}\n";
   */
-	
+  
   kernel_code += R"(
   barrier(CLK_LOCAL_MEM_FENCE);
   for (size_t i = N; i > 0; i >>= 1) {
     if (local_id < i && i + local_id < local_size)
       )"; 
-  kernel_code += Function::opencl_reduce("l[local_id]", "l[local_id + i]") + ";";
+
+  kernel_code += Function::opencl_reduce(std::string("l[local_id]"), 
+    std::string("l[local_id + i]")) + ";";
+
   kernel_code += R"(
     barrier(CLK_LOCAL_MEM_FENCE);
   };
@@ -1444,7 +1437,7 @@ std::string CreateOffsetKernelCode()
   kernel_code += std::string(OpenCLType<ReturnType>::value) + " *output, "
   + OpenCLType<ReturnType>::value + " const ival) {";
   kernel_code += "\n\toutput[0] = ";
-  kernel_code += Function::opencl_map("ival", "output[0]") + ";\n}";
+  kernel_code += Function::opencl_map(std::string("ival"), std::string("output[0]")) + ";\n}";
 
   return kernel_code;
 }
@@ -1830,7 +1823,7 @@ public:
 
 private:
   std::unordered_map<size_t, T> data_; /**< underlying STL hash map */
-  T zero_elem_;
+  T zero_elem_; /**< zero element that isn't allocated in the map */
 };
 
 template <typename T>
@@ -1973,8 +1966,11 @@ public:
 
   /* ------------------ Constructors ------------------ */
 
-  explicit Shape(std::initializer_list<size_t> dimensions); /**< initializer_list constructor */
-  Shape(Shape<N> const &shape);                  /**< Copy constructor */
+  /**< initializer_list constructor */
+  explicit Shape(std::initializer_list<size_t> dimensions); 
+
+  /**< Copy constructor */
+  Shape(Shape<N> const &shape);                  
 
   /* ------------------ Assignment -------------------- */
 
@@ -2930,20 +2926,20 @@ private:
 
   template <typename U, typename FunctionType, typename Tuple, size_t... I>
   friend inline U details::MapForwardSequence(FunctionType &&fn, size_t *indices, 
-		 Tuple &&tensors, meta::Sequence<I...>);
+     Tuple &&tensors, meta::Sequence<I...>);
 
-	template <typename FunctionType, typename Tuple, size_t... I>
-	friend inline void details::MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices,
-		Tuple &&tensors, meta::Sequence<I...>);
+  template <typename FunctionType, typename Tuple, size_t... I>
+  friend inline void details::MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices,
+    Tuple &&tensors, meta::Sequence<I...>);
 
-	template <typename U, typename FunctionType, typename Tuple, size_t... I>
-	friend inline void details::ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices,
-		Tuple &&tensors, meta::Sequence<I...>);
+  template <typename U, typename FunctionType, typename Tuple, size_t... I>
+  friend inline void details::ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices,
+    Tuple &&tensors, meta::Sequence<I...>);
 
-	template <typename U, size_t M, template <class> class C_,
-		typename FunctionType, typename Tuple, size_t... I>
-	friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-			FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>);
+  template <typename U, size_t M, template <class> class C_,
+    typename FunctionType, typename Tuple, size_t... I>
+  friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
+      FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>);
 
   /* ------------------ Utility --------------------- */
 
@@ -3726,8 +3722,8 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors) + 1] = { result.strides_, tensors.strides_... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-		details::ElemWiseForwardSequence(result, indices[0], fn, (size_t*)indices + 1,
-			std::forward_as_tuple(tensors...), sequence);
+    details::ElemWiseForwardSequence(result, indices[0], fn, (size_t*)indices + 1,
+      std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
   return result;
@@ -5884,7 +5880,7 @@ struct div {
   static std::string opencl_reduce(std::string const &accum, std::string const &v1)
     { return accum + " *= " + v1; }
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string div::opencl_map(Args const&... args);
+  template <typename... Args> static std::string opencl_map(Args const&... args);
 #endif
 };
 
@@ -7449,12 +7445,6 @@ private:
   template <size_t... TupleIndices>
   T pReduceExpansion(meta::Sequence<TupleIndices...>) const;
 
-  /* --------------------------- OpenCL ----------------------------- */
-
-#ifdef _ENABLE_OPENCL
-  // FIXME
-#endif
-
   /* ---------------------------- Data ------------------------------ */
 
   std::tuple<Exprs const&...> exprs_;
@@ -7706,7 +7696,7 @@ auto UnaryNegExpr<RHS>::operator[](Indices<M> const &indices) const
 
 template <typename RHS>
 template <size_t... Slices, typename... Args>
-auto UnaryNegExpr<RHS>::slice(Args... args) const
+auto UnaryNegExpr<RHS>::slice(Args... args) const 
   -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(args...))>::type
 {
   static_assert(rank() >= sizeof...(args), RANK_OUT_OF_BOUNDS);
