@@ -15,7 +15,6 @@ void TensorAssignmentTest() {
           tensor_1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; 
 
   SECTION("Assigning Tensors to Tensors") { 
-
     Tensor<int32_t, 2, Container> t2({3, 4}); 
     for (size_t i = 0; i < t2.dimension(0); ++i) 
       for (size_t j = 0; j < t2.dimension(1); ++j) 

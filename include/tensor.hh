@@ -147,7 +147,7 @@ extern int eDebugConstructorCounter;
 /* ---------------- Debug Messages --------------- */
 
 #define PANIC_ASSERTION \
-  "This assertion should never fire -> the developer messed up"
+  "This assertion should never fire... the developer messed up"
 
 /* -------------------- Macros ------------------- */
 
@@ -197,7 +197,6 @@ template <typename NodeType> class Model;
 
 } // namespace opencl
 
-
 /* ----------------- Type Definitions ---------------- */
 
 template <typename T, template <class> class C = data::Array> 
@@ -235,9 +234,7 @@ struct IsNonCVRefTensor<Tensor<T, N, C>>: std::true_type {};
  */
 template <typename T>
 struct IsTensor { 
-  enum: bool { value = IsNonCVRefTensor<
-          typename meta::RemoveCVRef<T>::type>::value
-        };
+  enum: bool { value = IsNonCVRefTensor< typename meta::RemoveCVRef<T>::type>::value };
 };
 
 /** Boolean member `value` is true if T is a non-cv qualified, non-ref 
@@ -257,9 +254,7 @@ struct IsNonCVRefScalarTensor<Tensor<T, 0, C>> { static bool const value = true;
  */
 template <typename T>
 struct IsScalar { 
-  enum: bool { value = IsNonCVRefScalarTensor<
-          typename meta::RemoveCVRef<T>::type>::value
-        };
+  enum: bool { value = IsNonCVRefScalarTensor<typename meta::RemoveCVRef<T>::type>::value };
 };
 
 /** Boolean member `value` is true if T is a non-cv qualified, non-ref
@@ -297,9 +292,9 @@ struct IsNonCVRefExpression<UnaryNegExpr<RHS>>: std::true_type {};
  */
 template <typename T>
 struct IsExpression {
-  enum: bool { value = IsNonCVRefExpression<
-          typename std::remove_reference<
-          typename std::remove_cv<T>::type>::type>::value
+  enum: bool { 
+          value = IsNonCVRefExpression<
+            typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value
         };
 };
 
@@ -378,8 +373,7 @@ constexpr bool InBetween(size_t x, size_t a, size_t b)
 template <typename T>
 struct RemoveCVRef {
   using type = typename std::remove_cv<
-               typename std::remove_reference<T>::type
-               >::type;
+    typename std::remove_reference<T>::type>::type;
 };
 
 /** template && */
@@ -440,7 +434,6 @@ struct FillFirst<Index, Middle, Middle> {
 
 template <size_t Middle, size_t End>
 struct FillFirst<Middle, Middle, End> {
-
   template <typename... Args>
   FillFirst(std::array<size_t, Middle> &array1, std::array<size_t, End - Middle> &array2,
     size_t next, Args... args)
@@ -490,7 +483,10 @@ struct FillArgs {
   {
     static_assert(End == sizeof...(Args), PANIC_ASSERTION);
     FillFirst<0, Middle, Middle + meta::NonZeroDifference(End, Middle)>(
-        array1, array2, args...);
+        array1, 
+        array2, 
+        args...
+    );
   }
 };
 
@@ -658,7 +654,7 @@ struct SequenceTransformer;
 template <size_t Offset, size_t Index, size_t... I>
 struct SequenceNegativeOffset<Offset, Index, I...> {
     using sequence = typename Append<Index - Offset, 
-                     typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
+          typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
 };
 
 /** provides typedef `sequence` which is a sequence with each 
@@ -675,7 +671,7 @@ struct SequenceNegativeOffset<Offset> {
 template <size_t Offset, size_t Index, size_t... I>
 struct SequencePositiveOffset<Offset, Index, I...> {
     using sequence = typename Append<Index + Offset, 
-                     typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
+          typename SequenceNegativeOffset<Offset, I...>::sequence>::sequence;
 };
 
 /** provides typedef `sequence` which is a sequence with each 
@@ -737,7 +733,8 @@ struct MakeLeftSequence;
  */
 template <size_t ThreshHold, size_t Index, size_t... I>
 struct MakeLeftSequence<ThreshHold, Index, I...> {
-  using sequence = typename Append<Index, typename MakeLeftSequence<ThreshHold - 1, I...>::sequence>::sequence;
+  using sequence = typename Append<
+    Index, typename MakeLeftSequence<ThreshHold - 1, I...>::sequence>::sequence;
 };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
@@ -892,31 +889,44 @@ struct RankSum<> {
 
 namespace details {
 
+// Given indices `relative_indices`, a shape, and `Count` number of strides,
+// incrementes `relative_indices` and fills the ith elem. `absolute_indices` with the 
+// absolute index given by `relative_indices` and the ith strides in `strides_array`
 template <size_t N, size_t Count>
-void UpdateIndices(Indices<0> &, Shape<N> const &, size_t (&)[Count], 
-    size_t const * const (&)[Count], size_t = 0) {}
-
-template <size_t N, size_t Count>
-void UpdateIndices(Indices<N> &reference_indices, Shape<N> const &shape, size_t (&indices)[Count], 
-    size_t const * const (&strides)[Count])
+void UpdateIndices(
+    Indices<N> &relative_indices, 
+    Shape<N> const &shape, 
+    size_t (&absolute_indices)[Count], 
+    size_t const * const (&strides_array)[Count])
 {
   static_assert(N, PANIC_ASSERTION);
   int dim_index = N - 1;
   bool propogate = true;
   while (dim_index >= 0 && propogate) {
-    ++reference_indices[dim_index];
+    ++relative_indices[dim_index];
     for (size_t i = 0; i < Count; ++i)
-      indices[i] += strides[i][dim_index];
-    if (reference_indices[dim_index] == shape[dim_index]) {
-      reference_indices[dim_index] = 0;
+      absolute_indices[i] += strides_array[i][dim_index];
+    if (relative_indices[dim_index] == shape[dim_index]) {
+      relative_indices[dim_index] = 0;
       for (size_t i = 0; i < Count; ++i)
-        indices[i] -= shape[dim_index] * strides[i][dim_index];
+        absolute_indices[i] -= shape[dim_index] * strides_array[i][dim_index];
     } else {
       propogate = false;
     }
     --dim_index;
   }
 }
+
+// Scalar override provided to match APIs
+// Nothing needs to be done if the Tensor is scalar
+template <size_t Count>
+void UpdateIndices(
+    Indices<0> &, 
+    Shape<0> const &, 
+    size_t (&)[Count], 
+    size_t const * const (&)[Count], 
+    size_t = 0
+) {}
 
 /** Fills `result` with the elements of `input`, skipping the element at position `Index` */
 template <size_t Index, size_t N>
@@ -944,22 +954,28 @@ inline size_t NextPowerOfTwo(size_t x)
 
 /* ------- Expansion for methods which take Tensors...  --------- */
 
+// Given a pack of Expressions, return the shape of the first expression
 template <typename NodeType, typename... Expressions>
-inline Shape<NodeType::rank()> const &GetShape(Expression<NodeType> const &expr, Expressions const&...)
+inline Shape<NodeType::rank()> const &GetShape(
+    Expression<NodeType> const &expr, 
+    Expressions const&...
+)
 {
   return expr.self().shape();
 }
 
+// Forward tuple of expressions `tensors` to non-void `fn`
 template <typename U, typename FunctionType, typename Tuple, size_t... I>
-inline U MapForwardSequence(FunctionType &&fn, size_t *indices, 
+inline U map_forward_sequence(FunctionType &&fn, size_t *indices, 
    Tuple &&tensors, meta::Sequence<I...>)
 {
   return std::forward<FunctionType>(fn)(
     std::get<I>(std::forward<Tuple>(tensors)).pGet(indices, I)...);
 }
 
+// Forward tuple of expressions `tensors` to void `fn`
 template <typename FunctionType, typename Tuple, size_t... I>
-inline void MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices, 
+inline void MapForwardSequence(FunctionType &&fn, size_t *indices, 
   Tuple &&tensors, meta::Sequence<I...>)
 {
   std::forward<FunctionType>(fn)(
@@ -997,7 +1013,7 @@ void Map(FunctionType &&fn, Tensors&&... tensors)
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   for (size_t i = 0; i < cumul_index; ++i) {
-    details::MapForwardSequenceInPlace(std::forward<FunctionType>(fn), (size_t *)indices,
+    details::MapForwardSequence(std::forward<FunctionType>(fn), (size_t *)indices,
       std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
@@ -1019,13 +1035,12 @@ Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
   Indices<M> reference_indices {};
   size_t indices[sizeof...(Tensors)] = {};
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
-  auto sequence = 
-    typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+  auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
   
   // Foward the values produced by `fn` to `tensor`
   for (size_t i = 0; i < cumul_index; ++i) {
     // `tensor`'s strides will be contiguous
-    tensor.pSet(i, details::MapForwardSequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
+    tensor.pSet(i, details::map_forward_sequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
       std::forward_as_tuple(tensors...), sequence));
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
@@ -1132,7 +1147,7 @@ public:
   void set_device(cl::Device const &device);
   cl::Device const &device() const { return device_; }
   cl::Context const &context() const { return context_; }
-  void set(cl::Platform const &platform, cl::Device const &device);
+  void Set(cl::Platform const &platform, cl::Device const &device);
 private:
   Info();
   cl::Platform platform_;
@@ -1177,7 +1192,7 @@ inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
   return devices;
 }
 
-inline void Info::set(cl::Platform const &platform, cl::Device const &device)
+inline void Info::Set(cl::Platform const &platform, cl::Device const &device)
 {
   platform_ = platform;
   device_ = device;
@@ -1295,30 +1310,40 @@ struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
  *  evaluating `expr`, an OpenCL expression.
  */
 template <typename T>
-cl::Buffer CreateBasicKernel(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-    std::string const &arg_list, std::string const &expr, size_t num_elems) 
+cl::Buffer EvaluateBasicKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string const &arg_list, 
+    std::string const &expr, 
+    size_t num_elems
+)
 {
-  std::string kernel_code = 
-    std::string("kernel void k(") + arg_list + "global "
+  std::string kernel_code = std::string("kernel void k(") + arg_list + "global "
     + OpenCLType<T>::value + " *output) {";
   kernel_code += "\n\tsize_t global_id = get_global_id(0);";
   kernel_code += std::string("\noutput[global_id] = ") + expr + ";\n}\n";
 
   cl_int err = 0;
-  cl::Buffer output_buffer(opencl::Info::v().context(), 
+  cl::Buffer output_buffer(
+      opencl::Info::v().context(), 
       CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, 
-      num_elems * sizeof(T), nullptr, &err);
+      num_elems * sizeof(T), 
+      nullptr, 
+      &err
+  );
 
   cl::Program::Sources sources({ kernel_code });
   cl::Program program(Info::v().context(), sources);
   err = program.build({ Info::v().device() });
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+
   cl::Kernel kernel(program, cKernelPrefix);
   for (size_t i = 0; i < buffers.size(); ++i)
     kernel.setArg(i, buffers[i]);
   kernel.setArg(buffers.size(), output_buffer);
   err = cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_elems));
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
+
   return output_buffer; 
 }
 
@@ -1327,10 +1352,10 @@ template <typename NodeType>
 cl::Buffer CreateBuffer(NodeType const& node)
 {
   cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
-  std::vector<cl::Buffer> buffers{};
-  std::string cl_arg_list{};
-  std::string cl_expr = node.OpenCLBuffer(cqueue, buffers, cl_arg_list);
-  return node.OpenCLKernel(cqueue, buffers, cl_arg_list, cl_expr);
+  auto buffers = std::vector<cl::Buffer>{};
+  auto cl_arg_list = std::string{};
+  auto cl_expr = node.OpenCLKernelCode(cqueue, buffers, cl_arg_list);
+  return node.OpenCLEvaluateKernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
 /** Returns the OpenCL code, as std::string, for a reduction kernel with one input  */
@@ -1342,19 +1367,6 @@ std::string CreateReductionKernelCode()
   // 4th argument is the size of half of the reduction group, the fifth argument is 
   // the offset, the sixth argument is the workgroup_size
     
-  // FIXME -- remove commented code after testing
-  /*
-  std::string kernel_code =
-    std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "("
-  + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value 
-  + " " + cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix + ", " 
-  + cLocalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier + cLocalPrefix
-  + ", " + cGlobalIdentifier + " " + OpenCLType<ReturnType>::value + " " + cPointerIdentifier 
-  + cOutputName + ", " + cSizeTType + " " + cReductionSize + ", " + cSizeTType + " "
-  + cConstIdentifier + " " + cOffsetName + ", " + cSizeTType + " " + cConstIdentifier 
-  + " " + cWGSizeName + ") {\n";
-  */
-
   // Kernel decleration & argument list
   std::string kernel_code = 
     std::string("kernel void k(global ") + OpenCLType<ReturnType>::value
@@ -1362,47 +1374,15 @@ std::string CreateReductionKernelCode()
     + OpenCLType<ReturnType>::value + " *output, size_t const N, size_t const offset,"
     + " size_t const wg_size) {";
   
-  /*
-  kernel_code +=
-    std::string("\t") + cSizeTType + " " + cGlobalIdName + " = " + cGlobalIdFunction 
-  + "(0);\n" + "\t" + cSizeTType + " " + cGroupIdName + " = " + cGroupIdFunction + "(0);\n"
-  + "\t" + cSizeTType + " " + cLocalIdName + " = " + cLocalIdFunction + "(0);\n"
-  + "\t" + cSizeTType + " " + cLocalSizeName + " = " + cLocalSizeFunction + "(0);\n";
-  */
-
   kernel_code += R"(
   size_t global_id = get_global_id(0);
   size_t group_id = get_group_id(0);
   size_t local_id = get_local_id(0);
   size_t local_size = get_local_size(0);)";
 
-  /*
-  kernel_code +=
-    std::string("\t") + cLocalPrefix + "[" + cLocalIdName + "] = " 
-  + cVariablePrefix + "[" + cGlobalIdName + " + " + cOffsetName + " * " + cWGSizeName + "];\n";
-  */
-
   kernel_code += R"(
   l[local_id] = v[global_id + offset * wg_size];)";
 
-  /*
-  kernel_code +=
-    std::string("\t") + cBarrierFunction + "(" + cLocalMemFence + ");\n"
-  + "\tfor (" + cSizeTType + " " + cForPrefix + " = " 
-  + cReductionSize + "; " + cForPrefix + " > 0; " + cForPrefix
-  + " >>= 1) {\n"
-  + "\t\tif (" + cLocalIdName + " < " + cForPrefix + " && "
-  + cForPrefix + " + " + cLocalIdName + " < " + cLocalSizeName + ")\n"
-  + "\t\t\t" + Function::opencl_reduce(std::string(cLocalPrefix) + "[" 
-      + cLocalIdName + "]", std::string(cLocalPrefix) + "[" + cLocalIdName 
-      + " + " + cForPrefix + " ]") + ";\n"
-  + "\t\t" + cBarrierFunction + "(" + cLocalMemFence + ");\n"
-  + "\t}\n"
-  + "\tif (" + cLocalIdName + " == 0)\n"
-  + "\t\t" + cOutputName + "[" + cOffsetName + "] = " + std::string(cLocalPrefix) + "[0];\n" 
-  + "}\n";
-  */
-  
   kernel_code += R"(
   barrier(CLK_LOCAL_MEM_FENCE);
   for (size_t i = N; i > 0; i >>= 1) {
@@ -1722,8 +1702,7 @@ public:
    *  correct forwarding. `index` must be less than capacity.
    */
   template <typename U>
-  void set(size_t index, U&& value)
-    { data_[index] = std::forward<U>(value); }
+  void Set(size_t index, U&& value) { data_[index] = std::forward<U>(value); }
 
   /** Calls `operator delete[]` on the underlying data */
   ~Array();
@@ -1809,7 +1788,7 @@ public:
    *  correct forwarding. `index` must be less than capacity.
    */
   template <typename U>
-  void set(size_t index, U&& value);
+  void Set(size_t index, U&& value);
 
   /** Reference to the element at `index` offset of the 
    *  underlying array. `index` must be less than `capacity`.
@@ -1859,7 +1838,7 @@ HashMap<T>::HashMap(size_t capacity, T *data)
 
 template <typename T>
 template <typename U>
-void HashMap<T>::set(size_t index, U&& value)
+void HashMap<T>::Set(size_t index, U&& value)
 {
   if (value == zero_elem_) data_.erase(index);
   else data_[index] = std::forward<U>(value);
@@ -2123,24 +2102,30 @@ void Shape<N>::pInitializeStrides(size_t (&strides)[N]) const noexcept
   }
 }
 
-/** Streams shape in S{dim1, dim2, ... dimN} format */
+/** stream recieves S{<dim1>, <dim2>, ..., <dimN>} */
 template <size_t N>
-std::ostream &operator<<(std::ostream &os, const Shape<N> &shape)
+std::ostream &operator<<(std::ostream &os, Shape<N> const &shape)
 {
   os << "S{";
-  for (size_t i = 0; i < N - 1; ++i) os << shape.dimensions_[i] << ", ";
+  for (size_t i = 0; i < N - 1; ++i) 
+    os << shape.dimensions_[i] << ", ";
   os << shape.dimensions_[N - 1] << "}";
   return os;
 }
 
 template <size_t N>
 class Indices { /*@Indices<N>*/
-  /** Wrapper around size_t[N] and Shape<N> to provide a specialized array
-   *  for accessing Tensors and convenient looping.
-   */
+/** Wrapper around size_t[N] to provide a specialized array
+ *  for accessing Tensors and looping.
+ */
 public:
 
-  /* --------------- Friend Classes ------------- */
+  /* ------------------ typedefs ---------------- */
+
+  typedef Indices                     self_t;
+  typedef std::size_t                 size_t;
+
+  /* --------------- friend classes ------------- */
 
   template <typename U, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
@@ -2152,7 +2137,7 @@ public:
   template <typename RHS> friend class UnaryNegExpr;
   template <typename Expr> friend class opencl::Model;
 
-  /* ---------------- Constructors -------------- */
+  /* ---------------- constructors -------------- */
 
   Indices();
   Indices(std::initializer_list<size_t> indices);
@@ -2177,7 +2162,7 @@ public:
    */
   bool decrement(Shape<N> const &shape);
 
-  /* ------------------ Print ------------------ */
+  /* ----------------- ostream ----------------- */
 
   template <size_t M>
   friend std::ostream &operator<<(std::ostream &os, Indices<M> const &indices);
@@ -2255,14 +2240,17 @@ bool Indices<N>::decrement(Shape<N> const &shape)
 template <size_t N>
 Indices<N>::Indices(size_t const *indices)
 {
-  for (size_t i = 0; i < N; ++i) indices_[i] = indices[i];
+  for (size_t i = 0; i < N; ++i) 
+    indices_[i] = indices[i];
 }
 
+/** stream recieves I{<dim1>, <dim2>, ..., <dimN>} */
 template <size_t M>
 std::ostream &operator<<(std::ostream &os, Indices<M> const &indices)
 {
   os << "I{";
-  for (size_t i = 0; i < M - 1; ++i) os << indices[i] << ", ";
+  for (size_t i = 0; i < M - 1; ++i) 
+    os << indices[i] << ", ";
   os << indices[M - 1] << "}";
   return os;
 }
@@ -2460,12 +2448,13 @@ public:
    *  The number of elements between [`begin`, `end`) must be equivalent 
    *  to the number of elements in the Tensor, or an assertion will fail.
    */
+  // FIXME :: no unit test exists for the function
   template <typename It>
-  void assign(It begin, It const &end);
+  void Assign(It begin, It const &end);
 
   /** Forwards valye to the element at position `indices` */
   template <typename U>
-  void set(Indices<N> const &indices, U&& value); 
+  void Set(Indices<N> const &indices, U&& value); 
 
   /* ------------------ Access To Data ----------------- */
 
@@ -2599,10 +2588,13 @@ public:
    *  and adds it to `buffers`, adds its value to `arg_list`, 
    *  and returns a string that represents a single element
    */
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
+  cl::Buffer OpenCLEvaluateKernel(cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, std::string &arg_list,
       std::string &expr) const noexcept;
 #endif
@@ -2917,36 +2909,60 @@ private:
   inline T const &pGet(size_t *indices, size_t index) const noexcept
     { return (static_cast<C<T> const&>(*ref_))[offset_ + indices[index]]; }
 
-  inline T &pGet(size_t *indices, size_t index)
-    { return (*ref_)[offset_ + indices[index]]; }
+  inline T &pGet(size_t *indices, size_t index) { return (*ref_)[offset_ + indices[index]]; }
 
   template <typename U>
-  inline void pSet(size_t index, U&& value)
-   { ref_->set(index, std::forward<U>(value)); }
+  inline void pSet(size_t index, U&& value) { ref_->Set(index, std::forward<U>(value)); }
 
   template <typename U, typename FunctionType, typename Tuple, size_t... I>
-  friend inline U details::MapForwardSequence(FunctionType &&fn, size_t *indices, 
-     Tuple &&tensors, meta::Sequence<I...>);
+  friend inline U details::map_forward_sequence(
+      FunctionType &&fn, 
+      size_t *indices, 
+      Tuple &&tensors, 
+      meta::Sequence<I...>
+  );
 
   template <typename FunctionType, typename Tuple, size_t... I>
-  friend inline void details::MapForwardSequenceInPlace(FunctionType &&fn, size_t *indices,
-    Tuple &&tensors, meta::Sequence<I...>);
+  friend inline void details::MapForwardSequence(
+      FunctionType &&fn, 
+      size_t *indices,
+      Tuple &&tensors, 
+      meta::Sequence<I...>
+  );
 
   template <typename U, typename FunctionType, typename Tuple, size_t... I>
-  friend inline void details::ReduceForwardSequence(U &&ret_val, FunctionType &&fn, size_t *indices,
-    Tuple &&tensors, meta::Sequence<I...>);
+  friend inline void details::ReduceForwardSequence(
+      U &&ret_val, 
+      FunctionType &&fn, 
+      size_t *indices,
+      Tuple &&tensors, 
+      meta::Sequence<I...>
+  );
 
-  template <typename U, size_t M, template <class> class C_,
-    typename FunctionType, typename Tuple, size_t... I>
-  friend inline void details::ElemWiseForwardSequence(Tensor<U, M, C_> &tensor, size_t index,
-      FunctionType &&fn, size_t *indices, Tuple &&tensors, meta::Sequence<I...>);
+  template <
+    typename U, 
+    size_t M, 
+    template <class> class C_, 
+    typename FunctionType, 
+    typename Tuple, 
+    size_t... I
+  >
+  friend inline void details::ElemWiseForwardSequence(
+      Tensor<U, M, C_> &tensor, 
+      size_t index,
+      FunctionType &&fn, 
+      size_t *indices, 
+      Tuple &&tensors, 
+      meta::Sequence<I...>
+  );
 
   /* ------------------ Utility --------------------- */
 
   // Copy the dimensions of a C-array `Array` into `dimensions`
   template <typename Array, size_t Index, size_t Limit>
   struct SetCArrayDimensions {
-    void operator()(size_t (&dimensions)[N]) {
+    void operator()(size_t (&dimensions)[N]) 
+    {
       dimensions[Index] = std::extent<Array, Index>::value;
       SetCArrayDimensions<Array, Index + 1, Limit>{}(dimensions);
     }
@@ -2962,7 +2978,8 @@ private:
   // are equivalent to `dimensions`
   template <typename Array, size_t Index, size_t Limit>
   struct AssertCArrayDimensions {
-    void operator()(size_t (&dimensions)[N]) {
+    void operator()(size_t (&dimensions)[N]) 
+    {
       assert((dimensions[Index] == std::extent<Array, Index>::value && DIMENSION_MISMATCH));
       AssertCArrayDimensions<Array, Index + 1, Limit>{}(dimensions);
     }
@@ -2975,12 +2992,15 @@ private:
   };
 
   // Declare all fields in the constructor, but initialize strides assuming no gaps
-  Tensor(size_t const *dimensions, size_t offset,
-      std::shared_ptr<C<T>> &&_ref);
+  Tensor(size_t const *dimensions, size_t offset, std::shared_ptr<C<T>> &&_ref);
 
   // Declare all fields in the constructor
-  Tensor(size_t const *dimensions, size_t const *strides, size_t offset,
-      std::shared_ptr<C<T>> &&_ref);
+  Tensor(
+      size_t const *dimensions, 
+      size_t const *strides, 
+      size_t offset, 
+      std::shared_ptr<C<T>> &&_ref
+  );
 
 }; // Tensor
 
@@ -2988,8 +3008,9 @@ private:
 
 template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions) 
-  : shape_(Shape<N>(dimensions)), offset_(0), 
-  ref_(std::make_shared<C<T>>(shape_.index_product())) 
+  : shape_(Shape<N>(dimensions)), 
+    offset_(0), 
+    ref_(std::make_shared<C<T>>(shape_.index_product())) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -2999,8 +3020,9 @@ Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions)
 
 template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), offset_(0),
-  ref_(std::make_shared<C<T>>(shape_.index_product())) 
+  : shape_(Shape<N>(dimensions)), 
+    offset_(0),
+    ref_(std::make_shared<C<T>>(shape_.index_product())) 
 { 
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3008,12 +3030,12 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
   for (size_t i = 0; i < N; ++i)
     assert(dimensions[i] && ZERO_ELEMENT); 
   shape_.pInitializeStrides(strides_); 
-}
+} 
 
 template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
   : shape_(Shape<N>(dimensions)), offset_(0) 
-{ 
+{
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
@@ -3026,9 +3048,11 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
 
 template <typename T, size_t N, template <class> class C> 
 template <typename FunctionType, typename... Arguments> 
-Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], 
-    std::function<FunctionType> &f, Arguments&&...  args) 
-  : shape_(Shape<N>(dimensions)), offset_(0) 
+Tensor<T, N, C>::Tensor(
+    size_t const (&dimensions)[N], 
+    std::function<FunctionType> &f, 
+    Arguments&&...  args
+) : shape_(Shape<N>(dimensions)), offset_(0) 
 { 
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3060,8 +3084,8 @@ Tensor<T, N, C>::Tensor(CArrayProxy<Array> &&md_array): offset_(0)
 }
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
-   : shape_(tensor.shape_), offset_(0) 
+Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor) 
+  : shape_(tensor.shape_), offset_(0) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3073,7 +3097,7 @@ Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0], tensor.pGet(indices, 1));
+    ref_->Set(indices[0], tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -3093,15 +3117,14 @@ Tensor<T, N, C>::Tensor(Tensor<U, N, C_> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0], tensor.pGet(indices, 1));
+    ref_->Set(indices[0], tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
 
 template <typename T, size_t N, template <class> class C> 
 Tensor<T, N, C>::Tensor(Tensor<T, N, C> &&tensor) noexcept
-  : shape_(tensor.shape_), offset_(tensor.offset_),
-    ref_(std::move(tensor.ref_)) 
+  : shape_(tensor.shape_), offset_(tensor.offset_), ref_(std::move(tensor.ref_)) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3110,10 +3133,8 @@ Tensor<T, N, C>::Tensor(Tensor<T, N, C> &&tensor) noexcept
 }
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(
-    typename Tensor<T, N, C>::Proxy const &proxy)
-  : shape_(proxy.tensor_.shape_), offset_(proxy.tensor_.offset_), 
-  ref_(proxy.tensor_.ref_) 
+Tensor<T, N, C>::Tensor(typename Tensor<T, N, C>::Proxy const &proxy)
+  : shape_(proxy.tensor_.shape_), offset_(proxy.tensor_.offset_), ref_(proxy.tensor_.ref_) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3138,7 +3159,7 @@ Tensor<T, N, C>::Tensor(Expression<NodeType> const& rhs)
   size_t indices[1] = {};
   size_t const * const strides[] = { this->strides_ };
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0], expression[reference_indices]);
+    ref_->Set(indices[0], expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -3147,7 +3168,8 @@ Tensor<T, N, C>::Tensor(Expression<NodeType> const& rhs)
 
 template <typename T, size_t N, template <class> class C>
 template <typename NodeType>
-Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
+Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model)
+  : offset_(0)
 {
 #ifdef _TEST
   ++eDebugConstructorCounter;
@@ -3174,7 +3196,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<T, N, C> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0] + offset_, tensor.pGet(indices, 1));
+    ref_->Set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   return *this;
@@ -3185,14 +3207,16 @@ template <typename U, template <class> class C_>
 Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<U, N, C_> const &tensor)
 {
   assert((shape_ == tensor.shape_) && DIMENSION_MISMATCH);
+
   size_t cumul = shape_.index_product();
-  Indices<N> reference_indices{};
+  auto reference_indices = Indices<N>{};
   size_t indices[2] = {};
   size_t const * const strides[2] = { this->strides_, tensor.strides_ };
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->set(indices[0] + offset_, tensor.pGet(indices, 1));
+    ref_->Set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
+
   return *this;
 }
 
@@ -3205,16 +3229,18 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(CArrayProxy<Array> &&md_array)
 #endif
   static_assert(std::rank<Array>::value == N, RANK_MISMATCH); 
   AssertCArrayDimensions<Array, 0, N>{}(shape_.dimensions_); 
+
   // Make use of the fact C arrays are contiguously allocated
   using ArrayType = typename std::remove_all_extents<Array>::type; 
   ArrayType *ptr = (ArrayType *)md_array.value; 
-  Indices<N> reference_indices{};
+  auto reference_indices = Indices<N>{};
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->set(indices[0] + offset_, *(ptr++));
+    ref_->Set(indices[0] + offset_, *(ptr++));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
+  
   return *this;
 }
 
@@ -3224,15 +3250,19 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Expression<NodeType> const &rhs)
 {
   auto const &expression = rhs.self();
   assert((shape_ == expression.shape()) && DIMENSION_MISMATCH);
+
   // Allocate and assign into a new tensor to prevent aliasing errors
-  Tensor<T, N, C> tensor(this->shape());
-  Indices<N> reference_indices{};
+  auto tensor = Tensor<T, N, C>(this->shape());
+  auto reference_indices = Indices<N>{};
   size_t indices[1] = {};
   size_t const * const strides[1] = { tensor.strides_ };
+
+  // evaluate every element and assign it in place
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    tensor.ref_->set(indices[0] + offset_, expression[reference_indices]);
+    tensor.ref_->Set(indices[0] + offset_, expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
+
   *this = tensor;
   return *this;
 }
@@ -3243,13 +3273,15 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(NoAliasProxy<NodeType> const &rhs)
 {
   auto const &expression = rhs.expr.self();
   assert((shape_ == expression.shape()) && DIMENSION_MISMATCH);
-  Indices<N> reference_indices{};
+
+  auto reference_indices = Indices<N>{};
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->set(indices[0] + offset_, expression[reference_indices]);
+    ref_->Set(indices[0] + offset_, expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
+
   return *this;
 }
 
@@ -3268,7 +3300,7 @@ T const &Tensor<T, N, C>::get(Indices<N> const &indices) const noexcept
 
 template <typename T, size_t N, template <class> class C>
 template <typename It>
-void Tensor<T, N, C>::assign(It begin, It const &end)
+void Tensor<T, N, C>::Assign(It begin, It const &end)
 {
   auto diff = std::distance(begin, end);
   size_t cumul = shape_.index_product();
@@ -3277,19 +3309,19 @@ void Tensor<T, N, C>::assign(It begin, It const &end)
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->set(indices[0] + offset_, *(begin++));
+    ref_->Set(indices[0] + offset_, *(begin++));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
 
 template <typename T, size_t N, template <class> class C>
 template <typename U>
-void Tensor<T, N, C>::set(Indices<N> const &indices, U&& value)
+void Tensor<T, N, C>::Set(Indices<N> const &indices, U&& value)
 {
   size_t cumul_index = 0;
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-  ref_->set(cumul_index + offset_, std::forward<U>(value));
+  ref_->Set(cumul_index + offset_, std::forward<U>(value));
 }
 
 /* ------------------------------- Access ------------------------------- */
@@ -3301,8 +3333,16 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
   static_assert(N >= sizeof...(Args), TOO_MANY_INDICES);
   constexpr size_t M = sizeof...(args); 
   size_t cumul_index = pIndicesExpansion(
-      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, args...);
-  return Tensor<T, N - M, C>(shape_.dimensions_ + M, strides_ + M, offset_ + cumul_index, std::shared_ptr<C<T>>(ref_));
+      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, 
+      args...
+  );
+
+  return Tensor<T, N - M, C>(
+      shape_.dimensions_ + M, 
+      strides_ + M, 
+      offset_ + cumul_index, 
+      std::shared_ptr<C<T>>(ref_)
+  );
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3312,8 +3352,16 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::operator()(Args... args)
   static_assert(N > sizeof...(Args), TOO_MANY_INDICES);
   constexpr size_t M = sizeof...(args); 
   size_t cumul_index = pIndicesExpansion(
-      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, args...);
-  return Tensor<T, N - M, C>(shape_.dimensions_ + M, strides_ + M, offset_ + cumul_index, std::shared_ptr<C<T>>(ref_));
+      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, 
+      args...
+  );
+
+  return Tensor<T, N - M, C>(
+      shape_.dimensions_ + M, 
+      strides_ + M, 
+      offset_ + cumul_index, 
+      std::shared_ptr<C<T>>(ref_)
+  );
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3322,7 +3370,10 @@ T &Tensor<T, N, C>::operator()(Args... args)
 {
   static_assert(N == sizeof...(Args), PANIC_ASSERTION);
   size_t cumul_index = pIndicesExpansion(
-      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, args...);
+      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, 
+      args...
+  );
+
   return (*ref_)[cumul_index + offset_];
 }
 
@@ -3346,7 +3397,10 @@ T const &Tensor<T, N, C>::operator()(Args... args) const
 {
   static_assert(N == sizeof...(Args), PANIC_ASSERTION);
   size_t cumul_index = pIndicesExpansion(
-      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, args...);
+      typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, 
+      args...
+  );
+
   return (*static_cast<C<T> const *>(ref_.get()))[cumul_index + offset_];
 }
 
@@ -3358,8 +3412,13 @@ Tensor<T, N - M, C> Tensor<T, N, C>::operator[](Indices<M> const &indices)
   size_t cumul_index = 0;
   for (size_t i = 0; i < M; ++i)
     cumul_index += strides_[M - i - 1] * indices[M - i - 1];
+
   return Tensor<T, N - M, C>(
-      shape_.dimensions_ + M, strides_ + M,  offset_ + cumul_index, std::shared_ptr<C<T>>(ref_));
+      shape_.dimensions_ + M, 
+      strides_ + M,  
+      offset_ + cumul_index, 
+      std::shared_ptr<C<T>>(ref_)
+  );
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3370,6 +3429,7 @@ T &Tensor<T, N, C>::operator[](Indices<M> const &indices)
   size_t cumul_index = 0;
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+
   return (*ref_)[cumul_index + offset_];
 }
 
@@ -3388,6 +3448,7 @@ T const &Tensor<T, N, C>::operator[](Indices<M> const &indices) const
   size_t cumul_index = 0;
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+
   return (*static_cast<C<T> const*>(ref_.get()))[cumul_index + offset_];
 }
 
@@ -3398,7 +3459,8 @@ void Set(Tensor<U, M, C_> &tensor, Indices<M> const &indices, U&& value)
   size_t cumul_index = tensor.offset_;
   for (size_t i = 0; i < M; ++i)
     cumul_index += tensor.strides_[M - i - 1] * indices[M - i - 1];
-  tensor.ref_->set(cumul_index, std::forward<U>(value));
+
+  tensor.ref_->Set(cumul_index, std::forward<U>(value));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3407,10 +3469,12 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::slice(Args... args)
 {
   static_assert(N >= sizeof...(Slices) + sizeof...(args), SLICES_OUT_OF_BOUNDS);
   size_t placed_indices[N];
-  // Initially fill the array with 1s
+
+  // fill the array with 1s
   // place 0s where the indices are sliced
   std::fill_n(placed_indices, N, 1);
   meta::InsertZeros<N, Slices...>{placed_indices};
+
   // slice dimensions (aka set 0) not explicitly sliced nor 
   // filled by `indices`
   size_t unfilled_dimensions = N - sizeof...(Args) - sizeof...(Slices);
@@ -3421,13 +3485,9 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::slice(Args... args)
       --unfilled_dimensions;
     }
   }
-  Indices<sizeof...(args)> indices {};
-  size_t index = 0;
-  auto contract_indices = [&](size_t arg) -> void {
-    indices[index++] = arg;
-  };
-  VARDIAC_MAP(contract_indices(args));
-  (void)(contract_indices);
+
+  // expand `args` into Indices and forward both 
+  auto indices = Indices<sizeof...(args)>{(size_t)args...};
   return pSliceExpansion<sizeof...(args)>(placed_indices, indices);
 }
 
@@ -3458,15 +3518,16 @@ T const &Tensor<T, N, C>::slice(Args... args) const
 
 template <typename T, size_t N, template <class> class C>
 template <size_t... Slices, size_t M, typename>
-Tensor<T, N - M, C>
-    Tensor<T, N, C>::slice(Indices<M> const &indices)
+Tensor<T, N - M, C> Tensor<T, N, C>::slice(Indices<M> const &indices)
 {
   static_assert(N >= M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
-  size_t placed_indices[N];
+
   // Initially fill the array with 1s
   // place 0s where the indices are sliced
+  size_t placed_indices[N];
   std::fill_n(placed_indices, N, 1);
   meta::InsertZeros<N, Slices...>{placed_indices};
+
   // slice dimensions (aka set 0) not explicitly sliced nor 
   // filled by `indices`
   size_t unfilled_dimensions = N - M - sizeof...(Slices);
@@ -3477,6 +3538,7 @@ Tensor<T, N - M, C>
       --unfilled_dimensions;
     }
   }
+
   return pSliceExpansion<M>(placed_indices, indices);
 }
 
@@ -3513,7 +3575,9 @@ bool Tensor<T, N, C>::operator==(Tensor<T, N, C> const& tensor) const
 
   size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
-    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) return false;
+    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) 
+      return false;
+
   return true;
 }
 
@@ -3525,19 +3589,23 @@ bool Tensor<T, N, C>::operator==(Tensor<X, N, C> const& tensor) const
 
   size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
-    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) return false;
+    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) 
+      return false;
+
   return true;
 }
 
-/** Creates a string form of `tensor`, using square braces "[]" to denotate
- *  dimensions. I.e. a 1x1x1 Tensor with element x will appear as [[[x]]]
+/** Streams tensor square brace "[]" form (what python's MD arrays look like)
+ *  I.e. a 1x1x1 Tensor with element x will appear as [[[x]]]
  */
 template <typename U, size_t M, template <class> class C_>
 std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
 {
+  // FIXME methid could be a lot simpler?
   auto add_brackets = [&os](size_t n, bool left) -> void {
     for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
   };
+
   size_t cumul_index = tensor.shape_.index_product();
   size_t dim_quotas[M];
   std::copy_n(tensor.shape_.dimensions_, M, dim_quotas);
@@ -3549,6 +3617,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
     size_t bracket_count = 0;
     bool propogate = true;
     int dim_index = M - 1;
+
     // find the correct index to "step" to
     while (dim_index >= 0 && propogate) {
       --dim_quotas[dim_index];
@@ -3562,12 +3631,16 @@ std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
       }
       --dim_index;
     }
+
+    // add closing brackets to balance
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
     os << (*tensor.ref_)[index + tensor.offset_];
   }
-  add_brackets(M, false); // closing brackets
+  
+  // last set of closing brackets
+  add_brackets(M, false); 
   return os;
 }
 
@@ -3579,13 +3652,16 @@ size_t Tensor<T, N, C>::pIndicesExpansion(meta::Sequence<I...>, Args... args) co
 {
   constexpr size_t M = sizeof...(Args);
   static_assert(N >= M, RANK_OUT_OF_BOUNDS);
+
+  // scale indices with corresponding stride
   auto convert_index = [&](size_t dim, size_t index) -> size_t {
     assert((dim < shape_.dimensions_[index]) && INDEX_OUT_OF_BOUNDS);
     return strides_[index] * dim;
   }; 
+
+  // sum reduce args after conversion
   size_t cumul_index = 0;
   VARDIAC_MAP(cumul_index += convert_index(args, I));
-  // surpress compiler unused lval warnings
   (void)(convert_index);
   return cumul_index;
 }
@@ -3594,25 +3670,28 @@ size_t Tensor<T, N, C>::pIndicesExpansion(meta::Sequence<I...>, Args... args) co
 
 template <typename T, size_t N, template <class> class C>
 template <size_t M> 
-Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(size_t (&placed_indices)[N], Indices<M> const &indices)
+Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
+    size_t (&placed_indices)[N], 
+    Indices<M> const &indices
+)
 {
-  // FIXME -- This function can be much more concise
   size_t array_index = 0;
   for (size_t i = 0; i < N; ++i) {
     if (!placed_indices[i]) continue;
     assert((shape_.dimensions_[i] > indices[array_index]) && INDEX_OUT_OF_BOUNDS);
+
     // 0 is reserved for the "sliced" indices, so add one to all
     // of the accessed indices to differentiate
     placed_indices[i] = indices[array_index++] + 1;
   }
+
   size_t offset = 0;
   size_t dimensions[N - M];
   size_t strides[N - M];
   array_index = 0;
   for (size_t i = 0; i < N; ++i) {
     if (placed_indices[i]) {
-      // accessed indices were offset by +1 to differentiate
-      // between sliced indices, so convert back
+      // accessed indices were offset by + 1, so convert back
       offset += (placed_indices[i] - 1) * strides_[i];
     } else {
       strides[array_index] = strides_[i];
@@ -3620,7 +3699,13 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(size_t (&placed_indices)[N]
       ++array_index;
     }
   }
-  return Tensor<T, N - M, C>(dimensions, strides, offset_ + offset, std::shared_ptr<C<T>>(ref_));
+
+  return Tensor<T, N - M, C>(
+      dimensions, 
+      strides, 
+      offset_ + offset, 
+      std::shared_ptr<C<T>>(ref_)
+  );
 }
 
 /* -------------- Utility Methods --------------- */
@@ -3637,7 +3722,10 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t offset, std::shared_ptr
 }
 
 template <typename T, size_t N, template <class> class C>
-Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t const *strides, size_t offset, 
+Tensor<T, N, C>::Tensor(
+    size_t const *dimensions, 
+    size_t const *strides, 
+    size_t offset, 
     std::shared_ptr<C<T>> &&ref)
   : shape_(Shape<N>(dimensions)), offset_(offset), ref_(std::move(ref))
 {
@@ -3652,11 +3740,14 @@ Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t const *strides, size_t 
 #ifdef _ENABLE_OPENCL
 
 template <typename T, size_t N, template <class> class C>
-std::string Tensor<T, N, C>::OpenCLBuffer(cl::CommandQueue&, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string Tensor<T, N, C>::OpenCLKernelCode(
+    cl::CommandQueue&, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
   // Allocate all of the elements in a single contiguous buffer 
-  // so multiple writes to the device aren't necessary
+  // multiple writes to the device aren't necessary
   size_t cumul = shape().index_product();
   Indices<N> reference_indices {};
   size_t indices[1] = {};
@@ -3668,14 +3759,18 @@ std::string Tensor<T, N, C>::OpenCLBuffer(cl::CommandQueue&,
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 
-  // FIXME is there a more efficient way of copying over the memory?
+  // Copy the preallocated memory into a single OpenCL buffer
   cl_int err = 0;
-  buffers.push_back(cl::Buffer(opencl::Info::v().context(), 
+  buffers.emplace_back(
+      opencl::Info::v().context(), 
       CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, 
-      cumul * sizeof(T), data, &err));
+      cumul * sizeof(T), data, &err
+  );
   assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
+  delete[] data;
 
-  using namespace opencl::details; // WARNING -- using namespace
+  // WARNING -- using namespace
+  using namespace opencl::details; 
 
   // add the new tensor to the argument 
   size_t arg_index = buffers.size() - 1;
@@ -3683,16 +3778,16 @@ std::string Tensor<T, N, C>::OpenCLBuffer(cl::CommandQueue&,
            +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
            +  std::to_string(arg_index) + ", ";
 
-  delete[] data;
-
   // return the name of the element
   return cVariablePrefix + std::to_string(arg_index) + "[" + cGlobalIdName + "]";
 }
 
 template <typename T, size_t N, template <class> class C>
-cl::Buffer Tensor<T, N, C>::OpenCLKernel(cl::CommandQueue&, 
-      std::vector<cl::Buffer> &buffers, std::string&,
-      std::string&) const noexcept
+cl::Buffer Tensor<T, N, C>::OpenCLEvaluateKernel(
+    cl::CommandQueue&, 
+    std::vector<cl::Buffer> &buffers, std::string&,
+    std::string&
+) const noexcept
 {
   return buffers.back();
 }
@@ -3715,12 +3810,15 @@ auto elemwise(FunctionType &&fn, Tensors&&... tensors)
   auto const &shape = details::GetShape(tensors...);
   constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+
   return_t result = return_t(shape);
   size_t cumul_index = shape.index_product();
   Indices<M> reference_indices {};
   size_t indices[sizeof...(Tensors) + 1] = {};
   size_t const * const strides[sizeof...(Tensors) + 1] = { result.strides_, tensors.strides_... };
+
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+
   for (size_t i = 0; i < cumul_index; ++i) {
     details::ElemWiseForwardSequence(result, indices[0], fn, (size_t*)indices + 1,
       std::forward_as_tuple(tensors...), sequence);
@@ -4054,24 +4152,19 @@ void Fill(Tensor<U, M, C_> &tensor, RAIt const &begin, RAIt const &end)
   auto dist_sum = std::distance(begin, end);
   assert((dist_sum > 0 && cumul_sum == (size_t)dist_sum) && NELEMENTS);
   RAIt it = begin;
-  auto allocate = [&it](U &x) -> void
-  {
+  auto alloc = [&it](U &x) -> void {
     x = *it;
     ++it;
   };
-  Map(allocate, tensor);
+  Map(alloc, tensor);
 }
 
-/** Assigns to each element in Tensor the value `value`
- */
+/** Assigns to each element in `Tensor` `value` */
 template <typename U, size_t M, template <class> class C_, typename X>
 void Fill(Tensor<U, M, C_> &tensor, X const &value)
 {
-  auto allocate = [&value](U &x) -> void
-  {
-    x = value;
-  };
-  Map(allocate, tensor);
+  auto alloc = [&value](U &x) -> void { x = value; };
+  Map(alloc, tensor);
 }
 
 /** Returns a transposed Matrix, sharing the same underlying data as `mat`. If
@@ -4087,12 +4180,15 @@ Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat)
   size_t transposed_strides[2];
   transposed_strides[0] = mat.strides_[1];
   transposed_strides[1] = mat.strides_[0];
-  return Tensor<U, 2, C_>(transposed_dimensions, transposed_strides,
-      mat.offset_, std::shared_ptr<C_<U>>(mat.ref_));
+  return Tensor<U, 2, C_>(
+      transposed_dimensions, 
+      transposed_strides,
+      mat.offset_, 
+      std::shared_ptr<C_<U>>(mat.ref_)
+  );
 }
 
-/** See Tensor<T, N, C> transpose(Tensor<T, N, C> &)
- */
+/** See Tensor<T, N, C> transpose(Tensor<T, N, C> &) */
 template <typename U, template <class> class C_>
 Tensor<U, 2, C_> const transpose(Tensor<U, 2, C_> const &mat) 
 {
@@ -4101,7 +4197,7 @@ Tensor<U, 2, C_> const transpose(Tensor<U, 2, C_> const &mat)
 
 /** Returns a transposed Matrix, sharing the same underlying data as vec. If
  *  the dimension of `vec` is [n], the dimensions of the resulting matrix will be
- *  [1, n]. Note: This is only applicable to matrices and vectors
+ *  [1, n]. This is only applicable to 2-rank tensors.
  */
 template <typename T, template <class> class C>
 Tensor<T, 2, C> transpose(Tensor<T, 1, C> &vec) 
@@ -4112,18 +4208,21 @@ Tensor<T, 2, C> transpose(Tensor<T, 1, C> &vec)
   size_t transposed_strides[2];
   transposed_strides[0] = 1;
   transposed_strides[1] = vec.strides_[0];
-  return Tensor<T, 2, C>(transposed_dimensions, transposed_strides,
-      vec.offset_, std::shared_ptr<C<T>>(vec.ref_));
+  return Tensor<T, 2, C>(
+      transposed_dimensions, 
+      transposed_strides,
+      vec.offset_, 
+      std::shared_ptr<C<T>>(vec.ref_)
+  );
 }
 
+// FIXME documentation
 template <typename T, size_t N, template <class> class C>
 template <typename U, typename FunctionType> 
 U Tensor<T, N, C>::reduce(U&& initial_value, FunctionType&& fun) const
 {
-  U ret_val = std::forward<U>(initial_value);
-  auto accum = [&](T const &x) {
-    ret_val = fun(ret_val, x);
-  };
+  auto ret_val = std::forward<U>(initial_value);
+  auto accum = [&](T const &x) { ret_val = fun(ret_val, x); };
   Map(accum, *this);
   return ret_val;
 }
@@ -4135,12 +4234,11 @@ U Tensor<T, N, C>::reduce(U&& initial_value, FunctionType&& fun) const
  *  to `fn` must have be const ref or value qualified, and return value
  *  that is trivially convertible to `T`. 
  */
-
 template <typename U, template <class> class C_, typename FunctionType, typename... Expressions>
 Tensor<U, FirstExpression<Expressions...>::type::rank(), C_> 
   map(FunctionType &&fn, Expressions const&... exprs)
 {
-  // static check to verify arguments are expressions
+  // verify arguments are expressions
   static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
 
   // if expression, evaluate and forward as rvalue reference,
@@ -4158,7 +4256,7 @@ Tensor<U, FirstExpression<Expressions...>::type::rank(), C_>
 template <typename FunctionType, typename... Expressions>
 void Map(FunctionType &&fn, Expressions&&... exprs)
 {
-  // static check to verify arguments are expressions
+  // verify arguments are expressions
   static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
 
   // if expression, evaluate and forward as rvalue reference,
@@ -4176,8 +4274,11 @@ U reduce(U&& initial_value, FunctionType &&fn, Expressions const&... exprs)
 
   // if expression, evaluate and forward as rvalue reference,
   // if tensor, forward as lvalue reference
-  return details::reduce(std::forward<U>(initial_value), 
-      std::forward<FunctionType>(fn), exprs.eval()...);
+  return details::reduce(
+      std::forward<U>(initial_value), 
+      std::forward<FunctionType>(fn), 
+      exprs.eval()...
+  );
 }
 
 /* ------------------------------- Iterator ----------------------------- */
@@ -4186,7 +4287,7 @@ template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C>::Iterator::Iterator(Tensor<T, N + 1, C> const &tensor, size_t index)
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
-  assert(index < N + 1 && "This should throw earlier");
+  assert(index < N + 1 && PANIC_ASSERTION);
   std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
   std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
   std::copy_n(tensor.strides_, index, strides_);
@@ -4222,7 +4323,7 @@ Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator->()
 template <typename T, size_t N, template <class> class C>
 typename Tensor<T, N, C>::Iterator Tensor<T, N, C>::Iterator::operator++(int)
 {
-  Tensor<T, N, C>::Iterator it {*this};
+  auto it = Tensor<T, N, C>::Iterator{*this};
   ++(*this);
   return it;
 }
@@ -4237,7 +4338,7 @@ typename Tensor<T, N, C>::Iterator &Tensor<T, N, C>::Iterator::operator++()
 template <typename T, size_t N, template <class> class C>
 typename Tensor<T, N, C>::Iterator Tensor<T, N, C>::Iterator::operator--(int)
 {
-  Tensor<T, N, C>::Iterator it {*this};
+  auto it = Tensor<T, N, C>::Iterator{*this};
   --(*this);
   return it;
 }
@@ -4687,13 +4788,18 @@ private:
 
 template <>
 class Indices<0> { /*@Indices<0>*/
-  /** Scalar specialized 0-length Indices. This is an empty object
-   *  (sizeof(Indices<0>) will return 1) to resolve compiler issues with
-   *  0-length arrays.
-   */
+/** Scalar specialized 0-length Indices. This is an empty object
+ *  (sizeof(Indices<0>) will return 1) to resolve compiler issues with
+ *  0-length arrays.
+ */
 public:
 
-  /* --------------- Friend Classes ------------- */
+  /* ------------------ typedefs ---------------- */
+
+  typedef Indices                     self_t;
+  typedef std::size_t                 size_t;
+
+  /* --------------- friend classes ------------- */
 
   template <typename U, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
@@ -4908,55 +5014,50 @@ public:
 
   /* ------------ Expressions ------------- */
 
+  // FIXME add documentation
   template <typename X, typename Y, template <class> class C1, template <class> class C2>
   friend Tensor<X, 0, C1> add(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2);
-
   template <typename RHS>
   Tensor<T, 0, C> &operator+=(Expression<RHS> const &rhs);
-
   Tensor<T, 0, C> &operator+=(T const &scalar);
-
   template <typename X, typename Y>
   friend Tensor<X, 0, C> sub(Tensor<X, 0, C> const &tensor_1, Tensor<Y, 0, C> const &tensor_2);
-
   template <typename RHS>
   Tensor<T, 0, C> &operator-=(Expression<RHS> const &rhs);
-
   Tensor<T, 0, C> &operator-=(T const &scalar);
-
   template <typename X, typename Y>
   friend Tensor<X, 0, C> mul(Tensor<X, 0, C> const &tensor_1, Tensor<Y, 0, C> const &tensor_2);
-
   template <typename RHS>
   Tensor<T, 0, C> &operator*=(Expression<RHS> const &rhs);
-
   Tensor<T, 0, C> &operator*=(T const &scalar);
-
   template <typename RHS>
   Tensor<T, 0, C> &operator/=(Expression<RHS> const &rhs);
-
   Tensor<T, 0, C> &operator/=(T const &scalar);
-
   Tensor<T, 0, C> neg() const;
   Tensor<T, 0, C> operator-() const { return this->neg(); }
 
   /* ----------------- OpenCL --------------- */
 
 #ifdef _ENABLE_OPENCL
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
   /* ---------------- Iterator -------------- */
 
   class Iterator { /*@Iterator<T, 0>*/
   public:
-
-    /* -------------- Friend Classes -------------- */
+    /* ----------------- Friends ----------------- */
 
     template <typename U, size_t M, template <class> class C_> friend class Tensor;
 
@@ -4974,9 +5075,10 @@ public:
     Iterator &operator--();
     bool operator==(Iterator const &it) const;
     bool operator!=(Iterator const &it) const { return !(it == *this); }
-  private:
-    Iterator(Tensor<T, 1, C> const &tensor, size_t);
 
+  private:
+
+    Iterator(Tensor<T, 1, C> const &tensor, size_t);
     size_t offset_;
     std::shared_ptr<C<T>> ref_;
     size_t stride_;
@@ -5207,13 +5309,13 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator=(X&& elem)
 template <typename U, template <class> class C_>
 void Set(Tensor<U, 0, C_> &tensor, Indices<0> const&, U&& value)
 { 
-  tensor.ref_->set(tensor.offset_, std::forward<U>(value)); 
+  tensor.ref_->Set(tensor.offset_, std::forward<U>(value)); 
 }
 
 template <typename U, template <class> class C_>
 inline void Set(Tensor<U, 0, C_> &tensor, U&& value)
 { 
-  tensor.ref_->set(tensor.offset_, std::forward<U>(value)); 
+  tensor.ref_->Set(tensor.offset_, std::forward<U>(value)); 
 }
 
 /* ------------------------ Equivalence ----------------------- */
@@ -5426,8 +5528,11 @@ Tensor<T, 0, C> Tensor<T, 0, C>::neg() const
 #ifdef _ENABLE_OPENCL
 
 template <typename T, template <class> class C>
-std::string Tensor<T, 0, C>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string Tensor<T, 0, C>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
   cl_int cl_status = 0;
   buffers.push_back(cl::Buffer(opencl::Info::v().context(), 
@@ -5447,9 +5552,12 @@ std::string Tensor<T, 0, C>::OpenCLBuffer(cl::CommandQueue &cqueue,
 }
 
 template <typename T, template <class> class C>
-cl::Buffer Tensor<T, 0, C>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer Tensor<T, 0, C>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
   return buffers.back();
 }
@@ -6005,8 +6113,8 @@ Model<NodeType>::Model(Expression<NodeType> const &expr)
 {
   std::vector<cl::Buffer> buffers{};
   std::string cl_arg_list{};
-  std::string cl_expr = node_.OpenCLBuffer(cqueue_, buffers, cl_arg_list);
-  buffer_ = node_.OpenCLKernel(cqueue_, buffers, cl_arg_list, cl_expr);
+  std::string cl_expr = node_.OpenCLKernelCode(cqueue_, buffers, cl_arg_list);
+  buffer_ = node_.OpenCLEvaluateKernel(cqueue_, buffers, cl_arg_list, cl_expr);
 }
 
 template <typename NodeType>
@@ -6046,6 +6154,12 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinaryAddExpr<LHS_, RHS_> 
     _add(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+  template <typename LHS_, typename RHS_>
+  friend std::ostream &operator<<(
+      std::ostream &os, 
+      BinaryAddExpr<LHS_, RHS_> const &binary_add
+  ); 
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6088,12 +6202,18 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -6181,31 +6301,43 @@ BinaryAddExpr<LHS, RHS>::BinaryAddExpr(LHS const &lhs, RHS const &rhs)
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinaryAddExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string BinaryAddExpr<LHS, RHS>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " +  " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
+  std::string expr = std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
+    + " +  " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryAddExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer BinaryAddExpr<LHS, RHS>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
-  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
-      arg_list, expr, lhs_.shape().index_product());
+  return opencl::details::EvaluateBasicKernel<value_t>(
+      cqueue, 
+      buffers, 
+      arg_list, 
+      expr, 
+      lhs_.shape().index_product()
+  );
 }
 
 #endif
 
 /* ----------------- Print ----------------- */
 
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os, BinaryAddExpr<LHS, RHS> const &binary_add)
+/** `os` recieves BinaryAddExpr(`lhs_`, `rhs_`) */ 
+template <typename LHS_, typename RHS_>
+std::ostream &operator<<(std::ostream &os, BinaryAddExpr<LHS_, RHS_> const &binary_add) 
 {
-  os << binary_add();
+  os << "BinaryAddExpr(" << binary_add.lhs_ << ", " << binary_add.rhs_ << ")";
   return os;
 }
 
@@ -6233,6 +6365,13 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
     _sub(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+
+  template <typename LHS_, typename RHS_>
+  friend std::ostream &operator<<(
+      std::ostream &os, 
+      BinarySubExpr<LHS_, RHS_> const &binary_sub
+  );
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6276,12 +6415,18 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -6363,21 +6508,30 @@ auto BinarySubExpr<LHS, RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinarySubExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string BinarySubExpr<LHS, RHS>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " - " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
-  return expr;
+  return std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
+    + " - " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinarySubExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer BinarySubExpr<LHS, RHS>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
-  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
-      arg_list, expr, lhs_.shape().index_product());
+  return opencl::details::EvaluateBasicKernel<value_t>(
+      cqueue, 
+      buffers, 
+      arg_list, 
+      expr, lhs_.shape().index_product()
+  );
 }
 
 #endif
@@ -6390,10 +6544,11 @@ BinarySubExpr<LHS, RHS>::BinarySubExpr(LHS const &lhs, RHS const &rhs)
 
 /* ----------------- Print ----------------- */
 
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os, BinarySubExpr<LHS, RHS> const &binary_sub)
+/** `os` recieves BinarySubExpr(`lhs_`, `rhs_`) */ 
+template <typename LHS_, typename RHS_>
+std::ostream &operator<<(std::ostream &os, BinarySubExpr<LHS_, RHS_> const &binary_sub) 
 {
-  os << binary_sub();
+  os << "BinarySubExpr(" << binary_sub.lhs_ << ", " << binary_sub.rhs_ << ")";
   return os;
 }
 
@@ -6401,7 +6556,6 @@ std::ostream &operator<<(std::ostream &os, BinarySubExpr<LHS, RHS> const &binary
  * Multiplies the inner dimensions
  * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor
  */
-
 template <size_t I1, size_t I2, typename LHS, typename RHS>
 class BinaryMulExpr: public Expression<BinaryMulExpr<I1, I2, LHS, RHS>> { 
 /*@BinaryMulExpr*/
@@ -6409,13 +6563,12 @@ public:
 
   /* ---------------- typedefs --------------- */
 
-  typedef typename LHS::value_t                 value_t;
-  template <typename X>
-  using container_t = typename                  LHS::template container_t<X>;
-  typedef BinaryMulExpr                         self_t;
-  constexpr static size_t rank()                { return LHS::rank() + RHS::rank() - 2; }
-  typedef 
-  Tensor<value_t, self_t::rank(), container_t>  return_t;
+  constexpr static size_t rank() { return LHS::rank() + RHS::rank() - 2; }
+
+  typedef typename LHS::value_t                         value_t;
+  template <typename X> using container_t = typename    LHS::template container_t<X>;
+  typedef BinaryMulExpr                                 self_t;
+  typedef Tensor<value_t, self_t::rank(), container_t>  return_t;
 
   /* ---------------- Friends ---------------- */
   
@@ -6426,6 +6579,9 @@ public:
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
   friend BinaryMulExpr<I1_, I2_, LHS_, RHS_> 
     _mul(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
+  friend std::ostream &operator<<(std::ostream &os, BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6479,12 +6635,18 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -6518,11 +6680,10 @@ private:
 
   /* ------------------ Data ------------------ */
 
-  // cache so that `shape()` can return a const reference
+  // cache shape that `shape()` can return a const reference
   Shape<self_t::rank()> shape_;
   LHS const &lhs_;
   RHS const &rhs_;
-
 };
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6557,7 +6718,7 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::operator()(Args... args) const
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
   return lhs_.template slice<I1>(Indices<left>(seperate_args.array1.data())) * 
-         rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
+    rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6568,10 +6729,12 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
   meta::FillArgs<left, right + left> seperate_args(args...);
+
   auto lhs = lhs_.template slice<I1>(Indices<left>(seperate_args.array1.data()));
   auto rhs = rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
-  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
-  { return accum + x * y; };
+  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) { 
+    return accum + x * y; 
+  };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
@@ -6583,6 +6746,7 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::at(Args... args) const
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
   constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - 1);
+
   meta::FillArgs<left, right + left> seperate(args...);
   return lhs_.template slice<I1>(Indices<left>(seperate.array1.data())) *
      rhs_.template slice<I2>(Indices<right>(seperate.array2.data()));
@@ -6596,7 +6760,7 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::operator[](Indices<M> const &indices) cons
   static_assert(rank() >= M, RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - 1);
-  // std::array to get around zero array size issue
+
   std::array<size_t, left> array1{};
   std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
@@ -6616,10 +6780,12 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   std::array<size_t, right> array2{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
+
   auto lhs = lhs_.template slice<I1>(Indices<left>(array1.data()));
   auto rhs = rhs_.template slice<I2>(Indices<right>(array2.data()));
-  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
-  { return accum + x * y; };
+  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) { 
+    return accum + x * y; 
+  };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
@@ -6711,6 +6877,16 @@ BinaryMulExpr<I1, I2, LHS, RHS> _mul(Expression<LHS> const &lhs, Expression<RHS>
   return BinaryMulExpr<I1, I2, LHS, RHS>(lhs.self(), rhs.self());
 }
 
+/* ------------------------------- Print ------------------------------- */
+
+/** `os` recieves BinaryMulExpr<`I1_`, `I2_`>(`lhs_`, `rhs_`) */ 
+template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
+std::ostream &operator<<(std::ostream &os, BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul)
+{
+  os << "BinaryMulExpr<" << I1_ << ", " << I2_ << ">(" << binary_mul.lhs_ << ", " << binary_mul.rhs_ << ")";
+  return os;
+}
+
 /* ------------------------------ Utility ------------------------------ */
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6736,8 +6912,9 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
   meta::FillArgs<left, right + left> seperate(args...);
   auto lhs = lhs_.template slice<Slices1...>(Indices<left>(seperate.array1.data()));
   auto rhs = rhs_.template slice<Slices2...>(Indices<right>(seperate.array2.data()));
-  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
-    { return accum + x * y; };
+  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) { 
+    return accum + x * y; 
+  };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
@@ -6749,12 +6926,13 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
-  std::array<size_t, left> array1{}; 
-  std::array<size_t, right> array2{};
+  auto array1 = std::array<size_t, left>{}; 
+  auto array2 = std::array<size_t, right>{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
-  return lhs_.template slice<Slices1...>(Indices<left>(array1.data())) *
-               rhs_.template slice<Slices2...>(Indices<right>(array2.data()));
+  return lhs_.template slice<Slices1...>(
+      Indices<left>(array1.data())) * rhs_.template slice<Slices2...>(
+        Indices<right>(array2.data()));
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6765,14 +6943,16 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
-  std::array<size_t, left> array1{}; 
-  std::array<size_t, right> array2{};
+  auto array1 = std::array<size_t, left>{}; 
+  auto array2 = std::array<size_t, right>{};
   for (size_t i = 0; i < left; ++i) array1[i] = indices[i];
   for (size_t i = 0; i < right; ++i) array2[i]= indices[i + left];
+
   auto lhs = lhs_.template slice<Slices1...>(Indices<left>(array1.data()));
   auto rhs = rhs_.template slice<Slices2...>(Indices<right>(array2).data());
-  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) 
-    { return accum + x * y; };
+  auto mul_vals = [](value_t &accum, value_t const &x, typename RHS::value_t const &y) { 
+    return accum + x * y; 
+  };
   return reduce(value_t{}, mul_vals, lhs, rhs);
 }
 
@@ -6781,10 +6961,13 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 #ifdef _ENABLE_OPENCL
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
-std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  using namespace opencl::details; // WARNING -- using namespace
+  using namespace opencl::details; // WARNING using namespace
   using lhs_t = typename LHS::value_t;
   using rhs_t = typename RHS::value_t;
 
@@ -6809,13 +6992,17 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cque
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
-cl::Buffer BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernel(cl::CommandQueue &, 
-    std::vector<cl::Buffer> &buffers, std::string &, std::string &) const noexcept
+cl::Buffer BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLEvaluateKernel(
+    cl::CommandQueue &, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &, 
+    std::string &
+) const noexcept
 {
   return buffers.back();
 }
 
-#endif
+#endif // _ENABLE_OPENCL
 
 /* --------------------------------------------------------------------- */
 
@@ -6826,13 +7013,12 @@ public:
 
   /* ---------------- typedefs --------------- */
 
-  typedef typename LHS::value_t                 value_t;
-  template <typename X>
-  using container_t = typename                  LHS::template container_t<X>;
-  typedef BinaryHadExpr                         self_t;
-  constexpr static size_t rank()                { return LHS::rank(); }
-  typedef 
-  Tensor<value_t, self_t::rank(), container_t>  return_t;
+  constexpr static size_t rank() { return LHS::rank(); }
+
+  typedef typename LHS::value_t                         value_t;
+  template <typename X> using container_t = typename    LHS::template container_t<X>;
+  typedef BinaryHadExpr                                 self_t;
+  typedef Tensor<value_t, self_t::rank(), container_t>  return_t;
 
   /* ---------------- Friends ---------------- */
 
@@ -6842,7 +7028,10 @@ public:
 
   template <typename LHS_, typename RHS_>
   friend BinaryHadExpr<LHS_, RHS_> 
-    hadamard(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+    _hadamard(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+
+  template <typename LHS_, typename RHS_>
+  friend std::ostream &operator<<(std::ostream &os, BinaryHadExpr<LHS_, RHS_> const &binary_had);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6911,12 +7100,18 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -7040,33 +7235,50 @@ template <typename LHS, typename RHS>
 BinaryHadExpr<LHS, RHS>::BinaryHadExpr(LHS const &lhs, RHS const &rhs)
   : lhs_(lhs), rhs_(rhs) {}
 
+/* ----------------- Print ----------------- */
+
+/** `os` recieves "BinaryHadExpr(`lhs_`, `rhs_`)" */ 
+template <typename LHS_, typename RHS_>
+std::ostream &operator<<(std::ostream &os, BinaryHadExpr<LHS_, RHS_> const &binary_had)
+{
+  os << "BinaryHadExpr(" << binary_had.lhs_ << ", " << binary_had.rhs_ << ")";
+  return os;
+}
+
 /* ----------------- OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinaryHadExpr<LHS, RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string BinaryHadExpr<LHS, RHS>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  std::string expr = std::string("(") + lhs_.OpenCLBuffer(cqueue, buffers, arg_list)
-    + " * " + rhs_.OpenCLBuffer(cqueue, buffers, arg_list) + ")";
+  std::string expr = std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
+    + " * " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryHadExpr<LHS, RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer BinaryHadExpr<LHS, RHS>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
-  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
-      arg_list, expr, lhs_.shape().index_product());
+  return opencl::details::EvaluateBasicKernel<value_t>(
+      cqueue, 
+      buffers, 
+      arg_list, 
+      expr, 
+      lhs_.shape().index_product()
+  );
 }
 
-#endif
-
-/* ----------------- Print ----------------- */
-
-// FIXME
+#endif // _ENABLE_OPENCL
 
 template <typename Function, typename... Exprs> 
 class MapExpr: public Expression<MapExpr<Function, Exprs...>>  {
@@ -7075,21 +7287,23 @@ public:
 
   /* ----------------------------- typedefs ------------------------------ */
 
+  constexpr static size_t rank() { return first_t::rank(); }
+
   typedef typename meta::RemoveCVRef<
     typename std::result_of<Function(
-    typename Exprs::value_t...)>::type>::type          value_t;
-  typedef typename FirstExpression<Exprs...>::type     first_t;
-  template <typename X>
-  using container_t = typename                         first_t::template container_t<X>;
-  constexpr static size_t rank()                       { return first_t::rank(); }
-  typedef MapExpr                                      self_t;
-  typedef
-    Tensor<value_t, self_t::rank(), container_t>  return_t;
+    typename Exprs::value_t...)>::type>::type           value_t;
+  typedef typename FirstExpression<Exprs...>::type      first_t;
+  template <typename X> using container_t = typename    first_t::template container_t<X>;
+  typedef MapExpr                                       self_t;
+  typedef Tensor<value_t, self_t::rank(), container_t>  return_t;
 
   /* ------------------------------ Friend ------------------------------ */
 
   template <typename Function_, typename... Exprs_> 
   friend MapExpr<Function_, Exprs_...> _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
+
+  template <typename Function_, typename... Exprs_>
+  friend std::ostream &operator<<(std::ostream &os, MapExpr<Function_, Exprs_...> const &map_expr);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -7098,7 +7312,6 @@ public:
   template <typename U, typename Function_, typename... Exprs_> friend class ReduceExpr;
   template <typename Function_, typename... Exprs_> friend class MapExpr;
   template <typename RHS_> friend class UnaryNegExpr;
-
   template <typename Expr> friend class opencl::Model;
 
   /* ----------------------------- Getters ------------------------------ */
@@ -7134,19 +7347,25 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
   
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
 
   /* ------------------------- Constructors ------------------------- */
 
-  MapExpr(Function &&, Exprs const&... exprs);
+  MapExpr(Function &&fn, Exprs const&... exprs);
   MapExpr(MapExpr<Function, Exprs...> const&) = default;
 
   /* --------------------------- Utility ------------------------------ */
@@ -7187,12 +7406,19 @@ private:
             typename std::enable_if<self_t::rank() == M>::type>
   value_t pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const;
 
+  template <size_t... TupleIndices>
+  std::ostream &pOstreamExpansion(meta::Sequence<TupleIndices...>, std::ostream &os) const;
+
   /* ---------------------------- OpenCL ---------------------------- */
 
 #ifdef _ENABLE_OPENCL
   template <size_t... TupleIndices>
-  std::string pOpenCLBufferTupleExpansion(meta::Sequence<TupleIndices...>, 
-      cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept;
+  std::string pOpenCLKernelCodeTupleExpansion(
+      meta::Sequence<TupleIndices...>, 
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 #endif
 
   /* ---------------------------- Data ------------------------------ */
@@ -7341,34 +7567,77 @@ typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
   return fn_(std::get<TupleIndices>(exprs_)[indices]...);
 }
 
+template <typename Function, typename... Exprs>
+template <size_t... TupleIndices>
+std::ostream &MapExpr<Function, Exprs...>::pOstreamExpansion(
+    meta::Sequence<TupleIndices...>, 
+    std::ostream &os
+) const
+{
+  os << "MapExpr(<fn>";
+  VARDIAC_MAP(os << ", " << std::get<TupleIndices>(exprs_));
+  os << ")";
+  return os;
+}
+
+/* ---------------------------- OpenCL ---------------------------- */
+
+template <typename Function_, typename... Exprs_>
+std::ostream &operator<<(std::ostream &os, MapExpr<Function_, Exprs_...> const &map_expr)
+{
+  return map_expr.pOstreamExpansion(
+      typename meta::MakeIndexSequence<0, sizeof...(Exprs_)>::sequence{},
+      os
+  );
+}
+
 /* ---------------------------- OpenCL ---------------------------- */
 
 #ifdef _ENABLE_OPENCL
 
 template <typename Function, typename... Exprs>
-std::string MapExpr<Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string MapExpr<Function, Exprs...>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
   static_assert(!Function::arity() || sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
-  return pOpenCLBufferTupleExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{}, cqueue, buffers, arg_list);
+  return pOpenCLKernelCodeTupleExpansion(
+      typename meta::MakeIndexSequence< 0, sizeof...(Exprs)>::sequence{}, 
+      cqueue, 
+      buffers, 
+      arg_list
+  );
 }
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-std::string MapExpr<Function, Exprs...>::pOpenCLBufferTupleExpansion(meta::Sequence<TupleIndices...>, 
-    cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string MapExpr<Function, Exprs...>::pOpenCLKernelCodeTupleExpansion(
+    meta::Sequence<TupleIndices...>, 
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  return Function::opencl_map(std::get<TupleIndices>(exprs_).OpenCLBuffer(cqueue, buffers, arg_list)...);
+  return Function::opencl_map(std::get<TupleIndices>(exprs_).OpenCLKernelCode(cqueue, buffers, arg_list)...);
 }
 
 template <typename Function, typename... Exprs>
-cl::Buffer MapExpr<Function, Exprs...>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer MapExpr<Function, Exprs...>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
-  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
-      arg_list, expr, shape().index_product());
+  return opencl::details::EvaluateBasicKernel<value_t>(
+      cqueue, 
+      buffers, 
+      arg_list, 
+      expr, 
+      shape().index_product()
+  );
 }
 
 #endif
@@ -7425,12 +7694,18 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -7467,23 +7742,20 @@ template <typename U, typename Function_, typename... Exprs_> ReduceExpr<U, Func
 template <typename T, typename Function, typename... Exprs>
 T ReduceExpr<T, Function, Exprs...>::operator()() const
 {
-  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
 auto ReduceExpr<T, Function, Exprs...>::at() const
   -> Tensor<T, 0, container_t>
 {
-  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
 T ReduceExpr<T, Function, Exprs...>::operator[](Indices<0> const &) const
 {
-  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
@@ -7491,8 +7763,7 @@ template <size_t... Slices>
 T ReduceExpr<T, Function, Exprs...>::slice() const
 {
   static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
-  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
 template <typename T, typename Function, typename... Exprs>
@@ -7500,8 +7771,7 @@ template <size_t... Slices>
 T ReduceExpr<T, Function, Exprs...>::slice(Indices<0> const&) const
 {
   static_assert(sizeof...(Slices) == 0, SLICES_OUT_OF_BOUNDS);
-  return pReduceExpansion(typename meta::MakeIndexSequence<0, 
-      sizeof...(Exprs)>::sequence{});
+  return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
 /* ----------------------- Constructors --------------------- */
@@ -7534,8 +7804,11 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 #ifdef _ENABLE_OPENCL
 
 template <typename T, typename Function, typename... Exprs>
-std::string ReduceExpr<T, Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list) const noexcept
+std::string ReduceExpr<T, Function, Exprs...>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
   using namespace opencl::details; // WARNING -- using namespace
 
@@ -7551,7 +7824,7 @@ std::string ReduceExpr<T, Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cq
 
   // There a pointer to the single element in the buffer to the element list
   arg_list += std::string(cGlobalIdentifier) + " " + (OpenCLType<T>::value) + " " 
-           +  cConstIdentifier + " " +  cPointerIdentifier + cVariablePrefix
+           +  cConstIdentifier + " " + cPointerIdentifier + cVariablePrefix
            +  std::to_string(arg_index) + ", ";
 
   // There is only one element in a reduction buffer
@@ -7559,8 +7832,12 @@ std::string ReduceExpr<T, Function, Exprs...>::OpenCLBuffer(cl::CommandQueue &cq
 }
 
 template <typename T, typename Function, typename... Exprs>
-cl::Buffer ReduceExpr<T, Function, Exprs...>::OpenCLKernel(cl::CommandQueue &, 
-    std::vector<cl::Buffer> &buffers, std::string &, std::string &) const noexcept
+cl::Buffer ReduceExpr<T, Function, Exprs...>::OpenCLEvaluateKernel(
+    cl::CommandQueue &, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &, 
+    std::string &
+) const noexcept
 {
   return buffers.back();
 }
@@ -7576,12 +7853,12 @@ public:
 
   /* ---------------- typedefs --------------- */
 
-  typedef typename RHS::value_t        value_t;
-  template <typename X>
-  using container_t = typename         RHS::template container_t<X>;
-  constexpr static size_t rank()       { return RHS::rank(); } 
-  typedef UnaryNegExpr                 self_t;
-  typedef typename RHS::return_t       return_t;
+  constexpr static size_t rank()  { return RHS::rank(); } 
+
+  typedef typename RHS::value_t                       value_t;
+  template <typename X> using container_t = typename  RHS::template container_t<X>;
+  typedef UnaryNegExpr                                self_t;
+  typedef typename RHS::return_t                      return_t;
 
   /* ---------------- Friends ---------------- */
   
@@ -7632,12 +7909,18 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-      std::string &arg_list) const noexcept;
+  std::string OpenCLKernelCode(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list
+  ) const noexcept;
 
-  cl::Buffer OpenCLKernel(cl::CommandQueue &cqueue, 
-      std::vector<cl::Buffer> &buffers, std::string &arg_list,
-      std::string &expr) const noexcept;
+  cl::Buffer OpenCLEvaluateKernel(
+      cl::CommandQueue &cqueue, 
+      std::vector<cl::Buffer> &buffers, 
+      std::string &arg_list,
+      std::string &expr
+  ) const noexcept;
 #endif
 
 private:
@@ -7650,7 +7933,6 @@ private:
   /* ------------------ Data ------------------ */
 
   RHS const &rhs_;
-
 };
 
 template <typename RHS>
@@ -7719,19 +8001,30 @@ auto UnaryNegExpr<RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename RHS>
-std::string UnaryNegExpr<RHS>::OpenCLBuffer(cl::CommandQueue &cqueue, std::vector<cl::Buffer> &buffers, 
-    std::string &arg_list) const noexcept
+std::string UnaryNegExpr<RHS>::OpenCLKernelCode(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list
+) const noexcept
 {
-  return "-" + rhs_.OpenCLBuffer(cqueue, buffers, arg_list);
+  return "-" + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list);
 }
 
 template <typename RHS>
-cl::Buffer UnaryNegExpr<RHS>::OpenCLKernel(cl::CommandQueue &cqueue, 
-    std::vector<cl::Buffer> &buffers, std::string &arg_list,
-    std::string &expr) const noexcept
+cl::Buffer UnaryNegExpr<RHS>::OpenCLEvaluateKernel(
+    cl::CommandQueue &cqueue, 
+    std::vector<cl::Buffer> &buffers, 
+    std::string &arg_list,
+    std::string &expr
+) const noexcept
 {
-  return opencl::details::CreateBasicKernel<value_t>(cqueue, buffers, 
-      arg_list, expr, shape().index_product());
+  return opencl::details::EvaluateBasicKernel<value_t>(
+      cqueue, 
+      buffers, 
+      arg_list, 
+      expr, 
+      shape().index_product()
+  );
 }
 
 #endif
