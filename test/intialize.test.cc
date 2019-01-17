@@ -1,5 +1,3 @@
-#include <catch.hh>
-#include <tensor.hh>
 #include <deque>
 #include "test.hh"
 

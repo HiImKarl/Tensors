@@ -1,6 +1,4 @@
 #ifdef _ENABLE_OPENCL
-#include <tensor.hh>
-#include <catch.hh>
 #include <CL/cl2.hpp>
 #include "test.hh"
 

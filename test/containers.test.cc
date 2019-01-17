@@ -1,5 +1,3 @@
-#include <tensor.hh>
-#include <catch.hh>
 #include "test.hh"
 
 using namespace tensor;

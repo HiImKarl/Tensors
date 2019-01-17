@@ -1,35 +1,31 @@
 cmake_minimum_required(VERSION 3.1)
-project(Example LANGUAGES CXX)
+project(Tensors LANGUAGES CXX)
+
+include_directories(
+    ${PROJECT_SOURCE_DIR}/external 
+    ${PROJECT_SOURCE_DIR}/include
+)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU") 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Wall -Wextra -fmax-errors=4")
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang") 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Wall -Wextra -ferror-limit=4")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fmax-errors=4")
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -ferror-limit=4")
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std=c++11 /W4")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 endif()
+
+set(CMAKE_CXX_STANDARD 11)
 
 find_package(benchmark QUIET)
 find_package(OpenCL QUIET)
-
-if (benchmark_FOUND)
-	add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
-endif ()
 
 if (OpenCL_FOUND)
   include_directories(${OpenCL_INCLUDE_DIRS})
   link_directories(${OpenCL_LIBRARY})
 endif()
 
+if (benchmark_FOUND)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
+endif ()
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
-
-include(CTest)
-add_test(NAME run_tests COMMAND tests)
-
-add_custom_target(
-	test_memcheck 
-	COMMAND ${CMAKE_CTEST_COMMAND}
-	--force-new-ctest-process --test-action memcheck
-    COMMAND cat "${CMAKE_BINARY_DIR}/Testing/Temporary/MemoryChecker.*.log"
-	)
-

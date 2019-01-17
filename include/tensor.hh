@@ -1672,7 +1672,7 @@ namespace data {
 template <typename T>
 class Array { /*@data::Array<T>*/
 /** Data container that allocates data in a single contiguous
- *  array. Thus indexing and iterating is very fast, but resizing
+ *  array. Indexing and iterating is very fast, but resizing
  *  any dimension will require reallocating and copying the 
  *  the entire array.
  */
@@ -2257,7 +2257,7 @@ std::ostream &operator<<(std::ostream &os, Indices<M> const &indices)
 
 template <typename T, size_t N, template <class> class C>
 class Tensor: public Expression<Tensor<T, N, C>> { 
-//  @Tensor<T, N, C>
+/*@Tensor<T, N, C>*/
 /** Any-rank() array of type `T`, where rank() `N` is a size_t template.
  *  The underlying data is implemented as a dynamically allocated contiguous
  *  array.
@@ -2450,7 +2450,7 @@ public:
    */
   // FIXME :: no unit test exists for the function
   template <typename It>
-  void Assign(It begin, It const &end);
+  void Fill(It begin, It const &end);
 
   /** Forwards valye to the element at position `indices` */
   template <typename U>
@@ -2767,12 +2767,18 @@ public:
 
     /** Move construct an iterator to the same underlying Tensor. Destroys `it`. */
     ConstReverseIterator(ConstReverseIterator &&it);
-    Tensor<T, N, C> const operator*();       /**< Create a reference to the underlying Tensor */
-    Tensor<T, N, C> const operator->();      /**< Syntatic sugar for (*it). */                                
-    ConstReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
-    ConstReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
-    ConstReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
-    ConstReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
+    /** Create a reference to the underlying Tensor */
+    Tensor<T, N, C> const operator*();       
+    /** Syntatic sugar for (*it). */                                
+    Tensor<T, N, C> const operator->();      
+    /** Increment (postfix). Returns a temporary before increment */
+    ConstReverseIterator operator++(int); 
+    /** Increment (prefix). Returns *this */
+    ConstReverseIterator &operator++();   
+    /** Decrement (postfix). Returns a temporary before decrement */
+    ConstReverseIterator operator--(int); 
+    /** Decrement (prefix). Returns *this */
+    ConstReverseIterator &operator--();   
     bool operator==(ConstReverseIterator const &it) const;
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
   private:
@@ -2857,7 +2863,7 @@ public:
   typename Tensor<T, N, C>::Proxy ref();
 
   template <typename U, size_t M, template <class> class C_, typename RAIt>
-  friend void Fill(Tensor<U, M, C_> &tensor, RAIt const &begin, RAIt const &end);
+  friend void Fill(Tensor<U, M, C_> &tensor, RAIt begin, RAIt const &end);
 
   template <typename U, size_t M, template <class> class C_, typename X>
   friend void Fill(Tensor<U, M, C_> &tensor, X const &value);
@@ -3300,9 +3306,9 @@ T const &Tensor<T, N, C>::get(Indices<N> const &indices) const noexcept
 
 template <typename T, size_t N, template <class> class C>
 template <typename It>
-void Tensor<T, N, C>::Assign(It begin, It const &end)
+void Tensor<T, N, C>::Fill(It begin, It const &end)
 {
-  auto diff = std::distance(begin, end);
+  size_t diff = std::distance(begin, end);
   size_t cumul = shape_.index_product();
   assert((diff > 0 && cumul == diff) &&  ELEMENT_COUNT_MISMATCH);
   Indices<N> reference_indices{};
@@ -4104,8 +4110,7 @@ template <typename U, size_t M, template <class> class C_>
 Tensor<U, M, C_> neg(Tensor<U, M, C_> const &tensor)
 {
   Tensor<U, M, C_> neg_tensor(tensor.shape_);
-  auto neg = [](U &x, U const &y) -> void
-  { x = -y; };
+  auto neg = [](U &x, U const &y) -> void { x = -y; };
   Map(neg, neg_tensor, tensor);
   return neg_tensor;
 }
@@ -4146,17 +4151,9 @@ typename Tensor<T, N, C>::Proxy Tensor<T, N, C>::ref()
  *  `tensor`, otherwise an assertion will fail during debug.
  */
 template <typename U, size_t M, template <class> class C_, typename RAIt>
-void Fill(Tensor<U, M, C_> &tensor, RAIt const &begin, RAIt const &end)
+void Fill(Tensor<U, M, C_> &tensor, RAIt begin, RAIt const &end)
 {
-  size_t cumul_sum = tensor.shape_.index_product();
-  auto dist_sum = std::distance(begin, end);
-  assert((dist_sum > 0 && cumul_sum == (size_t)dist_sum) && NELEMENTS);
-  RAIt it = begin;
-  auto alloc = [&it](U &x) -> void {
-    x = *it;
-    ++it;
-  };
-  Map(alloc, tensor);
+  tensor.Fill(begin, end);
 }
 
 /** Assigns to each element in `Tensor` `value` */
@@ -4431,7 +4428,8 @@ typename Tensor<T, N, C>::ConstIterator &Tensor<T, N, C>::ConstIterator::operato
 
 template <typename T, size_t N, template <class> class C>
 bool Tensor<T, N, C>::ConstIterator::operator==(
-  typename Tensor<T, N, C>::ConstIterator const &it) const
+    typename Tensor<T, N, C>::ConstIterator const &it
+) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -4442,8 +4440,10 @@ bool Tensor<T, N, C>::ConstIterator::operator==(
 /* ---------------------------- ReverseIterator -------------------------- */
 
 template <typename T, size_t N, template <class> class C>
-Tensor<T, N, C>::ReverseIterator::ReverseIterator(Tensor<T, N + 1, C> const &tensor, size_t index)
-  : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
+Tensor<T, N, C>::ReverseIterator::ReverseIterator(
+    Tensor<T, N + 1, C> const &tensor, 
+    size_t index
+) : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
   std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
@@ -4482,7 +4482,7 @@ Tensor<T, N, C> Tensor<T, N, C>::ReverseIterator::operator->()
 template <typename T, size_t N, template <class> class C>
 typename Tensor<T, N, C>::ReverseIterator Tensor<T, N, C>::ReverseIterator::operator++(int)
 {
-  Tensor<T, N, C>::ReverseIterator it {*this};
+  auto it = Tensor<T, N, C>::ReverseIterator{*this};
   ++(*this);
   return it;
 }
@@ -4522,7 +4522,10 @@ bool Tensor<T, N, C>::ReverseIterator::operator==(
 /* ------------------------- ConstReverseIterator ----------------------- */
 
 template <typename T, size_t N, template <class> class C>
-Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(Tensor<T, N + 1, C> const &tensor, size_t index)
+Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(
+    Tensor<T, N + 1, C> const &tensor, 
+    size_t index
+)
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
@@ -4550,8 +4553,7 @@ Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, 
-      std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -4561,7 +4563,8 @@ Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator->()
 }
 
 template <typename T, size_t N, template <class> class C>
-typename Tensor<T, N, C>::ConstReverseIterator Tensor<T, N, C>::ConstReverseIterator::operator++(int)
+typename Tensor<T, N, C>::ConstReverseIterator 
+Tensor<T, N, C>::ConstReverseIterator::operator++(int)
 {
   Tensor<T, N, C>::ConstReverseIterator it {*this};
   ++(*this);
@@ -4569,14 +4572,16 @@ typename Tensor<T, N, C>::ConstReverseIterator Tensor<T, N, C>::ConstReverseIter
 }
 
 template <typename T, size_t N, template <class> class C>
-typename Tensor<T, N, C>::ConstReverseIterator &Tensor<T, N, C>::ConstReverseIterator::operator++()
+typename Tensor<T, N, C>::ConstReverseIterator &
+Tensor<T, N, C>::ConstReverseIterator::operator++()
 {
   offset_ -= stride_;
   return *this;
 }
 
 template <typename T, size_t N, template <class> class C>
-typename Tensor<T, N, C>::ConstReverseIterator Tensor<T, N, C>::ConstReverseIterator::operator--(int)
+typename Tensor<T, N, C>::ConstReverseIterator 
+Tensor<T, N, C>::ConstReverseIterator::operator--(int)
 {
   Tensor<T, N, C>::ConstReverseIterator it {*this};
   --(*this);
@@ -4584,7 +4589,8 @@ typename Tensor<T, N, C>::ConstReverseIterator Tensor<T, N, C>::ConstReverseIter
 }
 
 template <typename T, size_t N, template <class> class C>
-typename Tensor<T, N, C>::ConstReverseIterator &Tensor<T, N, C>::ConstReverseIterator::operator--()
+typename Tensor<T, N, C>::ConstReverseIterator &
+Tensor<T, N, C>::ConstReverseIterator::operator--()
 {
   offset_ += stride_;
   return *this;
@@ -4592,7 +4598,8 @@ typename Tensor<T, N, C>::ConstReverseIterator &Tensor<T, N, C>::ConstReverseIte
 
 template <typename T, size_t N, template <class> class C>
 bool Tensor<T, N, C>::ConstReverseIterator::operator==(
-    typename Tensor<T, N, C>::ConstReverseIterator const &it) const
+    typename Tensor<T, N, C>::ConstReverseIterator const &it
+) const
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
@@ -4695,7 +4702,8 @@ typename Tensor<T, N - 1, C>::ReverseIterator Tensor<T, N, C>::rend()
 }
 
 template <typename T, size_t N, template <class> class C>
-typename Tensor<T, N - 1, C>::ConstReverseIterator Tensor<T, N, C>::crbegin(size_t index) const
+typename Tensor<T, N - 1, C>::ConstReverseIterator 
+Tensor<T, N, C>::crbegin(size_t index) const
 {
   assert((index < N) && INDEX_OUT_OF_BOUNDS);
   return typename Tensor<T, N - 1, C>::ConstReverseIterator(*this, index);
@@ -4783,7 +4791,6 @@ public:
   template <typename X, size_t M, template <class> class C_>
   friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M, C_> &tensor);
 
-private:
 };
 
 template <>
@@ -4840,7 +4847,7 @@ public:
 
 private:
 
-  // private constructor to match Indices<N> interface
+  // to mirror Indices<N> API -- doesn't do anything
   Indices(size_t const *) {}
 
 };
@@ -4848,11 +4855,11 @@ private:
 // Scalar specialization
 template <typename T, template <class> class C>
 class Tensor<T, 0, C>: public Expression<Tensor<T, 0, C>> { 
-  /*@Tensor<T, 0, C>*/
-  /** Scalar specialization of Tensor object. The major motivation is
-   *  the ability to implicitly convert to the underlying data type,
-   *  allowing the Scalar to effectively be used as an ordinary value.
-   */
+/*@Tensor<T, 0, C>*/
+/** Scalar specialization of Tensor object. The major motivation is
+ *  the ability to implicitly convert to the underlying data type,
+ *  allowing the Scalar to effectively be used as an ordinary value.
+ */
 public:
   typedef T                                       value_t;
   template <typename X> using container_t =       C<X>;
@@ -4956,10 +4963,12 @@ public:
 
   /* -------------- Setters -------------- */
 
-  template <typename X,
-            typename = typename std::enable_if<std::is_convertible<
-            typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type>
+  template <
+    typename X,
+    typename = typename std::enable_if<std::is_convertible<
+      typename std::remove_reference<T>::type,
+    typename std::remove_reference<X>::type>::value>::type
+  >
   Tensor<T, 0, C> &operator=(X&& elem); /**< Assigns `elem` to the underlying data */
 
   template <typename U, template <class> class C_>
@@ -4995,45 +5004,59 @@ public:
   /** Equivalence Scalar with an element of a type default-convertible 
    *  to the underlying data type.
    */
-  template <typename X,
-            typename = typename std::enable_if
-            <std::is_convertible
-            <typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type
-  > bool operator==(X val) const;
+  template <
+    typename X,
+    typename = typename std::enable_if<std::is_convertible<
+      typename std::remove_reference<T>::type,
+    typename std::remove_reference<X>::type>::value>::type
+  > 
+  bool operator==(X val) const;
 
   /** Non-equivalence Scalar with an element of a type default-convertible 
    *  to the underlying data type.
    */
-  template <typename X,
-            typename = typename std::enable_if
-            <std::is_convertible
-            <typename std::remove_reference<T>::type,
-            typename std::remove_reference<X>::type>::value>::type
-  > bool operator!=(X val) const { return !(*this == val); }
+  template <
+    typename X,
+    typename = typename std::enable_if<std::is_convertible<
+      typename std::remove_reference<T>::type,
+    typename std::remove_reference<X>::type>::value>::type
+  > 
+  bool operator!=(X val) const { return !(*this == val); }
 
   /* ------------ Expressions ------------- */
 
-  // FIXME add documentation
-  template <typename X, typename Y, template <class> class C1, template <class> class C2>
-  friend Tensor<X, 0, C1> add(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2);
+  /** Equivalent to `*this = *this + rhs` */
   template <typename RHS>
   Tensor<T, 0, C> &operator+=(Expression<RHS> const &rhs);
+
+  /** Equivalent to `*this = *this + scalar` */
   Tensor<T, 0, C> &operator+=(T const &scalar);
-  template <typename X, typename Y>
-  friend Tensor<X, 0, C> sub(Tensor<X, 0, C> const &tensor_1, Tensor<Y, 0, C> const &tensor_2);
+
+  /** Equivalent to `*this = *this - rhs` */
   template <typename RHS>
   Tensor<T, 0, C> &operator-=(Expression<RHS> const &rhs);
+
+  /** Equivalent to `*this = *this - scalar` */
   Tensor<T, 0, C> &operator-=(T const &scalar);
-  template <typename X, typename Y>
-  friend Tensor<X, 0, C> mul(Tensor<X, 0, C> const &tensor_1, Tensor<Y, 0, C> const &tensor_2);
+
+  /** Equivalent to `*this = *this * rhs` */
   template <typename RHS>
   Tensor<T, 0, C> &operator*=(Expression<RHS> const &rhs);
+
+  /** Equivalent to `*this = *this * scalar` */
   Tensor<T, 0, C> &operator*=(T const &scalar);
+                            
+  /** Equivalent to `*this = *this / rhs` */
   template <typename RHS>
   Tensor<T, 0, C> &operator/=(Expression<RHS> const &rhs);
+
+  /** Equivalent to `*this = *this / scalar` */
   Tensor<T, 0, C> &operator/=(T const &scalar);
+
+  /** Creates a scalar by applying unary - to this scalar's value */
   Tensor<T, 0, C> neg() const;
+
+  /** Creates a scalar by applying unary - to this scalar's value */
   Tensor<T, 0, C> operator-() const { return this->neg(); }
 
   /* ----------------- OpenCL --------------- */
@@ -5055,8 +5078,14 @@ public:
 
   /* ---------------- Iterator -------------- */
 
-  class Iterator { /*@Iterator<T, 0>*/
+  class Iterator { /*@Iterator<T, 0, C>*/
   public:
+  /** 
+   * Scalar iterator are provided to match the API of Tensor<T, N, C>'s iterator.
+   * They can be dereferenced to obtain the underlying value, and incrementing once
+   * will move past the underlying data.
+   */
+
     /* ----------------- Friends ----------------- */
 
     template <typename U, size_t M, template <class> class C_> friend class Tensor;
@@ -5086,7 +5115,12 @@ public:
 
   /* -------------- ConstIterator ------------ */
 
-  class ConstIterator { /*@ConstIterator<T, 0>*/
+  class ConstIterator { /*@ConstIterator<T, 0, C>*/
+  /** 
+   * Scalar const iterator are provided to match the API of Tensor<T, N, C>'s 
+   * const iterator.  They can be dereferenced to obtain the underlying value, 
+   * and incrementing once will move past the underlying data.
+   */
   public:
     /* -------------- Friend Classes -------------- */
 
@@ -5114,8 +5148,13 @@ public:
 
   /* ------------- ReverseIterator ----------- */
 
-  class ReverseIterator { /*@ReverseIterator<T, 0>*/
+  class ReverseIterator { /*@ReverseIterator<T, 0, C>*/
   public:
+  /** 
+   * Scalar reverse iterator are provided to match the API of Tensor<T, N, C>'s 
+   * reverse iterator. They can be dereferenced to obtain the underlying value, 
+   * and incrementing once will move past the underlying data.
+   */
     /* -------------- Friend Classes -------------- */
 
     template <typename U, size_t M, template <class> class C_> friend class Tensor;
@@ -5142,8 +5181,13 @@ public:
 
   /* ----------- ConstReverseIterator --------- */
 
-  class ConstReverseIterator { /*@ReverseIterator<T, 0>*/
+  class ConstReverseIterator { /*@ConstReverseIterator<T, 0, C>*/
   public:
+  /** 
+   * Scalar const reverse iterator are provided to match the API of Tensor<T, N, C>'s 
+   * const reverse iterator. They can be dereferenced to obtain the underlying value, 
+   * and incrementing once will move past the underlying data.
+   */
     /* -------------- Friend Classes -------------- */
 
     template <typename U, size_t M, template <class> class C_> friend class Tensor;
@@ -5201,7 +5245,8 @@ private:
 /* ------------------- Constructors ----------------- */
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor() : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
+Tensor<T, 0, C>::Tensor() 
+  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5209,7 +5254,8 @@ Tensor<T, 0, C>::Tensor() : shape_(Shape<0>()), offset_(0), ref_(std::make_share
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor(Shape<0>) : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
+Tensor<T, 0, C>::Tensor(Shape<0>) 
+  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5217,7 +5263,8 @@ Tensor<T, 0, C>::Tensor(Shape<0>) : shape_(Shape<0>()), offset_(0), ref_(std::ma
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor(T &&val) : shape_(Shape<0>()), offset_(0)
+Tensor<T, 0, C>::Tensor(T &&val) 
+  : shape_(Shape<0>()), offset_(0)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5226,8 +5273,8 @@ Tensor<T, 0, C>::Tensor(T &&val) : shape_(Shape<0>()), offset_(0)
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> const &tensor): shape_(Shape<0>()), offset_(0),
-  ref_(std::make_shared<C<T>>(1), (*tensor.ref_)[0])
+Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> const &tensor)
+  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1), (*tensor.ref_)[0])
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5235,8 +5282,8 @@ Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> const &tensor): shape_(Shape<0>()), offs
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> &&tensor): shape_(Shape<0>()), offset_(tensor.offset_),
-  ref_(std::make_shared<C<T>>(1))
+Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> &&tensor)
+  : shape_(Shape<0>()), offset_(tensor.offset_), ref_(std::make_shared<C<T>>(1))
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5268,7 +5315,8 @@ Tensor<T, 0, C>::Tensor(Expression<NodeType> const& expression)
 
 template <typename T, template <class> class C>
 template <typename NodeType>
-Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
+Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model)
+  : offset_(0)
 {
 #ifdef _TEST
   ++eDebugConstructorCounter;
@@ -5279,7 +5327,7 @@ Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model): offset_(0)
   ref_ = std::make_shared<C<T>>(1, data[0]);
 }
 
-#endif
+#endif // defined _ENABLE_OPENCL
 
 /* ---------------------- Assignment ---------------------- */
 
@@ -5348,6 +5396,12 @@ Tensor<X, 0, C1> add(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &t
   return Tensor<X, 0, C1>(tensor_1() + tensor_2());
 }
 
+template <typename X, typename Y, template <class> class C1, template <class> class C2>
+Tensor<X, 0, C1> sub(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
+{
+  return Tensor<X, 0, C2>(tensor_1() - tensor_2());
+}
+
 template <typename T, template <class> class C>
 template <typename RHS>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator+=(Expression<RHS> const &rhs)
@@ -5363,12 +5417,6 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator+=(T const &scalar)
 {
   (*ref_)[offset_] += scalar;
   return *this;
-}
-
-template <typename X, typename Y, template <class> class C_>
-Tensor<X, 0, C_> sub(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
-{
-  return Tensor<X, 0, C_>(tensor_1() - tensor_2());
 }
 
 template <typename T, template <class> class C>
@@ -5388,78 +5436,78 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator-=(T const &scalar)
   return *this;
 }
 
-/** Directly overload operators for scalar multiplication so templat expressions
- *  don't have to deal with them.
+/** 
+ * Directly overload operators for scalar multiplication so templat expressions
+ * don't have to deal with them.
  */
 template <typename X, typename Y, template <class> class C_>
-inline Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
 {
   return Tensor<X, 0, C_>(tensor_1() + tensor_2());
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
   return Tensor<X, 0, C_>(tensor() + scalar);
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator+(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+Tensor<X, 0, C_> operator+(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
   return Tensor<X, 0, C_>(tensor() + scalar);
 }
 
 template <typename X, typename Y, template <class> class C_>
-inline Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
 {
   return Tensor<X, 0, C_>(tensor_1() - tensor_2());
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
   return Tensor<X, 0, C_>(tensor() - scalar);
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator-(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+Tensor<X, 0, C_> operator-(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
   return Tensor<X, 0, C_>(tensor() - scalar);
 }
 
-// Hadarmard operator is overloaded for convience of use with BinaryHadExpr
-template <typename X, typename Y, template <class> class C_>
-inline Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+template <typename X, typename Y, template <class> class C1, template <class> class C2>
+Tensor<X, 0, C1> operator%(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
-  return Tensor<X, 0, C_>(tensor_1() % tensor_2());
+  return Tensor<X, 0, C1>(tensor_1() % tensor_2());
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
   return Tensor<X, 0, C_>(tensor() % scalar);
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator%(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+Tensor<X, 0, C_> operator%(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
   return Tensor<X, 0, C_>(tensor() % scalar);
 }
 
 template <typename X, typename Y, template <class> class C1, template <class> class C2>
-inline Tensor<X, 0, C1> operator*(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
+Tensor<X, 0, C1> operator*(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
   return Tensor<X, 0, C1>(tensor_1() * tensor_2());
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator*(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+Tensor<X, 0, C_> operator*(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
   return Tensor<X, 0, C_>(tensor() * scalar);
 }
 
 template <typename X, template <class> class C_>
-inline Tensor<X, 0, C_> operator*(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+Tensor<X, 0, C_> operator*(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
   return Tensor<X, 0, C_>(tensor() * scalar);
 }
@@ -5481,11 +5529,10 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator*=(T const &scalar)
   return *this;
 }
 
-// Directly overload operator/
-template <typename X, typename Y, template <class> class C_>
-inline Tensor<X, 0, C_> operator/(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+template <typename X, typename Y, template <class> class C1, template <class> class C2>
+Tensor<X, 0, C1> operator/(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
-  return Tensor<X, 0, C_>(tensor_1() / tensor_2());
+  return Tensor<X, 0, C1>(tensor_1() / tensor_2());
 }
 
 template <typename X, template <class> class C_>
@@ -5562,7 +5609,7 @@ cl::Buffer Tensor<T, 0, C>::OpenCLEvaluateKernel(
   return buffers.back();
 }
 
-#endif
+#endif // defined _ENABLE_OPENCL
 
 /* ------------------------ Utility --------------------------- */
 
@@ -5581,16 +5628,14 @@ template <typename X, template <class> class C_>
 std::ostream &operator<<(std::ostream &os, const Tensor<X, 0, C_> &tensor)
 {
   os << (*tensor.ref_)[tensor.offset_];
-  return os;
-}
+  return os; }
 
 /* ------------------- Useful Functions ---------------------- */
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::copy() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, 0, 
-      std::make_shared<C<T>>(1, (*ref_)[offset_]));
+  return Tensor<T, 0, C>(nullptr, nullptr, 0, std::make_shared<C<T>>(1, (*ref_)[offset_]));
 }
 
 template <typename T, template <class> class C>
@@ -5608,11 +5653,13 @@ Tensor<T, 0, C>::Iterator::Iterator(Tensor<T, 1, C> const &tensor, size_t)
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Iterator::Iterator(Iterator const &it)
-  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Iterator::Iterator(Iterator &&it)
-  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::Iterator::operator*()
@@ -5673,11 +5720,13 @@ Tensor<T, 0, C>::ConstIterator::ConstIterator(Tensor<T, 1, C> const &tensor, siz
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator const &it)
-  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator &&it)
-  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> const Tensor<T, 0, C>::ConstIterator::operator*()
@@ -5740,11 +5789,13 @@ Tensor<T, 0, C>::ReverseIterator::ReverseIterator(Tensor<T, 1, C> const &tensor,
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator const &it)
-  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
-  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
+  : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) 
+{}
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator*()
@@ -5760,8 +5811,8 @@ Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator->()
 
 template <typename T, template <class> class C>
 typename Tensor<T, 0, C>::ReverseIterator Tensor<T, 0, C>::ReverseIterator::operator++(int)
-{
-  Tensor<T, 0, C>::ReverseIterator it {*this};
+{ 
+  auto it = Tensor<T, 0, C>::ReverseIterator{*this};
   ++(*this);
   return it;
 }
@@ -5776,7 +5827,7 @@ typename Tensor<T, 0, C>::ReverseIterator &Tensor<T, 0, C>::ReverseIterator::ope
 template <typename T, template <class> class C>
 typename Tensor<T, 0, C>::ReverseIterator Tensor<T, 0, C>::ReverseIterator::operator--(int)
 {
-  Tensor<T, 0, C>::ReverseIterator it {*this};
+  auto it = Tensor<T, 0, C>::ReverseIterator{*this};
   --(*this);
   return it;
 }
@@ -5792,15 +5843,18 @@ template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::ReverseIterator::operator==(
   typename Tensor<T, 0, C>::ReverseIterator const &it) const
 {
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_.get() != it.ref_.get()) 
+    return false;
   return offset_ == it.offset_;
 }
 
 /* ----------------- ConstReverseIterator ------------------- */
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(Tensor<T, 1, C> const &tensor, size_t)
-  : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
+Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(
+    Tensor<T, 1, C> const &tensor, 
+    size_t
+) : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {
   offset_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
 }
@@ -5826,30 +5880,34 @@ Tensor<T, 0, C> const Tensor<T, 0, C>::ConstReverseIterator::operator->()
 }
 
 template <typename T, template <class> class C>
-typename Tensor<T, 0, C>::ConstReverseIterator Tensor<T, 0, C>::ConstReverseIterator::operator++(int)
+typename Tensor<T, 0, C>::ConstReverseIterator 
+Tensor<T, 0, C>::ConstReverseIterator::operator++(int)
 {
-  Tensor<T, 0, C>::ConstReverseIterator it {*this};
+  auto it = Tensor<T, 0, C>::ConstReverseIterator{*this};
   ++(*this);
   return it;
 }
 
 template <typename T, template <class> class C>
-typename Tensor<T, 0, C>::ConstReverseIterator &Tensor<T, 0, C>::ConstReverseIterator::operator++()
+typename Tensor<T, 0, C>::ConstReverseIterator &
+Tensor<T, 0, C>::ConstReverseIterator::operator++()
 {
   offset_ -= stride_;
   return *this;
 }
 
 template <typename T, template <class> class C>
-typename Tensor<T, 0, C>::ConstReverseIterator Tensor<T, 0, C>::ConstReverseIterator::operator--(int)
+typename Tensor<T, 0, C>::ConstReverseIterator 
+Tensor<T, 0, C>::ConstReverseIterator::operator--(int)
 {
-  Tensor<T, 0, C>::ConstReverseIterator it {*this};
+  auto it = Tensor<T, 0, C>::ConstReverseIterator{*this};
   --(*this);
   return it;
 }
 
 template <typename T, template <class> class C>
-typename Tensor<T, 0, C>::ConstReverseIterator &Tensor<T, 0, C>::ConstReverseIterator::operator--()
+typename Tensor<T, 0, C>::ConstReverseIterator &
+Tensor<T, 0, C>::ConstReverseIterator::operator--()
 {
   offset_ += stride_;
   return *this;
@@ -5857,7 +5915,8 @@ typename Tensor<T, 0, C>::ConstReverseIterator &Tensor<T, 0, C>::ConstReverseIte
 
 template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
-  typename Tensor<T, 0, C>::ConstReverseIterator const &it) const
+    typename Tensor<T, 0, C>::ConstReverseIterator const &it
+) const
 {
   if (ref_.get() != it.ref_.get()) return false;
   return offset_ == it.offset_;
@@ -5881,7 +5940,7 @@ struct add {
 };
 
 template <typename T, typename... Args>
-inline T add::operator()(T const &arg1, Args const&... args) const
+T add::operator()(T const &arg1, Args const&... args) const
 {
   T result = arg1;
   VARDIAC_MAP(result += args);
@@ -5895,7 +5954,8 @@ std::string add::opencl_map(Args const&... args)
   // surround expression in brackets to give priority
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " + "));
-  // remove last " + "
+
+  // remove trailing " + "
   expr.pop_back();
   expr.pop_back();
   expr.pop_back();
@@ -5932,11 +5992,13 @@ std::string sub::opencl_map(Args const&... args)
   // surround expression in brackets to give priority
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " - "));
-  // remove last " - "
+
+  // remove trailing " - "
   expr.pop_back();
   expr.pop_back();
   expr.pop_back();
   expr += ")";
+
   return expr;
 }
 #endif
@@ -5970,11 +6032,13 @@ std::string mul::opencl_map(Args const&... args)
   // surround expression in brackets to give priority
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " * "));
-  // remove last " * "
+
+  // remove trailing " * "
   expr.pop_back();
   expr.pop_back();
   expr.pop_back();
   expr += ")";
+
   return expr;
 }
 #endif
@@ -6070,10 +6134,11 @@ struct min {
 
 #ifdef _ENABLE_OPENCL
 namespace opencl {
+
 template <typename NodeType>
-class Model {
-/*@opencl::Model*/ 
+class Model { /*@opencl::Model*/ 
 public:
+// FIXME -- Documentation
 
   /* -------------- Friends -------------- */
 
@@ -6111,8 +6176,8 @@ template <typename NodeType>
 Model<NodeType>::Model(Expression<NodeType> const &expr)
   : cqueue_(Info::v().context(), Info::v().device()), node_(expr.self())
 {
-  std::vector<cl::Buffer> buffers{};
-  std::string cl_arg_list{};
+  auto buffers = std::vector<cl::Buffer>{};
+  std::string cl_arg_list = "";
   std::string cl_expr = node_.OpenCLKernelCode(cqueue_, buffers, cl_arg_list);
   buffer_ = node_.OpenCLEvaluateKernel(cqueue_, buffers, cl_arg_list, cl_expr);
 }
@@ -6121,8 +6186,7 @@ template <typename NodeType>
 template <typename U>
 void Model<NodeType>::pFill(U *ptr, size_t num_elems) const
 {
-  cl_int err = cqueue_.enqueueReadBuffer(buffer_, CL_TRUE, 0, 
-      num_elems * sizeof(U), ptr);
+  cl_int err = cqueue_.enqueueReadBuffer(buffer_, CL_TRUE, 0, num_elems * sizeof(U), ptr);
   assert((err == CL_SUCCESS) && OPENCL_BUFFER_ERROR);
 }
 
@@ -6134,6 +6198,7 @@ void Model<NodeType>::pFill(U *ptr, size_t num_elems) const
 template <typename LHS, typename RHS>
 class BinaryAddExpr: public Expression<BinaryAddExpr<LHS, RHS>> { 
 /*@BinaryAddExpr<LHS, RHS>*/
+// FIXME -- Documentation
 public:
 
   /* ---------------- typedefs --------------- */
@@ -6192,11 +6257,13 @@ public:
 
   template <size_t... Slices, typename... Args>
   auto slice(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<LHS const>().slice(args...))>::type;
 
   template <size_t... Slices, size_t M>
   auto slice(Indices<M> const &indices) const
-    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<LHS const>().slice(indices))>::type;
 
   /* ---------------- OpenCL ----------------- */
 
@@ -6404,11 +6471,13 @@ public:
 
   template <size_t... Slices, typename... Args>
   auto slice(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(args...))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<LHS const>().slice(args...))>::type;
 
   template <size_t... Slices, size_t M>
   auto slice(Indices<M> const &indices) const
-    -> typename std::remove_reference<decltype(std::declval<LHS const>().slice(indices))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<LHS const>().slice(indices))>::type;
 
   /* ---------------- OpenCL ----------------- */
 
@@ -6581,7 +6650,10 @@ public:
     _mul(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
-  friend std::ostream &operator<<(std::ostream &os, BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul);
+  friend std::ostream &operator<<(
+      std::ostream &os, 
+      BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul
+  );
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6600,10 +6672,13 @@ public:
   /** Evaluate and return the resulting Tensor */
   return_t eval() const { return (*this)(); }
 
-  template <typename... Args, typename = 
-            typename std::enable_if<self_t::rank() != sizeof...(Args)>::type>
+  template <
+    typename... Args, 
+    typename = typename std::enable_if<self_t::rank() != sizeof...(Args)>::type
+  >
   auto operator()(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<return_t const>()(args...))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<return_t const>()(args...))>::type;
 
   template <typename... Args, typename = 
             typename std::enable_if<self_t::rank() == sizeof...(Args)>::type>
@@ -6611,12 +6686,14 @@ public:
 
   template <typename... Args>
   auto at(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<return_t const>().at(args...))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<return_t const>().at(args...))>::type;
   
   template <size_t M, typename = 
             typename std::enable_if<self_t::rank() != M>::type>
   auto operator[](Indices<M> const &indices) const
-    -> typename std::remove_reference<decltype(std::declval<return_t const>()[indices])>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<return_t const>()[indices])>::type;
 
   template <size_t M, typename = 
             typename std::enable_if<self_t::rank() == M>::type>
@@ -6624,11 +6701,13 @@ public:
 
   template <size_t... Slices, typename... Args>
   auto slice(Args... args) const
-    -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<return_t const>().slice(args...))>::type;
 
   template <size_t... Slices, size_t M>
   auto slice(Indices<M> const &indices) const
-    -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type;
+    -> typename std::remove_reference<decltype(
+        std::declval<return_t const>().slice(indices))>::type;
 
   /* --------------------------- OpenCL ----------------------------- */
 
@@ -6660,23 +6739,57 @@ private:
 
   // Accepts the slice sequences and forwards to `mul()`. Ideally, this
   // would be a lambda in `slice()` but C++11 has no support for templated lambdas 
-  template <size_t... Slices1, size_t... Slices2, typename... Args, typename =
-            typename std::enable_if<self_t::rank() != sizeof...(Args)>::type>
-  auto pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Args... args) const 
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type;
+  template <
+    size_t... Slices1, 
+    size_t... Slices2, 
+    typename... Args, 
+    typename = typename std::enable_if<self_t::rank() != sizeof...(Args)>::type
+  >
+  auto pSliceSequences(
+      meta::Sequence<Slices1...>, 
+      meta::Sequence<Slices2...>, 
+      Args... args
+  ) const 
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().slice(args...))>::type;
 
-  template <size_t... Slices1, size_t... Slices2, typename... Args, typename =
-            typename std::enable_if<self_t::rank() == sizeof...(Args)>::type>
-  value_t pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Args... args) const;
+  template <
+    size_t... Slices1, 
+    size_t... Slices2, 
+    typename... Args, 
+    typename = typename std::enable_if<self_t::rank() == sizeof...(Args)>::type
+  >
+  value_t pSliceSequences(
+      meta::Sequence<Slices1...>, 
+      meta::Sequence<Slices2...>, 
+      Args... args
+  ) const;
 
-  template <size_t... Slices1, size_t... Slices2, size_t M, typename = 
-            typename std::enable_if<self_t::rank() != M>::type>
-  auto pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type;
+  template <
+    size_t... Slices1, 
+    size_t... Slices2, 
+    size_t M, 
+    typename = typename std::enable_if<self_t::rank() != M>::type
+  >
+  auto pSliceSequences(
+      meta::Sequence<Slices1...>, 
+      meta::Sequence<Slices2...>, 
+      Indices<M> const &indices
+  ) const
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().slice(indices))>::type;
 
-  template <size_t... Slices1, size_t... Slices2, size_t M, typename = 
-            typename std::enable_if<self_t::rank() == M>::type>
-  value_t pSliceSequences(meta::Sequence<Slices1...>, meta::Sequence<Slices2...>, Indices<M> const &indices) const;
+  template <
+    size_t... Slices1, 
+    size_t... Slices2, 
+    size_t M, 
+    typename = typename std::enable_if<self_t::rank() == M>::type
+  >
+  value_t pSliceSequences(
+      meta::Sequence<Slices1...>, 
+      meta::Sequence<Slices2...>, 
+      Indices<M> const &indices
+  ) const;
 
   /* ------------------ Data ------------------ */
 
@@ -6698,7 +6811,10 @@ BinaryMulExpr<I1, I2, LHS, RHS>::BinaryMulExpr(LHS const &lhs, RHS const &rhs)
 
   // shape <- lhs.shape[:~I1] ++ rhs.shape[:~I2]
   details::FillExceptForIndex<I1>(lhs.shape().dimensions_, shape_.dimensions_);
-  details::FillExceptForIndex<I2>(rhs.shape().dimensions_, shape_.dimensions_ + LHS::rank() - 1);
+  details::FillExceptForIndex<I2>(
+      rhs.shape().dimensions_, 
+      shape_.dimensions_ + LHS::rank() - 1
+  );
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
@@ -6741,7 +6857,8 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <typename... Args>
 auto BinaryMulExpr<I1, I2, LHS, RHS>::at(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().at(args...))>::type
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().at(args...))>::type
 {
   static_assert(rank() >= sizeof...(Args), RANK_OUT_OF_BOUNDS);
   constexpr size_t left = meta::Min(LHS::rank() - 1, sizeof...(args));
@@ -6792,7 +6909,8 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices, typename... Args>
 auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().slice(args...))>::type
 {
   using namespace meta; // WARNING -- using namespace
   static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
@@ -6802,39 +6920,50 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Args... args) const
   constexpr size_t lhs_count = lhs_left_count + lhs_right_count;
 
   auto lhs_left_sequence = typename MakeLeftSequence<lhs_left_count, Slices...>::sequence{};
-  auto lhs_right_sequence = typename LeftSequence<lhs_right_count, typename MakeRightSequence<
-                    lhs_left_count, Slices...>::sequence>::sequence{};
 
-  auto lhs_sequence = typename Concatenate<typename AppendEnd<I1, decltype(lhs_left_sequence)>::sequence,
-                      typename SequenceTransformer<decltype(lhs_right_sequence), SequencePositiveOffset,
-                      1>::sequence>::sequence{};
+  auto lhs_right_sequence = typename LeftSequence<lhs_right_count, 
+       typename MakeRightSequence<lhs_left_count, Slices...>::sequence>::sequence{};
 
-  auto rhs_raw_sequence = typename SequenceTransformer<typename 
-                          MakeRightSequence<lhs_count, Slices...>::sequence, SequenceNegativeOffset,
-                          Max(LHS::rank(), 2) - 2>::sequence{};
+  auto lhs_sequence = typename Concatenate<
+    typename AppendEnd<I1, 
+    decltype(lhs_left_sequence)>::sequence, 
+    typename SequenceTransformer<decltype(lhs_right_sequence), 
+    SequencePositiveOffset, 1>::sequence
+  >::sequence{};
 
-  constexpr size_t rhs_left_count = CountLTMaxSequence<I2 + 1, decltype(rhs_raw_sequence)>::value;
+  auto rhs_raw_sequence = typename SequenceTransformer<
+    typename MakeRightSequence<lhs_count, Slices...>::sequence, 
+    SequenceNegativeOffset, Max(LHS::rank(), 2) - 2
+  >::sequence{};
 
-  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
-  auto rhs_right_sequence = typename RightSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+  constexpr size_t rhs_left_count = CountLTMaxSequence<I2 + 1, 
+        decltype(rhs_raw_sequence)>::value;
 
-  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, typename SequenceTransformer<
-                      decltype(rhs_left_sequence), SequenceNegativeOffset, 1>::sequence>::sequence,
-                      decltype(rhs_right_sequence)>::sequence{};
+  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, 
+       decltype(rhs_raw_sequence)>::sequence{};
 
-  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
+  auto rhs_right_sequence = typename RightSequence<rhs_left_count, 
+       decltype(rhs_raw_sequence)>::sequence{};
+
+  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, 
+       typename SequenceTransformer<decltype(rhs_left_sequence), 
+           SequenceNegativeOffset, 1>::sequence>::sequence, decltype(
+               rhs_right_sequence)>::sequence{};
+
+  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == 
+      sizeof...(Slices) + 2, PANIC_ASSERTION);
+
   return pSliceSequences(lhs_sequence, rhs_sequence, args...);
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices, size_t M>
 auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(indices))>::type
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().slice(indices))>::type
 {
   using namespace meta; // WARNING -- using namespace
   static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
-  //static_assert(ContainsIndex<I1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
-  //static_assert(ContainsIndex<I2 + LHS::rank() - 1, Slices...>::value, SLICING_MULTIPLICATION_AXIS);
 
   constexpr size_t lhs_left_count = CountLTMax<I1, Slices...>::value;
   constexpr size_t lhs_right_count = CountInBetween<I1, LHS::rank() - 1, Slices...>::value;
@@ -6844,29 +6973,38 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
   auto lhs_right_sequence = typename LeftSequence<lhs_right_count, typename MakeRightSequence<
                     lhs_left_count, Slices...>::sequence>::sequence{};
 
-  auto lhs_sequence = typename Concatenate<typename AppendEnd<I1, decltype(lhs_left_sequence)>::sequence,
-                      typename SequenceTransformer<decltype(lhs_right_sequence), SequencePositiveOffset,
-                      1>::sequence>::sequence{};
+  auto lhs_sequence = typename Concatenate<typename AppendEnd<I1, decltype(
+      lhs_left_sequence)>::sequence, typename SequenceTransformer<decltype(
+        lhs_right_sequence), SequencePositiveOffset, 1>::sequence>::sequence{};
 
-  auto rhs_raw_sequence = typename SequenceTransformer<typename 
-                          MakeRightSequence<lhs_count, Slices...>::sequence, SequenceNegativeOffset,
-                          Max(LHS::rank(), 2) - 2>::sequence{};
+  auto rhs_raw_sequence = typename SequenceTransformer<typename MakeRightSequence<
+      lhs_count, Slices...>::sequence, SequenceNegativeOffset, Max(
+          LHS::rank(), 2) - 2>::sequence{};
 
   constexpr size_t rhs_left_count = CountLTMaxSequence<I2, decltype(rhs_raw_sequence)>::value;
 
-  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
-  auto rhs_right_sequence = typename RightSequence<rhs_left_count, decltype(rhs_raw_sequence)>::sequence{};
+  auto rhs_left_sequence = typename LeftSequence<rhs_left_count, decltype(
+      rhs_raw_sequence)>::sequence{};
 
-  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, typename SequenceTransformer<
-                      decltype(rhs_left_sequence), SequenceNegativeOffset, 1>::sequence>::sequence,
-                      decltype(rhs_right_sequence)>::sequence{};
+  auto rhs_right_sequence = typename RightSequence<rhs_left_count, decltype(
+      rhs_raw_sequence)>::sequence{};
 
-  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size == sizeof...(Slices) + 2, PANIC_ASSERTION);
+  auto rhs_sequence = typename Concatenate<typename AppendEnd<I2, 
+      typename SequenceTransformer< decltype(rhs_left_sequence), 
+          SequenceNegativeOffset, 1>::sequence>::sequence, decltype(
+              rhs_right_sequence)>::sequence{};
+
+  static_assert(decltype(lhs_sequence)::size + decltype(rhs_sequence)::size 
+      == sizeof...(Slices) + 2, PANIC_ASSERTION);
+
   return pSliceSequences(lhs_sequence, rhs_sequence, indices);
 }
 
 template <typename LHS, typename RHS>
-BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS> operator*(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
+BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS> operator*(
+    Expression<LHS> const &lhs, 
+    Expression<RHS> const &rhs
+)
 {
   return BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS>(lhs.self(), rhs.self());
 }
@@ -6881,9 +7019,13 @@ BinaryMulExpr<I1, I2, LHS, RHS> _mul(Expression<LHS> const &lhs, Expression<RHS>
 
 /** `os` recieves BinaryMulExpr<`I1_`, `I2_`>(`lhs_`, `rhs_`) */ 
 template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
-std::ostream &operator<<(std::ostream &os, BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul)
+std::ostream &operator<<(
+    std::ostream &os, 
+    BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul
+)
 {
-  os << "BinaryMulExpr<" << I1_ << ", " << I2_ << ">(" << binary_mul.lhs_ << ", " << binary_mul.rhs_ << ")";
+  os << "BinaryMulExpr<" << I1_ << ", " << I2_ << ">(" 
+      << binary_mul.lhs_ << ", " << binary_mul.rhs_ << ")";
   return os;
 }
 
@@ -6893,11 +7035,16 @@ template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, typename... Args, typename>
 auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
     meta::Sequence<Slices2...>, Args... args) const 
-  -> typename std::remove_reference<decltype(std::declval<return_t const>().slice(args...))>::type
+  -> typename std::remove_reference<decltype(
+      std::declval<return_t const>().slice(args...))>::type
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), sizeof...(args));
-  constexpr size_t right = meta::NonZeroDifference(sizeof...(args), LHS::rank() - sizeof...(Slices1));
+  constexpr size_t right = meta::NonZeroDifference(
+      sizeof...(args), 
+      LHS::rank() - sizeof...(Slices1)
+  );
   meta::FillArgs<left, right + left> seperate(args...);
+
   return lhs_.template slice<Slices1...>(Indices<left>(seperate.array1.data())) *
           rhs_.template slice<Slices2...>(Indices<right>(seperate.array2.data()));
 }

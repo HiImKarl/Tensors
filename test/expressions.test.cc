@@ -1,8 +1,7 @@
-#include <tensor.hh>
-#include <catch.hh>
 #include "test.hh"
 
 using namespace tensor;
+using namespace std;
 
 template <template <class> class C>
 void RawExpressionTests() {

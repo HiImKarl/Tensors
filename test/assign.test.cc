@@ -1,5 +1,4 @@
-#include <tensor.hh>
-#include <catch.hh>
+#include <vector>
 #include "test.hh"
 
 using namespace tensor;
@@ -315,6 +314,24 @@ void ScalarAssignmentTest() {
   } 
 }
 
+template <template <class> class Container>
+void RangeAssignmentTest()
+{
+  auto tensor_1 = Tensor<int32_t, 4, Container>({2, 3, 2, 3}, 0); 
+
+  SECTION("Fill Tensor Method") {
+    auto vec = vector<int32_t>(2 * 3 * 2 * 3, 1);
+    tensor_1.Fill(vec.begin(), vec.end());
+    Map([](int32_t x) { REQUIRE(x == 1); }, tensor_1);
+  }
+
+  SECTION("Fill Method") {
+    auto vec = vector<int32_t>(2 * 3 * 2 * 3, -1);
+    Fill(tensor_1, vec.begin(), vec.end());
+    Map([](int32_t x) { REQUIRE(x == -1); }, tensor_1);
+  }
+}
+
 TEST_CASE("Tensor Assignment") {
   TensorAssignmentTest<data::Array>();  
   TensorAssignmentTest<data::HashMap>();  
@@ -323,4 +340,9 @@ TEST_CASE("Tensor Assignment") {
 TEST_CASE("Scalar Assignment") {
   ScalarAssignmentTest<data::Array>();  
   ScalarAssignmentTest<data::HashMap>();  
+}
+
+TEST_CASE("Range Assignment") {
+  RangeAssignmentTest<data::Array>();
+  RangeAssignmentTest<data::HashMap>();
 }

@@ -1,7 +1,3 @@
-include_directories(
-    ${PROJECT_SOURCE_DIR}/external
-    ${PROJECT_SOURCE_DIR}/include
-    )
 
 file(GLOB TEST_CC *.test.cc)
 if ((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang")) 
@@ -17,12 +13,12 @@ foreach(ONE_TEST_CC ${TEST_CC})
     set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME ${ONE_TEST_EXEC}) 
 endforeach()
 
-add_executable(tests ${TEST_CC} test.cc) 
-target_compile_definitions (tests PUBLIC _TEST=1)
+add_executable(test_all ${TEST_CC} test.cc test.hh) 
+target_compile_definitions(test_all PUBLIC _TEST=1)
 
 if (OpenCL_FOUND)
-  target_link_libraries (tests ${OpenCL_LIBRARY})
-  target_compile_definitions (tests PUBLIC _ENABLE_OPENCL=1)
+  target_link_libraries(test_all ${OpenCL_LIBRARY})
+  target_compile_definitions(test_all PUBLIC _ENABLE_OPENCL=1)
 endif()
 
 

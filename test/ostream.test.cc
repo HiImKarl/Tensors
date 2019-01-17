@@ -1,7 +1,4 @@
-#include <tensor.hh>
-#include <catch.hh>
 #include <regex>
-#include <iostream>
 #include <sstream>
 #include "test.hh"
 
