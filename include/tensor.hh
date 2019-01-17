@@ -29,7 +29,9 @@
 #pragma GCC diagnostic ignored "-Wmissing-braces"
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
+
 #include <CL/cl2.hpp>
+
 #if (defined __GNUC__)
 #pragma GCC diagnostic pop
 #endif
@@ -140,7 +142,7 @@ extern int eDebugConstructorCounter;
 #define OPENCL_KERNEL_ERROR \
   "OpenCL -- Kernel Error"
 #define OPENCL_ARITY_ERROR \
-  "OpenCL -- Number of arguments given to OpenCL function is incorrect"
+  "OpenCL -- Number of arguments provided to OpenCL function is incorrect"
 #define OPENCL_REDUCTION_SIZE_ERROR \
   "OpenCL -- OpenCL reduction can only take one argument"
 
@@ -151,7 +153,7 @@ extern int eDebugConstructorCounter;
 
 /* -------------------- Macros ------------------- */
 
-// MSVC parses {} as an initializer_list
+// MSVC prioritizes parsing {} as an initializer_list
 #ifdef _MSC_VER
 #define VARDIAC_MAP(EXPR) \
   (void)std::initializer_list<int>{(EXPR, 0)...};
@@ -223,9 +225,7 @@ using SparseScalar = Tensor<T, 0, data::HashMap>;
 template <typename T>
 struct IsNonCVRefTensor: std::false_type {};
 
-/** Tensor specialization of IsNonCVRefTensor, boolean enum 
- * `value` is true
- */
+/** Tensor specialization of IsNonCVRefTensor, boolean enum `value` is true */
 template <typename T, size_t N, template <class> class C>
 struct IsNonCVRefTensor<Tensor<T, N, C>>: std::true_type {};
 
@@ -243,9 +243,7 @@ struct IsTensor {
 template <typename T>
 struct IsNonCVRefScalarTensor { static bool const value = true; };
 
-/** Scalar specialization of IsScalar, Boolean member 
- * `value` is true
- */
+/** Scalar specialization of IsScalar, Boolean member `value` is true */
 template <typename T, template <class> class C>
 struct IsNonCVRefScalarTensor<Tensor<T, 0, C>> { static bool const value = true; };
 
@@ -661,9 +659,7 @@ struct SequenceNegativeOffset<Offset, Index, I...> {
  *  element subtracted by `offset`. Base case.
  */
 template <size_t Offset>
-struct SequenceNegativeOffset<Offset> {
-    using sequence = Sequence<>;
-};
+struct SequenceNegativeOffset<Offset> { using sequence = Sequence<>; };
 
 /** provides typedef `sequence` which is a sequence with each 
  *  element added by `offset`. Recursive case.
@@ -678,9 +674,7 @@ struct SequencePositiveOffset<Offset, Index, I...> {
  *  element added by `offset`. Base case.
  */
 template <size_t Offset>
-struct SequencePositiveOffset<Offset> {
-    using sequence = Sequence<>;
-};
+struct SequencePositiveOffset<Offset> { using sequence = Sequence<>; };
 
 /** Provides typedef `sequence` which is 
  *  `sequence` transformed with `transformer` 
@@ -692,15 +686,11 @@ struct SequenceTransformer<Sequence<I...>, Transformer, Initial...> {
 
 /** Extends `Sequence<I...>` by placing `Index` in front */
 template <size_t Index, size_t... I> 
-struct Append<Index, Sequence<I...>> {
-  using sequence = Sequence<Index, I...>;
-};
+struct Append<Index, Sequence<I...>> { using sequence = Sequence<Index, I...>; };
 
 /** Extends `Sequence<I...>` by placing `Index` at the end */
 template <size_t Index, size_t... I> 
-struct AppendEnd<Index, Sequence<I...>> {
-  using sequence = Sequence<I..., Index>;
-};
+struct AppendEnd<Index, Sequence<I...>> { using sequence = Sequence<I..., Index>; };
 
 /** Concatenates `Sequence1` and `Sequence2` together */
 template <size_t... I1, size_t... I2>
@@ -712,14 +702,12 @@ struct Concatenate<Sequence<I1...>, Sequence<I2...>> {
 template <size_t Index, size_t N>
 struct MakeIndexSequence {
   using sequence = typename Append<Index, 
-                   typename MakeIndexSequence<Index + 1, N>::sequence>::sequence;
+        typename MakeIndexSequence<Index + 1, N>::sequence>::sequence;
 };
 
 /** Creates a `Sequence<I...>` where `I...` is the natural numbers up to `N`  */
 template <size_t N>
-struct MakeIndexSequence<N, N> {
-  using sequence = Sequence<>;
-};
+struct MakeIndexSequence<N, N> { using sequence = Sequence<>; };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
  *  `X...` are the first `ThreshHold` elements of `I...` 
@@ -789,7 +777,8 @@ struct MakeRightSequence<ThreshHold, Index, I...> {
  */
 template <size_t Index, size_t... I>
 struct MakeRightSequence<0, Index, I...> {
-    using sequence = typename Append<Index, typename MakeRightSequence<0, I...>::sequence>::sequence;
+    using sequence = typename Append<Index, 
+          typename MakeRightSequence<0, I...>::sequence>::sequence;
 };
 
 /** Typedef `sequence` is a `Sequence<X...>` where 
@@ -864,8 +853,8 @@ struct AreExpressions;
 
 template <typename Arg, typename... Args>
 struct AreExpressions<Arg, Args...> {
-  enum: bool { value = (IsExpression<Arg>::value || IsTensor<Arg>::value)
-            && AreExpressions<Args...>::value }; 
+  enum: bool { value = (IsExpression<Arg>::value || IsTensor<Arg>::value) 
+          && AreExpressions<Args...>::value }; 
 };
 
 template <>
@@ -1108,9 +1097,10 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, 
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
       X value {};
       for (size_t x = 0; x < tensor_1.shape_.dimensions_[I1]; ++x)
-          value += (*tensor_1.ref_)[tensor_1.offset_ + t1_indices[0] + tensor_1.strides_[I1] * x] *
-            (*tensor_2.ref_)[tensor_2.offset_ + t2_indices[0] + tensor_2.strides_[I2] * x];
-      (*prod_tensor.ref_)[index] = value;
+          value += tensor_1.ref_[tensor_1.offset_ + t1_indices[0] 
+            + tensor_1.strides_[I1] * x] * tensor_2.ref_[tensor_2.offset_ 
+            + t2_indices[0] + tensor_2.strides_[I2] * x];
+      prod_tensor.ref_[index] = value;
       details::UpdateIndices(reference_indices_2, t2_shape, t2_indices, t2_strides_array);
       ++index;
     }
@@ -1310,7 +1300,7 @@ struct OpenCLType<float> { constexpr static char const *value = cFloatType; };
  *  evaluating `expr`, an OpenCL expression.
  */
 template <typename T>
-cl::Buffer EvaluateBasicKernel(
+cl::Buffer evaluate_basic_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string const &arg_list, 
@@ -1349,18 +1339,18 @@ cl::Buffer EvaluateBasicKernel(
 
 /** Given a Tensor Expression node, create its output buffer */
 template <typename NodeType>
-cl::Buffer CreateBuffer(NodeType const& node)
+cl::Buffer create_buffer(NodeType const& node)
 {
   cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
   auto buffers = std::vector<cl::Buffer>{};
   auto cl_arg_list = std::string{};
-  auto cl_expr = node.OpenCLKernelCode(cqueue, buffers, cl_arg_list);
-  return node.OpenCLEvaluateKernel(cqueue, buffers, cl_arg_list, cl_expr);
+  auto cl_expr = node.opencl_kernel_code(cqueue, buffers, cl_arg_list);
+  return node.opencl_evaluate_kernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
 /** Returns the OpenCL code, as std::string, for a reduction kernel with one input  */
 template <typename ReturnType, typename Function> 
-std::string CreateReductionKernelCode()
+std::string create_reduction_kernel_code()
 {
   // The kernel's 1st argument is the input buffer, and the 2nd argument a local buffer,
   // 3rd argument is an output buffer which stores the result of the reduction,
@@ -1403,7 +1393,7 @@ std::string CreateReductionKernelCode()
 
 /** Returns the OpenCL code, as std::string, for an offset kernel */
 template <typename ReturnType, typename Function> 
-std::string CreateOffsetKernelCode()
+std::string create_offset_kernel_code()
 {
   // The kernel's 1st argument is the input buffer, containing one element,
   // and the second argument is the initial value
@@ -1423,11 +1413,15 @@ std::string CreateOffsetKernelCode()
 }
 
 template <typename ReturnType, typename Function> 
-cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue, 
-    cl::Buffer const &buffer, size_t cumul, ReturnType const &initial_value)
+cl::Buffer create_reduction_kernel(
+    cl::CommandQueue &cqueue, 
+    cl::Buffer const &buffer, 
+    size_t cumul, 
+    ReturnType const &initial_value
+)
 {
   // Create the code for the reduction kernel
-  std::string kernel_code = CreateReductionKernelCode<ReturnType, Function>();
+  std::string kernel_code = create_reduction_kernel_code<ReturnType, Function>();
   cl_int err = 0;
 
   // Join output buffer, which is used as the reduction output buffer as well
@@ -1472,8 +1466,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
       assert((err == CL_SUCCESS) && PANIC_ASSERTION);
     }
 
-    // Reduction of the work group that does not fit the kernel workgroup size,
-    // if it exists
+    // Reduction of the work group that does not fit the kernel workgroup size, if it exists
     if (last_group_size) {
       kernel.setArg(1, sizeof(ReturnType) * last_group_size, nullptr);
       kernel.setArg(3, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
@@ -1488,7 +1481,7 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
   } while (total_num_work_groups != 1);
 
   // Transform, depending on the function, the reduced value with the specified initial value
-  kernel_code = CreateOffsetKernelCode<ReturnType, Function>();
+  kernel_code = create_offset_kernel_code<ReturnType, Function>();
 
   // Recompile the program
   program = cl::Program(Info::v().context(), { kernel_code });
@@ -1508,7 +1501,10 @@ cl::Buffer CreateReductionKernel(cl::CommandQueue &cqueue,
 }
 
 template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
-std::string CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape)
+std::string create_multiplication_kernel_code(
+    Shape<M1> const &lhs_shape, 
+    Shape<M2> const &rhs_shape
+)
 {
   // initialize contiguous strides
   size_t lhs_strides[M1];
@@ -1623,15 +1619,20 @@ std::string CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2>
 }
 
 template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
-cl::Buffer CreateMultiplicationKernel(cl::CommandQueue &cqueue, cl::Buffer &lhs_buffer, 
-    cl::Buffer &rhs_buffer, Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape)
+cl::Buffer create_multiplication_kernel(
+    cl::CommandQueue &cqueue, 
+    cl::Buffer &lhs_buffer, 
+    cl::Buffer &rhs_buffer, 
+    Shape<M1> const &lhs_shape, 
+    Shape<M2> const &rhs_shape
+)
 {
   // total number of elements
   size_t lhs_cumul = lhs_shape.index_product();
   size_t rhs_cumul = rhs_shape.index_product();
   size_t output_cumul = lhs_cumul / lhs_shape[I1] * rhs_cumul / rhs_shape[I2];
 
-  std::string kernel_code = CreateMultiplicationKernelCode<I1, I2, LHSType, RHSType>(
+  std::string kernel_code = create_multiplication_kernel_code<I1, I2, LHSType, RHSType>(
       lhs_shape, rhs_shape);
 
   cl_int status = 0;
@@ -1671,17 +1672,27 @@ namespace data {
 
 template <typename T>
 class Array { /*@data::Array<T>*/
-/** Data container that allocates data in a single contiguous
- *  array. Indexing and iterating is very fast, but resizing
- *  any dimension will require reallocating and copying the 
- *  the entire array.
+/** Shared data container (using std::shared_ptr) that allocates data in a single contiguous
+ *  array. Indexing and iterating is very fast, but resizing any dimension will 
+ *  require reallocating and copying the the entire array. 
+ *  Access to data is *not* atomic.
  */
 public:
+
+  Array() = default;
 
   /** Allocates an array of size `capacity`, with `operator new[]`. 
    *  Initializes every element to `T{}`, 
    */
   explicit Array(size_t capacity);
+
+  /** Copy constructor -- copies the underlying shared_ptr */
+  Array(Array const &a) = default;
+  Array &operator=(Array const &a) = default;
+
+  /** Move constructor -- moves the underlying std::shared_ptr */
+  Array(Array &&a) = default;
+  Array &operator=(Array &&a) = default;
 
   /** Allocates an array of size `capacity`, with `operator new[]`. 
    *  Initialize every element to `value`, 
@@ -1696,67 +1707,90 @@ public:
   Array(size_t capacity, It const &first, It const &end);
 
   /** Takes direct ownership of `data` */
-  Array(size_t, T *data): data_(data) {}
+  Array(size_t, T *data): data_(data, [](T *p) { delete[] p; }) {}
 
   /** Constructs an element at `index` with `value`. Must perform 
    *  correct forwarding. `index` must be less than capacity.
    */
   template <typename U>
-  void Set(size_t index, U&& value) { data_[index] = std::forward<U>(value); }
-
-  /** Calls `operator delete[]` on the underlying data */
-  ~Array();
+  void Set(size_t index, U&& value) { data_.get()[index] = std::forward<U>(value); }
 
   /** Reference to the element at `index` offset of the 
    *  underlying array. `index` must be less than `capacity`.
    */
-  T &operator[](size_t index) { return data_[index]; };
+  T &operator[](size_t index) { return data_.get()[index]; };
 
   /** Const-reference to the element at `index` offset of the 
    *  underlying array. `index` must be less than `capacity`.
    */
-  T const &operator[](size_t index) const { return data_[index]; }
+  T const &operator[](size_t index) const { return data_.get()[index]; }
+
+  /** Compares the underlying pointers */
+  template <typename T_>
+  friend bool operator==(Array<T_> const &x, Array<T_> const &y);
+
+  /** Compares the underlying pointers */
+  template <typename T_>
+  friend bool operator!=(Array<T_> const &x, Array<T_> const &y);
 
 private:
-  T *data_; /**< Contiguously allocated array of `T` */
+  std::shared_ptr<T> data_; /**< Contiguously allocated array of `T` */
 };
 
 template <typename T>
 Array<T>::Array(size_t capacity)
-  : data_(new T[capacity]()) {}
+  : data_(new T[capacity](), [](T *p) { delete[] p; }) {}
 
 template <typename T>
 Array<T>::Array(size_t capacity, T const &value)
-  : data_(new T[capacity]())
+  : data_(new T[capacity](), [](T *p) { delete[] p; })
 {
-  std::fill(data_, data_ + capacity, value);
+  std::fill(data_.get(), data_.get() + capacity, value);
 }
 
 template <typename T>
 template <typename It>
 Array<T>::Array(size_t capacity, It const &first, It const &end)
-  : data_(new T[capacity]())
+  : data_(new T[capacity](), [](T *p) { delete[] p; })
 {
-  std::copy(first, end, data_);
+  std::copy(first, end, data_.get());
 }
 
-template <typename T>
-Array<T>::~Array() 
-{
-  delete[] data_;
+/** Compares the underlying pointers */
+template <typename T_>
+bool operator==(Array<T_> const &x, Array<T_> const &y) 
+{ 
+  return x.data_ == y.data_; 
+}
+
+/** Compares the underlying pointers */
+template <typename T_>
+bool operator!=(Array<T_> const &x, Array<T_> const &y) 
+{ 
+  return x.data_ != y.data_; 
 }
 
 template <typename T>
 class HashMap { /*@data::HashMap<T>*/
-/** Data container that allocates data in a hash map 
- *  (STL unordered_map). The map only stores non-zero 
- *  entries (configurable zero-entry). Memory efficiency 
- *  for sparse tensors is good, but quickly degrades 
- *  as density increases. Index and iterating is fast,
- *  O(1), but resizing will require destroying and 
- *  rehashing larger dimensions.
+/** Shared data container (std::shared_ptr) that allocates data in a hash map 
+ *  (STL unordered_map). The map only stores non-zero entries (configurable zero-entry). 
+ *  Memory efficiency for sparse tensors is good, but quickly degrades as density increases.
+ *  Index and iterating is fast, O(1), but resizing will require destroying and 
+ *  rehashing larger dimensions. Access to data is *not* atomic.
  */
 public:
+
+  typedef std::unordered_map<size_t, T> container_t;
+
+  HashMap() = default;
+
+  /** Copy constructor -- copies the STL shared_ptr */
+  HashMap(HashMap const &hash_map) = default;
+  HashMap &operator=(HashMap const &hash_map) = default;
+
+  /** Move constructor -- move the STL shared_ptr */
+  HashMap(HashMap &&hash_map) = default;
+  HashMap &operator=(HashMap &&hash_map) = default;
 
   /** Creates a HashMap with initial capacity `capacity`,
    *  and sets the zero-element `T{}`.
@@ -1800,31 +1834,36 @@ public:
    */
   T const &operator[](size_t index) const;
 
+  template <typename T_>
+  friend bool operator==(HashMap<T_> const &x, HashMap<T_> const &y);
+
+  template <typename T_>
+  friend bool operator!=(HashMap<T_> const &x, HashMap<T_> const &y);
+
 private:
-  std::unordered_map<size_t, T> data_; /**< underlying STL hash map */
+  std::shared_ptr<container_t> data_; /**< underlying STL hash map */
   T zero_elem_; /**< zero element that isn't allocated in the map */
 };
 
 template <typename T>
 HashMap<T>::HashMap(size_t)
-  : data_({}), zero_elem_(T{})
+  : data_(std::make_shared<container_t>()), zero_elem_(T{})
 {}
 
 template <typename T>
 HashMap<T>::HashMap(size_t, T const &value)
-  : data_({}), zero_elem_(value)
+  : data_(std::make_shared<container_t>()), zero_elem_(value)
 {}
 
 template <typename T>
 template <typename It>
 HashMap<T>::HashMap(size_t capacity, It const &first, It const &end)
-  : data_({}), zero_elem_(T{})
+  : data_(std::make_shared<container_t>()), zero_elem_(T{})
 {
   assert((long)capacity == std::distance(first, end) && PANIC_ASSERTION);
-  (void)capacity;
   size_t index = 0;
   for (auto it = first; it != end; ++it) {
-    if (*it != zero_elem_) data_.insert({index, *it});
+    if (*it != zero_elem_) data_->insert({index, *it});
     ++index;
   }
 } 
@@ -1840,24 +1879,38 @@ template <typename T>
 template <typename U>
 void HashMap<T>::Set(size_t index, U&& value)
 {
-  if (value == zero_elem_) data_.erase(index);
-  else data_[index] = std::forward<U>(value);
+  if (value == zero_elem_) data_->erase(index);
+  else (*data_)[index] = std::forward<U>(value);
 }
 
 template <typename T>
 T &HashMap<T>::operator[](size_t index)
 {
-  auto it = data_.find(index);
-  if (it != data_.end()) return it->second;
-  return (data_[index] = zero_elem_);
+  auto it = data_->find(index);
+  if (it != data_->end()) return it->second;
+  return ((*data_)[index] = zero_elem_);
 }
 
 template <typename T>
 T const &HashMap<T>::operator[](size_t index) const
 {
-  auto it = data_.find(index);
-  if (it != data_.end()) return it->second;
+  auto it = data_->find(index);
+  if (it != data_->end()) return it->second;
   return zero_elem_;
+}
+
+/** Compares the underlying pointers */
+template <typename T_>
+bool operator==(HashMap<T_> const &x, HashMap<T_> const &y) 
+{ 
+  return x.data_ == y.data_; 
+}
+
+/** Compares the underlying jointers */
+template <typename T_>
+bool operator!=(HashMap<T_> const &x, HashMap<T_> const &y) 
+{ 
+  return x.data_ != y.data_; 
 }
 
 } // namespace data
@@ -1940,7 +1993,10 @@ public:
 
 #ifdef _ENABLE_OPENCL
   template <size_t I1, size_t I2, typename LHSType, typename RHSType, size_t M1, size_t M2>
-  friend std::string opencl::details::CreateMultiplicationKernelCode(Shape<M1> const &lhs_shape, Shape<M2> const &rhs_shape);
+  friend std::string opencl::details::create_multiplication_kernel_code(
+      Shape<M1> const &lhs_shape, 
+      Shape<M2> const &rhs_shape
+  );
 #endif
 
   /* ------------------ Constructors ------------------ */
@@ -2588,13 +2644,13 @@ public:
    *  and adds it to `buffers`, adds its value to `arg_list`, 
    *  and returns a string that represents a single element
    */
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(cl::CommandQueue &cqueue, 
+  cl::Buffer opencl_evaluate_kernel(cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, std::string &arg_list,
       std::string &expr) const noexcept;
 #endif
@@ -2660,7 +2716,7 @@ public:
     Shape<N> shape_; // Data describing the underlying tensor 
     size_t strides_[N];
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
     size_t stride_; // Step size of the underlying data pointer per increment
   };
 
@@ -2693,17 +2749,13 @@ public:
   private:
     ConstIterator(Tensor<T, N + 1, C> const &tensor, size_t index);
 
-    /**
-     * Data describing the underlying tensor
-     */
+    // Data describing the underlying tensor
     Shape<N> shape_;
     size_t strides_[N];
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
 
-    /**
-     * Step size of the underlying data pointer per increment
-     */
+    // Step size of the underlying data pointer per increment 
     size_t stride_;
   };
 
@@ -2736,17 +2788,13 @@ public:
   private:
     ReverseIterator (Tensor<T, N + 1, C> const &tensor, size_t index);
 
-    /**
-     * Data describing the underlying tensor
-     */
+    // Data describing the underlying tensor 
     Shape<N> shape_;
     size_t strides_[N];
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
 
-    /**
-     * Step size of the underlying data pointer per increment
-     */
+    // Step size of the underlying data pointer per increment
     size_t stride_;
   };
 
@@ -2784,17 +2832,13 @@ public:
   private:
     ConstReverseIterator (Tensor<T, N + 1, C> const &tensor, size_t index);
 
-    /**
-     * Data describing the underlying tensor
-     */
+    // Data describing the underlying tensor
     Shape<N> shape_;
     size_t strides_[N];
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
 
-    /**
-     * Step size of the underlying data pointer per increment
-     */
+    // Step size of the underlying data pointer per increment
     size_t stride_;
   };
 
@@ -2893,7 +2937,7 @@ private:
   Shape<N> shape_;
   size_t strides_[N];
   size_t offset_;
-  std::shared_ptr<C<T>> ref_;
+  C<T> ref_;
 
   /* -------------------- Getters -------------------- */
 
@@ -2913,12 +2957,12 @@ private:
   /* ------- Expansion for methods which take Tensors --------- */
 
   inline T const &pGet(size_t *indices, size_t index) const noexcept
-    { return (static_cast<C<T> const&>(*ref_))[offset_ + indices[index]]; }
+    { return (static_cast<C<T> const&>(ref_))[offset_ + indices[index]]; }
 
-  inline T &pGet(size_t *indices, size_t index) { return (*ref_)[offset_ + indices[index]]; }
+  inline T &pGet(size_t *indices, size_t index) { return ref_[offset_ + indices[index]]; }
 
   template <typename U>
-  inline void pSet(size_t index, U&& value) { ref_->Set(index, std::forward<U>(value)); }
+  inline void pSet(size_t index, U&& value) { ref_.Set(index, std::forward<U>(value)); }
 
   template <typename U, typename FunctionType, typename Tuple, size_t... I>
   friend inline U details::map_forward_sequence(
@@ -2998,14 +3042,21 @@ private:
   };
 
   // Declare all fields in the constructor, but initialize strides assuming no gaps
-  Tensor(size_t const *dimensions, size_t offset, std::shared_ptr<C<T>> &&_ref);
+  Tensor(size_t const *dimensions, size_t offset, C<T> &&_ref);
+  Tensor(size_t const *dimensions, size_t offset, C<T> const &_ref);
 
   // Declare all fields in the constructor
   Tensor(
       size_t const *dimensions, 
       size_t const *strides, 
       size_t offset, 
-      std::shared_ptr<C<T>> &&_ref
+      C<T> &&_ref
+  );
+  Tensor(
+      size_t const *dimensions, 
+      size_t const *strides, 
+      size_t offset, 
+      C<T> const &_ref
   );
 
 }; // Tensor
@@ -3016,7 +3067,7 @@ template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions) 
   : shape_(Shape<N>(dimensions)), 
     offset_(0), 
-    ref_(std::make_shared<C<T>>(shape_.index_product())) 
+    ref_(shape_.index_product())
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3028,7 +3079,7 @@ template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
   : shape_(Shape<N>(dimensions)), 
     offset_(0),
-    ref_(std::make_shared<C<T>>(shape_.index_product())) 
+    ref_(shape_.index_product())
 { 
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3049,7 +3100,7 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
     assert(dimensions[i] && ZERO_ELEMENT); 
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product(); 
-  ref_ = std::make_shared<C<T>>(cumul, value); 
+  ref_ = container_t<T>(cumul, value); 
 }
 
 template <typename T, size_t N, template <class> class C> 
@@ -3068,7 +3119,7 @@ Tensor<T, N, C>::Tensor(
   shape_.pInitializeStrides(strides_);
   auto value_setter = 
     [&f, &args...](T &lhs) -> void { lhs = f(args...); }; 
-  ref_ = std::make_shared<C<T>>(shape_.index_product());
+  ref_ = container_t<T>(shape_.index_product());
   Map(value_setter, *this); 
 }
 
@@ -3086,7 +3137,7 @@ Tensor<T, N, C>::Tensor(CArrayProxy<Array> &&md_array): offset_(0)
   // Make use of the fact C arrays are contiguously allocated
   ArrayType *ptr = (ArrayType *)md_array.value; 
   size_t cumul = shape_.index_product();
-  ref_ = std::make_shared<C<T>>(shape_.index_product(), ptr, ptr + cumul);
+  ref_ = container_t<T>(shape_.index_product(), ptr, ptr + cumul);
 }
 
 template <typename T, size_t N, template <class> class C> 
@@ -3098,12 +3149,12 @@ Tensor<T, N, C>::Tensor(Tensor<T, N, C> const &tensor)
 #endif
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
-  ref_ = std::make_shared<C<T>>(cumul); 
+  ref_ = container_t<T>(cumul); 
   Indices<N> reference_indices{};
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->Set(indices[0], tensor.pGet(indices, 1));
+    ref_.Set(indices[0], tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -3118,7 +3169,7 @@ Tensor<T, N, C>::Tensor(Tensor<U, N, C_> const &tensor)
 #endif
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
-  ref_ = std::make_shared<C<T>>(cumul); 
+  ref_ = container_t<T>(cumul); 
   Indices<N> reference_indices{};
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
@@ -3160,12 +3211,12 @@ Tensor<T, N, C>::Tensor(Expression<NodeType> const& rhs)
   shape_ = expression.shape(); 
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product();
-  ref_ = std::make_shared<C<T>>(cumul);
+  ref_ = container_t<T>(cumul);
   Indices<N> reference_indices{};
   size_t indices[1] = {};
   size_t const * const strides[] = { this->strides_ };
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->Set(indices[0], expression[reference_indices]);
+    ref_.Set(indices[0], expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -3186,7 +3237,7 @@ Tensor<T, N, C>::Tensor(opencl::Model<NodeType> const &model)
   size_t cumul = shape_.index_product();
   T *data = new T[cumul];
   model.template pFill<T>(data, cumul);
-  ref_ = std::make_shared<C<T>>(cumul, data[0]);
+  ref_ = container_t<T>(cumul, data[0]);
 }
 
 #endif
@@ -3202,7 +3253,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<T, N, C> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[] = {this->strides_, tensor.strides_};
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->Set(indices[0] + offset_, tensor.pGet(indices, 1));
+    ref_.Set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   return *this;
@@ -3219,7 +3270,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Tensor<U, N, C_> const &tensor)
   size_t indices[2] = {};
   size_t const * const strides[2] = { this->strides_, tensor.strides_ };
   for (size_t i = 0; i < cumul; ++i) {
-    ref_->Set(indices[0] + offset_, tensor.pGet(indices, 1));
+    ref_.Set(indices[0] + offset_, tensor.pGet(indices, 1));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 
@@ -3243,7 +3294,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(CArrayProxy<Array> &&md_array)
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->Set(indices[0] + offset_, *(ptr++));
+    ref_.Set(indices[0] + offset_, *(ptr++));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
   
@@ -3265,7 +3316,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(Expression<NodeType> const &rhs)
 
   // evaluate every element and assign it in place
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    tensor.ref_->Set(indices[0] + offset_, expression[reference_indices]);
+    tensor.ref_.Set(indices[0] + offset_, expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 
@@ -3284,7 +3335,7 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(NoAliasProxy<NodeType> const &rhs)
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->Set(indices[0] + offset_, expression[reference_indices]);
+    ref_.Set(indices[0] + offset_, expression[reference_indices]);
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 
@@ -3299,7 +3350,7 @@ T const &Tensor<T, N, C>::get(Indices<N> const &indices) const noexcept
   size_t cumul_index = 0;
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-  return (*static_cast<C<T> const*>(ref_.get()))[cumul_index + offset_];
+  return (static_cast<C<T> const&>(ref_))[cumul_index + offset_];
 }
 
 /* ------------------------------- Setters ------------------------------- */
@@ -3315,7 +3366,7 @@ void Tensor<T, N, C>::Fill(It begin, It const &end)
   size_t indices[1] = {};
   size_t const * const strides[1] = { strides_ };
   for (size_t i = 0; i < shape_.index_product(); ++i) {
-    ref_->Set(indices[0] + offset_, *(begin++));
+    ref_.Set(indices[0] + offset_, *(begin++));
     details::UpdateIndices(reference_indices, this->shape_, indices, strides);
   }
 }
@@ -3327,7 +3378,7 @@ void Tensor<T, N, C>::Set(Indices<N> const &indices, U&& value)
   size_t cumul_index = 0;
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-  ref_->Set(cumul_index + offset_, std::forward<U>(value));
+  ref_.Set(cumul_index + offset_, std::forward<U>(value));
 }
 
 /* ------------------------------- Access ------------------------------- */
@@ -3347,7 +3398,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
       shape_.dimensions_ + M, 
       strides_ + M, 
       offset_ + cumul_index, 
-      std::shared_ptr<C<T>>(ref_)
+      ref_
   );
 }
 
@@ -3366,7 +3417,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::operator()(Args... args)
       shape_.dimensions_ + M, 
       strides_ + M, 
       offset_ + cumul_index, 
-      std::shared_ptr<C<T>>(ref_)
+      ref_
   );
 }
 
@@ -3380,7 +3431,7 @@ T &Tensor<T, N, C>::operator()(Args... args)
       args...
   );
 
-  return (*ref_)[cumul_index + offset_];
+  return ref_[cumul_index + offset_];
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3407,7 +3458,7 @@ T const &Tensor<T, N, C>::operator()(Args... args) const
       args...
   );
 
-  return (*static_cast<C<T> const *>(ref_.get()))[cumul_index + offset_];
+  return (static_cast<C<T> const&>(ref_))[cumul_index + offset_];
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3423,7 +3474,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::operator[](Indices<M> const &indices)
       shape_.dimensions_ + M, 
       strides_ + M,  
       offset_ + cumul_index, 
-      std::shared_ptr<C<T>>(ref_)
+      ref_
   );
 }
 
@@ -3436,7 +3487,7 @@ T &Tensor<T, N, C>::operator[](Indices<M> const &indices)
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
 
-  return (*ref_)[cumul_index + offset_];
+  return ref_[cumul_index + offset_];
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3455,7 +3506,7 @@ T const &Tensor<T, N, C>::operator[](Indices<M> const &indices) const
   for (size_t i = 0; i < N; ++i)
     cumul_index += strides_[N - i - 1] * indices[N - i - 1];
 
-  return (*static_cast<C<T> const*>(ref_.get()))[cumul_index + offset_];
+  return (static_cast<C<T> const&>(ref_))[cumul_index + offset_];
 }
 
 template <typename U, size_t M, template <class> class C_>
@@ -3466,7 +3517,7 @@ void Set(Tensor<U, M, C_> &tensor, Indices<M> const &indices, U&& value)
   for (size_t i = 0; i < M; ++i)
     cumul_index += tensor.strides_[M - i - 1] * indices[M - i - 1];
 
-  tensor.ref_->Set(cumul_index, std::forward<U>(value));
+  tensor.ref_.Set(cumul_index, std::forward<U>(value));
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -3581,7 +3632,7 @@ bool Tensor<T, N, C>::operator==(Tensor<T, N, C> const& tensor) const
 
   size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
-    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) 
+    if (ref_[i + offset_] != tensor.ref_[i + tensor.offset_]) 
       return false;
 
   return true;
@@ -3595,7 +3646,7 @@ bool Tensor<T, N, C>::operator==(Tensor<X, N, C> const& tensor) const
 
   size_t indices_product = shape_.index_product();
   for (size_t i = 0; i < indices_product; ++i)
-    if ((*ref_)[i + offset_] != (*tensor.ref_)[i + tensor.offset_]) 
+    if (ref_[i + offset_] != tensor.ref_[i + tensor.offset_]) 
       return false;
 
   return true;
@@ -3618,7 +3669,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
   size_t index = 0;
 
   add_brackets(M, true);
-  os << (*tensor.ref_)[tensor.offset_]; 
+  os << tensor.ref_[tensor.offset_]; 
   for (size_t i = 0; i < cumul_index - 1; ++i) {
     size_t bracket_count = 0;
     bool propogate = true;
@@ -3642,7 +3693,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
     add_brackets(bracket_count - 1, false);
     os << ", ";
     add_brackets(bracket_count - 1, true);
-    os << (*tensor.ref_)[index + tensor.offset_];
+    os << tensor.ref_[index + tensor.offset_];
   }
   
   // last set of closing brackets
@@ -3710,7 +3761,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
       dimensions, 
       strides, 
       offset_ + offset, 
-      std::shared_ptr<C<T>>(ref_)
+      ref_
   );
 }
 
@@ -3718,8 +3769,18 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
 
 // private constructors
 template <typename T, size_t N, template <class> class C>
-Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t offset, std::shared_ptr<C<T>> &&ref)
+Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t offset, C<T> &&ref)
   : shape_(Shape<N>(dimensions)), offset_(offset), ref_(std::move(ref))
+{
+#ifdef _TEST
+ ++eDebugConstructorCounter;
+#endif
+  shape_.pInitializeStrides(strides_);
+}
+
+template <typename T, size_t N, template <class> class C>
+Tensor<T, N, C>::Tensor(size_t const *dimensions, size_t offset, C<T> const &ref)
+  : shape_(Shape<N>(dimensions)), offset_(offset), ref_(ref)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3732,8 +3793,22 @@ Tensor<T, N, C>::Tensor(
     size_t const *dimensions, 
     size_t const *strides, 
     size_t offset, 
-    std::shared_ptr<C<T>> &&ref)
+    C<T> &&ref)
   : shape_(Shape<N>(dimensions)), offset_(offset), ref_(std::move(ref))
+{
+#ifdef _TEST
+ ++eDebugConstructorCounter;
+#endif
+  std::copy_n(strides, N, strides_);
+}
+
+template <typename T, size_t N, template <class> class C>
+Tensor<T, N, C>::Tensor(
+    size_t const *dimensions, 
+    size_t const *strides, 
+    size_t offset, 
+    C<T> const &ref)
+  : shape_(Shape<N>(dimensions)), offset_(offset), ref_(ref)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -3746,7 +3821,7 @@ Tensor<T, N, C>::Tensor(
 #ifdef _ENABLE_OPENCL
 
 template <typename T, size_t N, template <class> class C>
-std::string Tensor<T, N, C>::OpenCLKernelCode(
+std::string Tensor<T, N, C>::opencl_kernel_code(
     cl::CommandQueue&, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
@@ -3789,7 +3864,7 @@ std::string Tensor<T, N, C>::OpenCLKernelCode(
 }
 
 template <typename T, size_t N, template <class> class C>
-cl::Buffer Tensor<T, N, C>::OpenCLEvaluateKernel(
+cl::Buffer Tensor<T, N, C>::opencl_evaluate_kernel(
     cl::CommandQueue&, 
     std::vector<cl::Buffer> &buffers, std::string&,
     std::string&
@@ -4181,7 +4256,7 @@ Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat)
       transposed_dimensions, 
       transposed_strides,
       mat.offset_, 
-      std::shared_ptr<C_<U>>(mat.ref_)
+      mat.ref_
   );
 }
 
@@ -4209,7 +4284,7 @@ Tensor<T, 2, C> transpose(Tensor<T, 1, C> &vec)
       transposed_dimensions, 
       transposed_strides,
       vec.offset_, 
-      std::shared_ptr<C<T>>(vec.ref_)
+      vec.ref_
   );
 }
 
@@ -4308,13 +4383,13 @@ Tensor<T, N, C>::Iterator::Iterator(Iterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -4353,7 +4428,7 @@ bool Tensor<T, N, C>::Iterator::operator==(
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -4387,13 +4462,13 @@ Tensor<T, N, C>::ConstIterator::ConstIterator(ConstIterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -4433,7 +4508,7 @@ bool Tensor<T, N, C>::ConstIterator::operator==(
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -4470,13 +4545,13 @@ Tensor<T, N, C>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::ReverseIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::ReverseIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -4515,7 +4590,7 @@ bool Tensor<T, N, C>::ReverseIterator::operator==(
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -4553,13 +4628,13 @@ Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -4603,7 +4678,7 @@ bool Tensor<T, N, C>::ConstReverseIterator::operator==(
 {
   if (shape_ != it.shape_) return false;
   if (stride_ != it.stride_) return false;
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -4938,10 +5013,10 @@ public:
   Shape<0> shape() const noexcept { return shape_; } 
 
   /** Returns the data as a reference */
-  value_t &operator()() { return (*ref_)[offset_]; } 
+  value_t &operator()() { return ref_[offset_]; } 
 
   /** Returns the data as a const reference */
-  value_t const &operator()() const { return (*ref_)[offset_]; }
+  value_t const &operator()() const { return ref_[offset_]; }
 
   /** Creates a Scalar with the same underlying data */
   Tensor<T, 0, C> at() { return Tensor<T, 0, C>(this->ref()); }
@@ -5062,13 +5137,13 @@ public:
   /* ----------------- OpenCL --------------- */
 
 #ifdef _ENABLE_OPENCL
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -5109,7 +5184,7 @@ public:
 
     Iterator(Tensor<T, 1, C> const &tensor, size_t);
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
     size_t stride_;
   };
 
@@ -5142,7 +5217,7 @@ public:
     ConstIterator(Tensor<T, 1, C> const &tensor, size_t);
 
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
     size_t stride_;
   };
 
@@ -5175,7 +5250,7 @@ public:
     ReverseIterator(Tensor<T, 1, C> const &tensor, size_t);
 
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
     size_t stride_;
   };
 
@@ -5208,7 +5283,7 @@ public:
     ConstReverseIterator(Tensor<T, 1, C> const &tensor, size_t);
 
     size_t offset_;
-    std::shared_ptr<C<T>> ref_;
+    C<T> ref_;
     size_t stride_;
   };
 
@@ -5226,19 +5301,20 @@ private:
 
   Shape<0> shape_;
   size_t offset_;
-  std::shared_ptr<C<T>> ref_;
+  C<T> ref_;
 
   /* ------------------ Utility ----------------- */
 
   // Exists to match the Tensor<T, N, C> interface
   inline T const &pGet(size_t *, size_t) const noexcept 
-    { return (static_cast<C<T> const &>(*ref_))[offset_]; }
+  { return (static_cast<C<T> const &>(ref_))[offset_]; }
 
   // Exists to match the Tensor<T, N, C> interface
-  inline T &pGet(size_t *, size_t) noexcept { return (*ref_)[offset_]; }
+  inline T &pGet(size_t *, size_t) noexcept { return ref_[offset_]; }
 
   // Exists to match the Tensor<T, N, C> interface
-  Tensor(size_t const *, size_t const *, size_t, std::shared_ptr<C<T>> &&ref);
+  Tensor(size_t const *, size_t const *, size_t, C<T> &&ref);
+  Tensor(size_t const *, size_t const *, size_t, C<T> const &ref);
 
 };
 
@@ -5246,7 +5322,7 @@ private:
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Tensor() 
-  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
+  : shape_(Shape<0>()), offset_(0), ref_(1)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5255,7 +5331,7 @@ Tensor<T, 0, C>::Tensor()
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Tensor(Shape<0>) 
-  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1))
+  : shape_(Shape<0>()), offset_(0), ref_(1)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5269,12 +5345,12 @@ Tensor<T, 0, C>::Tensor(T &&val)
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
-  ref_ = std::make_shared<C<T>>(1, val);
+  ref_ = container_t<T>(1, val);
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> const &tensor)
-  : shape_(Shape<0>()), offset_(0), ref_(std::make_shared<C<T>>(1), (*tensor.ref_)[0])
+  : shape_(Shape<0>()), offset_(0), ref_(1, tensor.ref_[0])
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5283,7 +5359,7 @@ Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> const &tensor)
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C>::Tensor(Tensor<T, 0, C> &&tensor)
-  : shape_(Shape<0>()), offset_(tensor.offset_), ref_(std::make_shared<C<T>>(1))
+  : shape_(Shape<0>()), offset_(tensor.offset_), ref_(1)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5308,7 +5384,7 @@ Tensor<T, 0, C>::Tensor(Expression<NodeType> const& expression)
  ++eDebugConstructorCounter;
 #endif
   T result = expression.self()();
-  ref_ = std::make_shared<C<T>>(1, result);
+  ref_ = container_t<T>(1, result);
 }
 
 #ifdef _ENABLE_OPENCL
@@ -5324,7 +5400,7 @@ Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model)
   static_assert(!NodeType::rank(), RANK_MISMATCH);
   T data[1];
   model.template pFill<T>(data, 1);
-  ref_ = std::make_shared<C<T>>(1, data[0]);
+  ref_ = container_t<T>(1, data[0]);
 }
 
 #endif // defined _ENABLE_OPENCL
@@ -5334,7 +5410,7 @@ Tensor<T, 0, C>::Tensor(opencl::Model<NodeType> const &model)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator=(Tensor<T, 0, C> const &tensor)
 {
-  (*ref_)[offset_] = (*tensor.ref_)[tensor.offset_];
+  ref_[offset_] = tensor.ref_[tensor.offset_];
   return *this;
 }
 
@@ -5342,7 +5418,7 @@ template <typename T, template <class> class C>
 template <typename X>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator=(Tensor<X, 0, C> const &tensor)
 {
-  (*ref_)[offset_] = (*tensor.ref_)[tensor.offset_];
+  ref_[offset_] = tensor.ref_[tensor.offset_];
   return *this;
 }
 
@@ -5350,20 +5426,20 @@ template <typename T, template <class> class C>
 template <typename X, typename>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator=(X&& elem)
 {
-  (*ref_)[offset_] = std::forward<X>(elem);
+  ref_[offset_] = std::forward<X>(elem);
   return *this;
 }
 
 template <typename U, template <class> class C_>
 void Set(Tensor<U, 0, C_> &tensor, Indices<0> const&, U&& value)
 { 
-  tensor.ref_->Set(tensor.offset_, std::forward<U>(value)); 
+  tensor.ref_.Set(tensor.offset_, std::forward<U>(value)); 
 }
 
 template <typename U, template <class> class C_>
 inline void Set(Tensor<U, 0, C_> &tensor, U&& value)
 { 
-  tensor.ref_->Set(tensor.offset_, std::forward<U>(value)); 
+  tensor.ref_.Set(tensor.offset_, std::forward<U>(value)); 
 }
 
 /* ------------------------ Equivalence ----------------------- */
@@ -5371,21 +5447,21 @@ inline void Set(Tensor<U, 0, C_> &tensor, U&& value)
 template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::operator==(Tensor<T, 0, C> const &tensor) const
 {
-  return (*ref_)[offset_] == (*tensor.ref_)[tensor.offset_];
+  return ref_[offset_] == tensor.ref_[tensor.offset_];
 }
 
 template <typename T, template <class> class C>
 template <typename X>
 bool Tensor<T, 0, C>::operator==(Tensor<X, 0, C> const &tensor) const
 {
-  return (*ref_)[offset_] == (*tensor.ref_)[tensor.offset_];
+  return ref_[offset_] == tensor.ref_[tensor.offset_];
 }
 
 template <typename T, template <class> class C>
 template <typename X, typename>
 bool Tensor<T, 0, C>::operator==(X val) const
 {
-  return (*ref_)[offset_] == val;
+  return ref_[offset_] == val;
 }
 
 /* ----------------------- Expressions ----------------------- */
@@ -5415,7 +5491,7 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator+=(Expression<RHS> const &rhs)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator+=(T const &scalar)
 {
-  (*ref_)[offset_] += scalar;
+  ref_[offset_] += scalar;
   return *this;
 }
 
@@ -5432,7 +5508,7 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator-=(Expression<RHS> const &rhs)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator-=(T const &scalar)
 {
-  (*ref_)[offset_] -= scalar;
+  ref_[offset_] -= scalar;
   return *this;
 }
 
@@ -5525,7 +5601,7 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator*=(Expression<RHS> const &rhs)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator*=(T const &scalar)
 {
-  (*ref_)[offset_] *= scalar;
+  ref_[offset_] *= scalar;
   return *this;
 }
 
@@ -5560,14 +5636,14 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator/=(Expression<RHS> const &rhs)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> &Tensor<T, 0, C>::operator/=(T const &scalar)
 {
-  (*ref_)[offset_] /= scalar;
+  ref_[offset_] /= scalar;
   return *this;
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::neg() const
 {
-  return Tensor<T, 0, C>(-(*ref_)[offset_]);
+  return Tensor<T, 0, C>(-ref_[offset_]);
 }
 
 /* ------------------------ OpenCL --------------------------- */
@@ -5575,7 +5651,7 @@ Tensor<T, 0, C> Tensor<T, 0, C>::neg() const
 #ifdef _ENABLE_OPENCL
 
 template <typename T, template <class> class C>
-std::string Tensor<T, 0, C>::OpenCLKernelCode(
+std::string Tensor<T, 0, C>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
@@ -5599,7 +5675,7 @@ std::string Tensor<T, 0, C>::OpenCLKernelCode(
 }
 
 template <typename T, template <class> class C>
-cl::Buffer Tensor<T, 0, C>::OpenCLEvaluateKernel(
+cl::Buffer Tensor<T, 0, C>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
@@ -5614,8 +5690,17 @@ cl::Buffer Tensor<T, 0, C>::OpenCLEvaluateKernel(
 /* ------------------------ Utility --------------------------- */
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C>::Tensor(size_t const *, size_t const *, size_t offset, std::shared_ptr<C<T>> &&ref)
+Tensor<T, 0, C>::Tensor(size_t const *, size_t const *, size_t offset, C<T> &&ref)
   : offset_(offset), ref_(std::move(ref))
+{
+#ifdef _TEST
+ ++eDebugConstructorCounter;
+#endif
+}
+
+template <typename T, template <class> class C>
+Tensor<T, 0, C>::Tensor(size_t const *, size_t const *, size_t offset, C<T> const &ref)
+  : offset_(offset), ref_(ref)
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
@@ -5627,7 +5712,7 @@ Tensor<T, 0, C>::Tensor(size_t const *, size_t const *, size_t offset, std::shar
 template <typename X, template <class> class C_>
 std::ostream &operator<<(std::ostream &os, const Tensor<X, 0, C_> &tensor)
 {
-  os << (*tensor.ref_)[tensor.offset_];
+  os << tensor.ref_[tensor.offset_];
   return os; }
 
 /* ------------------- Useful Functions ---------------------- */
@@ -5635,7 +5720,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor<X, 0, C_> &tensor)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::copy() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, 0, std::make_shared<C<T>>(1, (*ref_)[offset_]));
+  return Tensor<T, 0, C>(nullptr, nullptr, 0, std::make_shared<C<T>>(1, ref_[offset_]));
 }
 
 template <typename T, template <class> class C>
@@ -5664,13 +5749,13 @@ Tensor<T, 0, C>::Iterator::Iterator(Iterator &&it)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::Iterator::operator*()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::Iterator::operator->()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
@@ -5707,7 +5792,7 @@ template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::Iterator::operator==(
   typename Tensor<T, 0, C>::Iterator const &it) const
 {
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -5731,13 +5816,13 @@ Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator &&it)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> const Tensor<T, 0, C>::ConstIterator::operator*()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> const Tensor<T, 0, C>::ConstIterator::operator->()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
@@ -5774,7 +5859,7 @@ template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::ConstIterator::operator==(
   typename Tensor<T, 0, C>::ConstIterator const &it) const
 {
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -5800,13 +5885,13 @@ Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator*()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator->()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
@@ -5843,7 +5928,7 @@ template <typename T, template <class> class C>
 bool Tensor<T, 0, C>::ReverseIterator::operator==(
   typename Tensor<T, 0, C>::ReverseIterator const &it) const
 {
-  if (ref_.get() != it.ref_.get()) 
+  if (ref_ != it.ref_) 
     return false;
   return offset_ == it.offset_;
 }
@@ -5870,13 +5955,13 @@ Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator
 template <typename T, template <class> class C>
 Tensor<T, 0, C> const Tensor<T, 0, C>::ConstReverseIterator::operator*()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
 Tensor<T, 0, C> const Tensor<T, 0, C>::ConstReverseIterator::operator->()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, std::shared_ptr<C<T>>(ref_));
+  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
 }
 
 template <typename T, template <class> class C>
@@ -5918,7 +6003,7 @@ bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
     typename Tensor<T, 0, C>::ConstReverseIterator const &it
 ) const
 {
-  if (ref_.get() != it.ref_.get()) return false;
+  if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
 
@@ -6178,8 +6263,8 @@ Model<NodeType>::Model(Expression<NodeType> const &expr)
 {
   auto buffers = std::vector<cl::Buffer>{};
   std::string cl_arg_list = "";
-  std::string cl_expr = node_.OpenCLKernelCode(cqueue_, buffers, cl_arg_list);
-  buffer_ = node_.OpenCLEvaluateKernel(cqueue_, buffers, cl_arg_list, cl_expr);
+  std::string cl_expr = node_.opencl_kernel_code(cqueue_, buffers, cl_arg_list);
+  buffer_ = node_.opencl_evaluate_kernel(cqueue_, buffers, cl_arg_list, cl_expr);
 }
 
 template <typename NodeType>
@@ -6269,13 +6354,13 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -6368,26 +6453,26 @@ BinaryAddExpr<LHS, RHS>::BinaryAddExpr(LHS const &lhs, RHS const &rhs)
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinaryAddExpr<LHS, RHS>::OpenCLKernelCode(
+std::string BinaryAddExpr<LHS, RHS>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
-  std::string expr = std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
-    + " +  " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
+  std::string expr = std::string("(") + lhs_.opencl_kernel_code(cqueue, buffers, arg_list)
+    + " +  " + rhs_.opencl_kernel_code(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryAddExpr<LHS, RHS>::OpenCLEvaluateKernel(
+cl::Buffer BinaryAddExpr<LHS, RHS>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
     std::string &expr
 ) const noexcept
 {
-  return opencl::details::EvaluateBasicKernel<value_t>(
+  return opencl::details::evaluate_basic_kernel<value_t>(
       cqueue, 
       buffers, 
       arg_list, 
@@ -6484,13 +6569,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -6577,25 +6662,25 @@ auto BinarySubExpr<LHS, RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinarySubExpr<LHS, RHS>::OpenCLKernelCode(
+std::string BinarySubExpr<LHS, RHS>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
-  return std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
-    + " - " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
+  return std::string("(") + lhs_.opencl_kernel_code(cqueue, buffers, arg_list)
+    + " - " + rhs_.opencl_kernel_code(cqueue, buffers, arg_list) + ")";
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinarySubExpr<LHS, RHS>::OpenCLEvaluateKernel(
+cl::Buffer BinarySubExpr<LHS, RHS>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
     std::string &expr
 ) const noexcept
 {
-  return opencl::details::EvaluateBasicKernel<value_t>(
+  return opencl::details::evaluate_basic_kernel<value_t>(
       cqueue, 
       buffers, 
       arg_list, 
@@ -6714,13 +6799,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -7108,7 +7193,7 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_t
 #ifdef _ENABLE_OPENCL
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
-std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernelCode(
+std::string BinaryMulExpr<I1, I2, LHS, RHS>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
@@ -7120,10 +7205,10 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernelCode(
 
   // Create the multiplication kernel
   // lhs and rhs buffers
-  cl::Buffer lhs_buffer = opencl::details::CreateBuffer(lhs_);
-  cl::Buffer rhs_buffer = opencl::details::CreateBuffer(rhs_);
+  cl::Buffer lhs_buffer = opencl::details::create_buffer(lhs_);
+  cl::Buffer rhs_buffer = opencl::details::create_buffer(rhs_);
 
-  buffers.push_back(CreateMultiplicationKernel<I1, I2, lhs_t, rhs_t>(
+  buffers.push_back(create_multiplication_kernel<I1, I2, lhs_t, rhs_t>(
         cqueue, lhs_buffer, rhs_buffer, lhs_.shape(), rhs_.shape()));
   
   // add the new scalar to the argument list and the expression
@@ -7139,7 +7224,7 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLKernelCode(
 }
 
 template <size_t I1, size_t I2, typename LHS, typename RHS>
-cl::Buffer BinaryMulExpr<I1, I2, LHS, RHS>::OpenCLEvaluateKernel(
+cl::Buffer BinaryMulExpr<I1, I2, LHS, RHS>::opencl_evaluate_kernel(
     cl::CommandQueue &, 
     std::vector<cl::Buffer> &buffers, 
     std::string &, 
@@ -7247,13 +7332,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -7397,26 +7482,26 @@ std::ostream &operator<<(std::ostream &os, BinaryHadExpr<LHS_, RHS_> const &bina
 #ifdef _ENABLE_OPENCL
 
 template <typename LHS, typename RHS>
-std::string BinaryHadExpr<LHS, RHS>::OpenCLKernelCode(
+std::string BinaryHadExpr<LHS, RHS>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
-  std::string expr = std::string("(") + lhs_.OpenCLKernelCode(cqueue, buffers, arg_list)
-    + " * " + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list) + ")";
+  std::string expr = std::string("(") + lhs_.opencl_kernel_code(cqueue, buffers, arg_list)
+    + " * " + rhs_.opencl_kernel_code(cqueue, buffers, arg_list) + ")";
   return expr;
 }
 
 template <typename LHS, typename RHS>
-cl::Buffer BinaryHadExpr<LHS, RHS>::OpenCLEvaluateKernel(
+cl::Buffer BinaryHadExpr<LHS, RHS>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
     std::string &expr
 ) const noexcept
 {
-  return opencl::details::EvaluateBasicKernel<value_t>(
+  return opencl::details::evaluate_basic_kernel<value_t>(
       cqueue, 
       buffers, 
       arg_list, 
@@ -7494,13 +7579,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
   
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -7560,7 +7645,7 @@ private:
 
 #ifdef _ENABLE_OPENCL
   template <size_t... TupleIndices>
-  std::string pOpenCLKernelCodeTupleExpansion(
+  std::string popencl_kernel_codeTupleExpansion(
       meta::Sequence<TupleIndices...>, 
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
@@ -7743,14 +7828,14 @@ std::ostream &operator<<(std::ostream &os, MapExpr<Function_, Exprs_...> const &
 #ifdef _ENABLE_OPENCL
 
 template <typename Function, typename... Exprs>
-std::string MapExpr<Function, Exprs...>::OpenCLKernelCode(
+std::string MapExpr<Function, Exprs...>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
   static_assert(!Function::arity() || sizeof...(Exprs) == Function::arity(), OPENCL_ARITY_ERROR);
-  return pOpenCLKernelCodeTupleExpansion(
+  return popencl_kernel_codeTupleExpansion(
       typename meta::MakeIndexSequence< 0, sizeof...(Exprs)>::sequence{}, 
       cqueue, 
       buffers, 
@@ -7760,25 +7845,25 @@ std::string MapExpr<Function, Exprs...>::OpenCLKernelCode(
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-std::string MapExpr<Function, Exprs...>::pOpenCLKernelCodeTupleExpansion(
+std::string MapExpr<Function, Exprs...>::popencl_kernel_codeTupleExpansion(
     meta::Sequence<TupleIndices...>, 
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
-  return Function::opencl_map(std::get<TupleIndices>(exprs_).OpenCLKernelCode(cqueue, buffers, arg_list)...);
+  return Function::opencl_map(std::get<TupleIndices>(exprs_).opencl_kernel_code(cqueue, buffers, arg_list)...);
 }
 
 template <typename Function, typename... Exprs>
-cl::Buffer MapExpr<Function, Exprs...>::OpenCLEvaluateKernel(
+cl::Buffer MapExpr<Function, Exprs...>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
     std::string &expr
 ) const noexcept
 {
-  return opencl::details::EvaluateBasicKernel<value_t>(
+  return opencl::details::evaluate_basic_kernel<value_t>(
       cqueue, 
       buffers, 
       arg_list, 
@@ -7841,13 +7926,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -7951,7 +8036,7 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
 #ifdef _ENABLE_OPENCL
 
 template <typename T, typename Function, typename... Exprs>
-std::string ReduceExpr<T, Function, Exprs...>::OpenCLKernelCode(
+std::string ReduceExpr<T, Function, Exprs...>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
@@ -7962,8 +8047,8 @@ std::string ReduceExpr<T, Function, Exprs...>::OpenCLKernelCode(
   // Create the reduction kernel, evaluate, and store the resulting buffer
   static_assert(sizeof...(Exprs) == 1, OPENCL_REDUCTION_SIZE_ERROR);
   auto const& shape = std::get<0>(exprs_).shape();
-  cl::Buffer buffer = opencl::details::CreateBuffer(std::get<0>(exprs_));
-  buffers.push_back(CreateReductionKernel<T, Function>(
+  cl::Buffer buffer = opencl::details::create_buffer(std::get<0>(exprs_));
+  buffers.push_back(create_reduction_kernel<T, Function>(
         cqueue, buffer, shape.index_product(), return_value_));
   
   // add the new scalar to the argument list and the expression
@@ -7979,7 +8064,7 @@ std::string ReduceExpr<T, Function, Exprs...>::OpenCLKernelCode(
 }
 
 template <typename T, typename Function, typename... Exprs>
-cl::Buffer ReduceExpr<T, Function, Exprs...>::OpenCLEvaluateKernel(
+cl::Buffer ReduceExpr<T, Function, Exprs...>::opencl_evaluate_kernel(
     cl::CommandQueue &, 
     std::vector<cl::Buffer> &buffers, 
     std::string &, 
@@ -8056,13 +8141,13 @@ public:
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
 
-  std::string OpenCLKernelCode(
+  std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list
   ) const noexcept;
 
-  cl::Buffer OpenCLEvaluateKernel(
+  cl::Buffer opencl_evaluate_kernel(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
       std::string &arg_list,
@@ -8148,24 +8233,24 @@ auto UnaryNegExpr<RHS>::slice(Indices<M> const &indices) const
 #ifdef _ENABLE_OPENCL
 
 template <typename RHS>
-std::string UnaryNegExpr<RHS>::OpenCLKernelCode(
+std::string UnaryNegExpr<RHS>::opencl_kernel_code(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list
 ) const noexcept
 {
-  return "-" + rhs_.OpenCLKernelCode(cqueue, buffers, arg_list);
+  return "-" + rhs_.opencl_kernel_code(cqueue, buffers, arg_list);
 }
 
 template <typename RHS>
-cl::Buffer UnaryNegExpr<RHS>::OpenCLEvaluateKernel(
+cl::Buffer UnaryNegExpr<RHS>::opencl_evaluate_kernel(
     cl::CommandQueue &cqueue, 
     std::vector<cl::Buffer> &buffers, 
     std::string &arg_list,
     std::string &expr
 ) const noexcept
 {
-  return opencl::details::EvaluateBasicKernel<value_t>(
+  return opencl::details::evaluate_basic_kernel<value_t>(
       cqueue, 
       buffers, 
       arg_list, 
