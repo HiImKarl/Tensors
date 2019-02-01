@@ -1,6 +1,4 @@
-#include <tensor.hh>
-#include <benchmark/benchmark.h>
-#include <cmath>
+#include "benchmark.hh"
 
 using namespace tensor;
 

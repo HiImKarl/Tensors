@@ -1,5 +1,4 @@
-#include <tensor.hh>
-#include <benchmark/benchmark.h>
+#include "benchmark.hh"
 
 using namespace tensor;
 
@@ -15,7 +14,8 @@ BENCHMARK(BM_TensorTensor_Addition)->RangeMultiplier(2)->Range(2,  4 * sizeof(si
 
 static void BM_ScalarScalar_Addition(benchmark::State &state)
 {
-  for (auto _ : state) Scalar<int32_t>(Scalar<int32_t>() + Scalar<int32_t>());
+  for (auto _ : state) 
+    Scalar<int32_t>(Scalar<int32_t>() + Scalar<int32_t>());
 }
 
 BENCHMARK(BM_ScalarScalar_Addition);
@@ -32,7 +32,8 @@ BENCHMARK(BM_TensorTensor_Multiplication)->RangeMultiplier(2)->Range(2,  4 * siz
 
 static void BM_ScalarScalar_Multiplication(benchmark::State &state)
 {
-  for (auto _ : state) Scalar<int32_t>(Scalar<int32_t>() * Scalar<int32_t>());
+  for (auto _ : state) 
+    Scalar<int32_t>(Scalar<int32_t>() * Scalar<int32_t>());
 }
 
 BENCHMARK(BM_ScalarScalar_Multiplication);

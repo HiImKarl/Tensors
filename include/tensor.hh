@@ -1,10 +1,7 @@
-#pragma once
 #ifndef TENSOR_H_
 #define TENSOR_H_
 #include <cstddef>
-#include <iostream>
 #include <algorithm>
-#include <exception>
 #include <utility>
 #include <cmath>
 #include <type_traits>
@@ -22,34 +19,31 @@
 #ifdef _ENABLE_OPENCL
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
-#if (defined __GNUC__)
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wmissing-braces"
 #pragma GCC diagnostic ignored "-Wignored-attributes"
-#endif
+#endif // defined __GNUC__
 
 #include <CL/cl2.hpp>
 
-#if (defined __GNUC__)
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
-#endif
-#endif
+#endif // defined __GNUC__
+
+#endif // defined _ENABLE_OPENCL
 
 #ifdef _TEST
 extern int eDebugConstructorCounter; 
 #endif
 
-/* FIXME -- Remove debug macros */
-
 #ifndef _NDEBUG
 
 #define PRINT(x) std::cout << x << '\n';
 #define PRINTV(x) std::cout << #x << ": " << x << '\n';
-
 #define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
-#define GET_MACRO(_1,_2,_3,NAME,...) NAME
 #define PRINT_ARRAY1(x) \
   std::cout << #x << ": "; \
   for (size_t i = 0; i < ARRAY_SIZE(x); ++i) std::cout << x[i] << ' '; \
@@ -58,10 +52,11 @@ extern int eDebugConstructorCounter;
   std::cout << #x << ": "; \
   for (size_t i = 0; i < n; ++i) std::cout << x[i] << ' '; \
   std::cout << '\n';
+#define GET_MACRO(_1,_2,_3,NAME,...) NAME
 #define PRINT_ARRAY(...) \
   GET_MACRO(__VA_ARGS__, PRINT_ARRAY1, PRINT_ARRAY2)(__VA_ARGS__)
 
-#endif
+#endif // not defined _NDEBUG
 
 /* ---------------- Error Messages ---------------- */
 
@@ -87,11 +82,13 @@ extern int eDebugConstructorCounter;
 #define DIMENSION_INVALID \
   "Attempt To Access Invalid Dimension"
 #define RANK_OUT_OF_BOUNDS \
-  "Rank out of bounds"
+  "Rank Out Of Bounds"
 #define INDEX_OUT_OF_BOUNDS \
-  "Index out of bounds"
+  "Index Out Of Bounds"
 #define TOO_MANY_INDICES \
-  "Too many indices provided"
+  "Too Many Indices Provided"
+#define FLATTEN_INDICES_ERROR \
+  "Attempt to flatten failed -- Error with Indices Provided"
 
 // Slicing
 #define SLICES_EMPTY \
@@ -131,6 +128,10 @@ extern int eDebugConstructorCounter;
   "This method requires at least one tensor as an argument"
 #define SLICING_MULTIPLICATION_AXIS \
   "Attempt to slice a multiplication expression along one of its axes"
+
+// Broadcasting
+#define TENSOR_RANK_MISMATCH \
+  "Attempt to broadcast failed -- mismatched tensor rank"
 
 // OpenCL
 #define OPENCL_NO_PLATFORMS \
@@ -290,10 +291,11 @@ struct IsNonCVRefExpression<UnaryNegExpr<RHS>>: std::true_type {};
  */
 template <typename T>
 struct IsExpression {
-  enum: bool { 
-          value = IsNonCVRefExpression<
-            typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value
-        };
+  enum: bool 
+  { 
+    value = IsNonCVRefExpression<
+      typename std::remove_reference<typename std::remove_cv<T>::type>::type>::value
+  };
 };
 
 /** Provides `value` equal to the rank() of `type`, 0 
@@ -517,6 +519,44 @@ struct IsIncreasing<Index>: std::true_type {};
  */
 template <>
 struct IsIncreasing<>: std::true_type {};
+
+/** Member enum `value` is `true` iff `I...` is a 
+ *  consectutive sequence of unsigned integers.
+ */
+template <size_t...>
+struct IsConsecutive;
+
+template <size_t I1, size_t I2, size_t... I>
+struct IsConsecutive<I1, I2, I...> {
+  enum: bool { value = ((I1 == I2 - 1) && IsIncreasing<I2, I...>::value) };
+};
+
+template <size_t I>
+struct IsConsecutive<I>: std::true_type{};
+
+template <>
+struct IsConsecutive<>: std::true_type{};
+
+/** Member enum `value` is the last value in `I...` */
+template <size_t...>
+struct FirstIndex;
+
+template <size_t I1, size_t I2, size_t... I>
+struct FirstIndex<I1, I2, I...> {
+  enum: bool { value = I1 };
+};
+
+/** Member enum `value` is the last value in `I...` */
+template <size_t...>
+struct LastIndex;
+
+template <size_t I1, size_t I2, size_t... I>
+struct LastIndex<I1, I2, I...> {
+  enum: bool { value = LastIndex<I2, I...>::value };
+};
+
+template <size_t I>
+struct LastIndex<I> { enum: bool { value = I }; };
 
 /** Member enum 'value' is 'true' iff 'I...' contains 'Index` */
 template <size_t Index, size_t Next, size_t... I>
@@ -853,8 +893,11 @@ struct AreExpressions;
 
 template <typename Arg, typename... Args>
 struct AreExpressions<Arg, Args...> {
-  enum: bool { value = (IsExpression<Arg>::value || IsTensor<Arg>::value) 
-          && AreExpressions<Args...>::value }; 
+  enum: bool 
+  { 
+    value = (IsExpression<Arg>::value || IsTensor<Arg>::value) 
+      && AreExpressions<Args...>::value 
+  }; 
 };
 
 template <>
@@ -879,8 +922,8 @@ struct RankSum<> {
 namespace details {
 
 // Given indices `relative_indices`, a shape, and `Count` number of strides,
-// incrementes `relative_indices` and fills the ith elem. `absolute_indices` with the 
-// absolute index given by `relative_indices` and the ith strides in `strides_array`
+// incrementes `relative_indices` and fills the ith elem in `absolute_indices` with the 
+// absolute index given by `relative_indices` and `strides_array`
 template <size_t N, size_t Count>
 void UpdateIndices(
     Indices<N> &relative_indices, 
@@ -909,7 +952,7 @@ void UpdateIndices(
 // Scalar override provided to match APIs
 // Nothing needs to be done if the Tensor is scalar
 template <size_t Count>
-void UpdateIndices(
+inline void UpdateIndices(
     Indices<0> &, 
     Shape<0> const &, 
     size_t (&)[Count], 
@@ -993,14 +1036,18 @@ template <typename FunctionType, typename... Tensors>
 void Map(FunctionType &&fn, Tensors&&... tensors)
 {
   static_assert(sizeof...(tensors), PANIC_ASSERTION);
+
   auto const &shape = details::GetShape(tensors...);
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
+
   constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+
   size_t cumul_index = shape.index_product();
   Indices<M> reference_indices {};
   size_t indices[sizeof...(Tensors)] = {};
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+
   for (size_t i = 0; i < cumul_index; ++i) {
     details::MapForwardSequence(std::forward<FunctionType>(fn), (size_t *)indices,
       std::forward_as_tuple(tensors...), sequence);
@@ -1015,11 +1062,13 @@ Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
 {
   static_assert(sizeof...(Tensors), NO_TENSORS_PROVIDED);
   static_assert(meta::AreExpressions<Tensors...>::value, EXPECTING_EXPRESSION);
+
   auto const &shape = details::GetShape(tensors...);
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
-  constexpr size_t M = FirstExpression<Tensors...>::type::rank();
-  Tensor<U, M, C_> tensor(shape);
 
+  constexpr size_t M = FirstExpression<Tensors...>::type::rank();
+
+  Tensor<U, M, C_> tensor(shape);
   size_t cumul_index = shape.index_product();
   Indices<M> reference_indices {};
   size_t indices[sizeof...(Tensors)] = {};
@@ -1029,10 +1078,11 @@ Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
   // Foward the values produced by `fn` to `tensor`
   for (size_t i = 0; i < cumul_index; ++i) {
     // `tensor`'s strides will be contiguous
-    tensor.pSet(i, details::map_forward_sequence<U>(std::forward<FunctionType>(fn), (size_t *)indices, 
-      std::forward_as_tuple(tensors...), sequence));
+    tensor.pSet(i, details::map_forward_sequence<U>(std::forward<FunctionType>(fn), 
+          (size_t *)indices, std::forward_as_tuple(tensors...), sequence));
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
+
   return tensor; 
 }
 
@@ -1041,20 +1091,26 @@ template <typename U, typename FunctionType, typename... Tensors>
 U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
 {
   static_assert(sizeof...(tensors), NO_TENSORS_PROVIDED);
+
   auto const &shape = details::GetShape(tensors...);
   VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
-  U ret_val = std::forward<U>(initial_value);
+
   constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+
+  auto ret_val = std::forward<U>(initial_value);
   size_t cumul_index = shape.index_product();
-  Indices<M> reference_indices {};
+  auto reference_indices = Indices<M>{};
   size_t indices[sizeof...(Tensors)] = {};
   size_t const * const strides[sizeof...(Tensors)] = { tensors.strides()... };
   auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
+
   for (size_t i = 0; i < cumul_index; ++i) {
+    // `tensor`'s strides will be contiguous
     details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), 
-      (size_t *)indices, std::forward_as_tuple(tensors...), sequence);
+        (size_t *)indices, std::forward_as_tuple(tensors...), sequence);
     details::UpdateIndices(reference_indices, shape, indices, strides);
   }
+
   return ret_val;
 }
 
@@ -1111,6 +1167,56 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, 
 
 } // namespace details
 
+
+/* ---------------------------- String Formatting ---------------------------- */
+
+/** Overload this template to define how custom data types should be printed.
+ *  Overrides are provided for POD types. 
+ *  Provide `std::string operator()(T const &) const;`
+ */
+template <typename T>
+struct StringFormat;
+
+template <>
+struct StringFormat<int> {
+  std::string operator()(int x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<unsigned> {
+  std::string operator()(unsigned x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<long> {
+  std::string operator()(long x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<long long> {
+  std::string operator()(long long x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<unsigned long long> {
+  std::string operator()(unsigned long long x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<float> {
+  std::string operator()(float x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<double> {
+  std::string operator()(double x) const { return std::to_string(x); }
+};
+
+template <>
+struct StringFormat<long double> {
+  std::string operator()(long double x) const { return std::to_string(x); }
+};
+
 /* --------------------------- OpenCL Meta-Patterns --------------------------- */
 
 namespace opencl {
@@ -1126,18 +1232,43 @@ namespace meta {
 #ifdef _ENABLE_OPENCL
 namespace opencl {
 
-/** Singleton collection of opencl context information */
 class Info {
+/** Singleton collection of opencl context information */
 public:
-  static Info &v(); /** Reference to Singleton */
+   /** Reference to Singleton */ 
+  static Info &v(); 
+
+  /** Returns a vector of platforms avaliable to the platform */
   static std::vector<cl::Platform> get_platforms();
+
+  /** Sets the target that OpenCL will compile kernels. This can be changed dynamically. 
+   *  This will also set the target device to the default platform device. 
+   */
   void set_platform(cl::Platform const &platform);
+
+  /** Reference to the current target platform */
   cl::Platform const &platform() const { return platform_; }
+
+  /** Returns a list of devices avaliable to the specified platform */
   static std::vector<cl::Device> get_devices(cl::Platform const& platform);
+
+  /** Returns a list of devices avaliable to the current platform */
+  std::vector<cl::Device> get_devices() const noexcept;
+
+  /** Sets the device OpenCL will run kernels on */
   void set_device(cl::Device const &device);
-  cl::Device const &device() const { return device_; }
-  cl::Context const &context() const { return context_; }
+
+  /** Reference to the current device */
+  cl::Device const &device() const noexcept { return device_; }
+
+  /** Reference to the device context */
+  cl::Context const &context() const noexcept { return context_; }
+
+  /** Set platform and device with one function call. If the specified device is not
+   *  supported by the current platform, OpenCL will return an error
+   */
   void Set(cl::Platform const &platform, cl::Device const &device);
+
 private:
   Info();
   cl::Platform platform_;
@@ -1158,7 +1289,7 @@ inline void Info::set_platform(cl::Platform const &platform)
   assert(devices.size() && OPENCL_NO_DEVICES);
   device_ = devices[0];
   context_ = cl::Context({device_});
-}
+} 
 
 inline std::vector<cl::Platform> Info::get_platforms()
 {
@@ -1180,6 +1311,11 @@ inline std::vector<cl::Device> Info::get_devices(cl::Platform const &platform)
   platform.getDevices(CL_DEVICE_TYPE_ALL, &devices); 
   assert(devices.size() && OPENCL_NO_DEVICES);
   return devices;
+}
+
+inline std::vector<cl::Device> Info::get_devices() const noexcept
+{
+  return get_devices(platform_);
 }
 
 inline void Info::Set(cl::Platform const &platform, cl::Device const &device)
@@ -1308,7 +1444,7 @@ cl::Buffer evaluate_basic_kernel(
     size_t num_elems
 )
 {
-  std::string kernel_code = std::string("kernel void k(") + arg_list + "global "
+  auto kernel_code = std::string("kernel void k(") + arg_list + "global "
     + OpenCLType<T>::value + " *output) {";
   kernel_code += "\n\tsize_t global_id = get_global_id(0);";
   kernel_code += std::string("\noutput[global_id] = ") + expr + ";\n}\n";
@@ -1321,6 +1457,7 @@ cl::Buffer evaluate_basic_kernel(
       nullptr, 
       &err
   );
+  assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
 
   cl::Program::Sources sources({ kernel_code });
   cl::Program program(Info::v().context(), sources);
@@ -1341,14 +1478,14 @@ cl::Buffer evaluate_basic_kernel(
 template <typename NodeType>
 cl::Buffer create_buffer(NodeType const& node)
 {
-  cl::CommandQueue cqueue(Info::v().context(), Info::v().device());
+  auto cqueue = cl::CommandQueue(Info::v().context(), Info::v().device());
   auto buffers = std::vector<cl::Buffer>{};
   auto cl_arg_list = std::string{};
   auto cl_expr = node.opencl_kernel_code(cqueue, buffers, cl_arg_list);
   return node.opencl_evaluate_kernel(cqueue, buffers, cl_arg_list, cl_expr);
 }
 
-/** Returns the OpenCL code, as std::string, for a reduction kernel with one input  */
+/** Returns the OpenCL code, as an std::string, for a reduction kernel with one input  */
 template <typename ReturnType, typename Function> 
 std::string create_reduction_kernel_code()
 {
@@ -1391,23 +1528,17 @@ std::string create_reduction_kernel_code()
   return kernel_code;
 }
 
-/** Returns the OpenCL code, as std::string, for an offset kernel */
+/** Returns the OpenCL code, as an std::string, for an offset kernel */
 template <typename ReturnType, typename Function> 
 std::string create_offset_kernel_code()
 {
   // The kernel's 1st argument is the input buffer, containing one element,
   // and the second argument is the initial value
     
-  /*
-  std::string kernel_code =
-      std::string(cKernelIdentifier) + " " + cVoidType + " " + cKernelPrefix + "(";
-  */
-
   std::string kernel_code = R"(kernel void k(global )";
-  kernel_code += std::string(OpenCLType<ReturnType>::value) + " *output, "
-  + OpenCLType<ReturnType>::value + " const ival) {";
-  kernel_code += "\n\toutput[0] = ";
-  kernel_code += Function::opencl_map(std::string("ival"), std::string("output[0]")) + ";\n}";
+  kernel_code += std::string(OpenCLType<ReturnType>::value) + " *output, " 
+    + OpenCLType<ReturnType>::value + " const ival) {" + "\n\toutput[0] = "
+    + Function::opencl_map(std::string("ival"), std::string("output[0]")) + ";\n}";
 
   return kernel_code;
 }
@@ -1568,21 +1699,26 @@ std::string create_multiplication_kernel_code(
   kernel_code += "\nsize_t constant rhs_cdims[N2] = {";
   for (size_t i = 0; i < M2 - 1; ++i) 
     kernel_code += std::to_string(rhs_cumul_dim[i]) + ", ";
+
+  // Replace the trailing comma
   kernel_code[kernel_code.size() - 2] = '}';
   kernel_code[kernel_code.size() - 1] = ';';
+
   kernel_code += "\nsize_t constant rhs_strides[N2] = {";
-  for (size_t i = 0; i < M2; ++i)  {
-    // skip the dimension of the axis being foleded over
-    if (i != I2) kernel_code += std::to_string(rhs_strides[i]) + ", ";
-  }
+  // skip the dimension of the axis being foleded over
+  for (size_t i = 0; i < M2; ++i) 
+    if (i != I2) 
+      kernel_code += std::to_string(rhs_strides[i]) + ", ";
+
+  // Replace the trailing comma 
   kernel_code[kernel_code.size() - 2] = '}';
   kernel_code[kernel_code.size() - 1] = ';';
 
   // Kernel decleration & argument list
   kernel_code += std::string("\nkernel void k(global ")
-  + OpenCLType<LHSType>::value + " const *lhs, global "
-  + OpenCLType<LHSType>::value + " const *rhs, global "
-  + OpenCLType<LHSType>::value + " *output) {\n";
+    + OpenCLType<LHSType>::value + " const *lhs, global "
+    + OpenCLType<LHSType>::value + " const *rhs, global "
+    + OpenCLType<LHSType>::value + " *output) {\n";
 
   // Global size and id declerations
   kernel_code += R"(
@@ -1679,6 +1815,7 @@ class Array { /*@data::Array<T>*/
  */
 public:
 
+  /** Sets the underlying shared_ptr to `nullptr` */
   Array() = default;
 
   /** Allocates an array of size `capacity`, with `operator new[]`. 
@@ -2060,10 +2197,8 @@ public:
 
   /* -------------------- Print --------------------- */
 
-  template <typename U, size_t M, template <class> class C_>
-  friend std::ostream &operator<<(std::ostream &os, Tensor<U, M, C_> const&tensor);
-  template <size_t M>
-  friend std::ostream &operator<<(std::ostream &os, Shape<M> const &shape);
+  /** Produces "S{<dim1>, <dim2>, ..., <dimN>}" */
+  std::string str() const;
 
 private:
   
@@ -2149,24 +2284,24 @@ size_t Shape<N>::index_product() const noexcept
 }
 
 template <size_t N>
+std::string Shape<N>::str() const 
+{
+  auto s = std::string("S{");
+  for (size_t i = 0; i < N - 1; ++i) 
+    s += std::to_string(dimensions_[i]) + ", ";
+  s += std::to_string(dimensions_[N - 1]) + "}";
+  return s;
+}
+
+template <size_t N>
 void Shape<N>::pInitializeStrides(size_t (&strides)[N]) const noexcept
 {
+  static_assert(N, PANIC_ASSERTION);
   size_t accumulator = 1;
   for (size_t i = 0; i < N; ++i) {
     strides[N - i - 1] = accumulator;
     accumulator *= dimensions_[N - i - 1];
   }
-}
-
-/** stream recieves S{<dim1>, <dim2>, ..., <dimN>} */
-template <size_t N>
-std::ostream &operator<<(std::ostream &os, Shape<N> const &shape)
-{
-  os << "S{";
-  for (size_t i = 0; i < N - 1; ++i) 
-    os << shape.dimensions_[i] << ", ";
-  os << shape.dimensions_[N - 1] << "}";
-  return os;
 }
 
 template <size_t N>
@@ -2218,10 +2353,10 @@ public:
    */
   bool decrement(Shape<N> const &shape);
 
-  /* ----------------- ostream ----------------- */
+  /* ----------------- String Format ----------------- */
 
-  template <size_t M>
-  friend std::ostream &operator<<(std::ostream &os, Indices<M> const &indices);
+  /** Produces "I{<dim1>, <dim2>, ..., <dimN>}" */
+  std::string str() const;
   
 private:
   size_t indices_[N];
@@ -2300,15 +2435,15 @@ Indices<N>::Indices(size_t const *indices)
     indices_[i] = indices[i];
 }
 
-/** stream recieves I{<dim1>, <dim2>, ..., <dimN>} */
-template <size_t M>
-std::ostream &operator<<(std::ostream &os, Indices<M> const &indices)
+template <size_t N>
+std::string Indices<N>::str() const
 {
-  os << "I{";
-  for (size_t i = 0; i < M - 1; ++i) 
-    os << indices[i] << ", ";
-  os << indices[M - 1] << "}";
-  return os;
+  static_assert(N, PANIC_ASSERTION);
+  auto s = std::string("I{");
+  for (size_t i = 0; i < N - 1; ++i) 
+    s += std::string(indices_[i]) + ", ";
+  s += std::to_string(indices_[N - 1]) + "}";
+  return s;
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -2624,10 +2759,21 @@ public:
   template <typename RHS>
   Tensor<T, N, C> &operator-=(Expression<RHS> const &rhs);
 
-  template <typename X, template <class> class C_, size_t I1, size_t I2, 
-    typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
-  friend Tensor<X, M1 + M2 - 2, C_> details::mul(Tensor<Y, M1, C1> const& tensor_1, 
-      Tensor<Z, M2, C2> const& tensor_2);
+  template <typename X, 
+           template <class> class C_, 
+           size_t I1, 
+           size_t I2, 
+           typename Y, 
+           typename Z, 
+           size_t M1, 
+           size_t M2, 
+           template <class> class C1, 
+           template <class> class C2
+  >
+  friend Tensor<X, M1 + M2 - 2, C_> details::mul(
+      Tensor<Y, M1, C1> const& tensor_1, 
+      Tensor<Z, M2, C2> const& tensor_2
+  );
 
   template <typename RHS>
   Tensor<T, N, C> &operator*=(Expression<RHS> const &rhs);
@@ -2636,6 +2782,13 @@ public:
    *  elements are equivalent to *this with operator-() applied.
    */
   Tensor<T, N, C> neg() const;
+
+  /** Flattens the tensor, compressing the indices `I...` 
+   *  For example, S{2, 3, 4} with indices 1, 2 becomes S{2, 12}
+   *  `I...` must be consecutive and less than rank 
+   */
+  template <size_t I1, size_t I2>
+  Tensor<T, N - (I2 - I1), C> flatten();
 
   /* ---------------------- OpenCL ---------------------- */
    
@@ -2655,10 +2808,13 @@ public:
       std::string &expr) const noexcept;
 #endif
 
-  /* ------------------ Print to ostream --------------- */
+  /* ------------------ Convert to string --------------- */
 
-  template <typename X, size_t M, template <class> class C_>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M, C_> &tensor);
+  /** Converts tensor into a string using square brace "[]" form 
+   *  (identical to python's MD arrays) I.e. a 1x1x1 Tensor 
+   *  with element x will appear as [[[x]]]
+   */
+  std::string str() const;
 
   /* -------------------- Equivalence ------------------ */
 
@@ -2898,7 +3054,7 @@ public:
    *  over the values.
    */
   template <size_t M, template <class> class C_ = self_t::container_t>
-  Tensor<T, M, C_> resize(Shape<M> const &shape) const noexcept;
+  Tensor<T, M, C_> reshape(Shape<M> const &shape) const noexcept;
 
   /** Returns a deep copy of this tensor, equivalent to calling copy constructor */
   Tensor<T, N, C> copy() const; 
@@ -2950,7 +3106,6 @@ private:
 
   /* --------------- Expansion for slice() --------------- */
 
-  // Expansion
   template <size_t M>
   Tensor<T, N - M, C> pSliceExpansion(size_t (&placed_indices)[N], Indices<M> const &indices);
 
@@ -3527,13 +3682,11 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::slice(Args... args)
   static_assert(N >= sizeof...(Slices) + sizeof...(args), SLICES_OUT_OF_BOUNDS);
   size_t placed_indices[N];
 
-  // fill the array with 1s
-  // place 0s where the indices are sliced
+  // fill the array with 1s, place 0s where the indices are sliced
   std::fill_n(placed_indices, N, 1);
   meta::InsertZeros<N, Slices...>{placed_indices};
 
-  // slice dimensions (aka set 0) not explicitly sliced nor 
-  // filled by `indices`
+  // slice dimensions (aka set 0) not explicitly sliced nor filled by `indices`
   size_t unfilled_dimensions = N - sizeof...(Args) - sizeof...(Slices);
   for (size_t i = 0; i < N; ++i) {
     if (!unfilled_dimensions) break;
@@ -3644,61 +3797,60 @@ bool Tensor<T, N, C>::operator==(Tensor<X, N, C> const& tensor) const
 {
   assert((shape_ == tensor.shape_) && DIMENSION_MISMATCH);
 
-  size_t indices_product = shape_.index_product();
-  for (size_t i = 0; i < indices_product; ++i)
+  size_t index_product = shape_.index_product();
+  for (size_t i = 0; i < index_product; ++i)
     if (ref_[i + offset_] != tensor.ref_[i + tensor.offset_]) 
       return false;
 
   return true;
 }
 
-/** Streams tensor square brace "[]" form (what python's MD arrays look like)
- *  I.e. a 1x1x1 Tensor with element x will appear as [[[x]]]
- */
-template <typename U, size_t M, template <class> class C_>
-std::ostream &operator<<(std::ostream &os, const Tensor<U, M, C_> &tensor)
+template <typename T, size_t N, template <class> class C>
+std::string Tensor<T, N, C>::str() const
 {
-  // FIXME methid could be a lot simpler?
-  auto add_brackets = [&os](size_t n, bool left) -> void {
-    for (size_t i = 0; i < n; ++i) os << (left ?'[' : ']');
+  // FIXME method could be a lot simpler?
+  auto s = std::string{};
+  auto add_brackets = [&s](size_t n, bool left) -> void {
+    for (size_t i = 0; i < n; ++i) s += (left ?'[' : ']');
   };
 
-  size_t cumul_index = tensor.shape_.index_product();
-  size_t dim_quotas[M];
-  std::copy_n(tensor.shape_.dimensions_, M, dim_quotas);
+  size_t cumul_index = shape_.index_product();
   size_t index = 0;
+  size_t dim_capacities[N];
+  std::copy_n(shape_.dimensions_, N, dim_capacities);
 
-  add_brackets(M, true);
-  os << tensor.ref_[tensor.offset_]; 
+  add_brackets(N, true);
+  s += StringFormat<value_t>{}(ref_[offset_]); 
+
   for (size_t i = 0; i < cumul_index - 1; ++i) {
     size_t bracket_count = 0;
     bool propogate = true;
-    int dim_index = M - 1;
+    int dim_index = N - 1;
 
     // find the correct index to "step" to
     while (dim_index >= 0 && propogate) {
-      --dim_quotas[dim_index];
+      --dim_capacities[dim_index];
       ++bracket_count;
-      index += tensor.strides_[dim_index];
-      if (!dim_quotas[dim_index]) {
-        dim_quotas[dim_index] = tensor.shape_.dimensions_[dim_index];
-        index -= dim_quotas[dim_index] * tensor.strides_[dim_index];
+      index += strides_[dim_index];
+      if (!dim_capacities[dim_index]) {
+        dim_capacities[dim_index] = shape_.dimensions_[dim_index];
+        index -= dim_capacities[dim_index] * strides_[dim_index];
       } else {
         propogate = false;
       }
       --dim_index;
     }
 
-    // add closing brackets to balance
+    // add closing brackets
     add_brackets(bracket_count - 1, false);
-    os << ", ";
+    s += ", ";
     add_brackets(bracket_count - 1, true);
-    os << tensor.ref_[index + tensor.offset_];
+    s += StringFormat<value_t>{}(ref_[index + offset_]);
   }
   
   // last set of closing brackets
-  add_brackets(M, false); 
-  return os;
+  add_brackets(N, false); 
+  return s;
 }
 
 /* ----------- Expansion for operator()() ----------- */
@@ -4190,11 +4342,38 @@ Tensor<U, M, C_> neg(Tensor<U, M, C_> const &tensor)
   return neg_tensor;
 }
 
+template <typename T, size_t N, template <class> class C>
+template <size_t I1, size_t I2>
+Tensor<T, N - (I2 - I1), C> Tensor<T, N, C>::flatten()
+{
+  static_assert(I1 < I2, FLATTEN_INDICES_ERROR);
+  static_assert(I2 < N, FLATTEN_INDICES_ERROR);
+  
+  size_t dimensions[N - (I2 - I1)];
+  size_t strides[N - (I2 - I1)];
+
+  std::copy_n(dimensions, I1, shape_.dimensions_);
+  std::copy_n(dimensions + I2 + 1, N - I2 - 1, shape_.dimensions_ + I2 + 1);
+  std::copy_n(strides_, I1, strides_);
+  std::copy_n(strides_+ I2 + 1, N - I2 - 1, strides_ + I2 + 1);
+
+  size_t compressed_dimensions = std::accumulate(
+      shape_.dimensions_ + I1,
+      shape_.dimensions_ + I2 + 1,
+      1,
+      [](size_t accum, size_t next) { return accum * next; }
+  );
+
+  dimensions[I1] = compressed_dimensions;
+  strides[I1] = strides_[I2];
+  return Tensor<T, N - (I2 - I1), C>(dimensions, strides, offset_, ref_);
+}
+
 /* --------------------------- Useful Functions ------------------------- */
 
 template <typename T, size_t N, template <class> class C>
 template <size_t M, template <class> class C_>
-Tensor<T, M, C_> Tensor<T, N, C>::resize(Shape<M> const &shape) const noexcept
+Tensor<T, M, C_> Tensor<T, N, C>::reshape(Shape<M> const &shape) const noexcept
 {
   assert(shape_.index_product() == shape.index_product() && ELEMENT_COUNT_MISMATCH);
   Tensor<T, M, C_> resized_tensor(shape);
@@ -4861,11 +5040,6 @@ public:
   template <size_t M>
   bool operator!=(Shape<M> const&) const noexcept { return true; }
 
-  /* ---------------- Print ----------------- */
-
-  template <typename X, size_t M, template <class> class C_>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M, C_> &tensor);
-
 };
 
 template <>
@@ -5052,13 +5226,9 @@ public:
   template <typename U, template <class> class C_>
   friend inline void Set(Tensor<U, 0, C_> &tensor, U&& value);
 
-  /* --------------- Print --------------- */
- 
-  template <typename X, size_t M, template <class> class C_>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, M, C_> &tensor);
+  /* ---------- Convert To String ------------ */
 
-  template <typename X, template <class> class C_>
-  friend std::ostream &operator<<(std::ostream &os, const Tensor<X, 0, C_> &tensor);
+  std::string str() const;
 
   /* ------------ Equivalence ------------ */
 
@@ -5709,11 +5879,11 @@ Tensor<T, 0, C>::Tensor(size_t const *, size_t const *, size_t offset, C<T> cons
 
 /* ------------------------ Overloads ------------------------ */
 
-template <typename X, template <class> class C_>
-std::ostream &operator<<(std::ostream &os, const Tensor<X, 0, C_> &tensor)
+template <typename T, template <class> class C>
+std::string Tensor<T, 0, C>::str() const
 {
-  os << tensor.ref_[tensor.offset_];
-  return os; }
+  return StringFormat<value_t>{}(ref_[offset_]);
+}
 
 /* ------------------- Useful Functions ---------------------- */
 
@@ -6305,12 +6475,6 @@ public:
   friend BinaryAddExpr<LHS_, RHS_> 
     _add(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
-  template <typename LHS_, typename RHS_>
-  friend std::ostream &operator<<(
-      std::ostream &os, 
-      BinaryAddExpr<LHS_, RHS_> const &binary_add
-  ); 
-
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_> friend class BinaryMulExpr;
@@ -6349,6 +6513,9 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(
         std::declval<LHS const>().slice(indices))>::type;
+
+  /** Produces "(+ `lhs`, `rhs`)" */
+  std::string str() const;
 
   /* ---------------- OpenCL ----------------- */
 
@@ -6442,6 +6609,12 @@ auto BinaryAddExpr<LHS, RHS>::slice(Indices<M> const &indices) const
   return lhs_.template slice<Slices...>(indices) + rhs_.template slice<Slices...>(indices);
 }
 
+template <typename LHS, typename RHS>
+std::string BinaryAddExpr<LHS, RHS>::str() const 
+{
+  return "(+ " + lhs_.str() + " " + rhs_.str() + ")";
+}
+
 /* -------------- Constructors -------------- */
 
 template <typename LHS, typename RHS>
@@ -6483,16 +6656,6 @@ cl::Buffer BinaryAddExpr<LHS, RHS>::opencl_evaluate_kernel(
 
 #endif
 
-/* ----------------- Print ----------------- */
-
-/** `os` recieves BinaryAddExpr(`lhs_`, `rhs_`) */ 
-template <typename LHS_, typename RHS_>
-std::ostream &operator<<(std::ostream &os, BinaryAddExpr<LHS_, RHS_> const &binary_add) 
-{
-  os << "BinaryAddExpr(" << binary_add.lhs_ << ", " << binary_add.rhs_ << ")";
-  return os;
-}
-
 /* ----------------------------------------- */
 
 template <typename LHS, typename RHS>
@@ -6517,13 +6680,6 @@ public:
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
     _sub(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
-
-
-  template <typename LHS_, typename RHS_>
-  friend std::ostream &operator<<(
-      std::ostream &os, 
-      BinarySubExpr<LHS_, RHS_> const &binary_sub
-  );
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6563,6 +6719,9 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(
         std::declval<LHS const>().slice(indices))>::type;
+
+  /** Produces "(- `lhs`, `rhs`)" */
+  std::string str() const;
 
   /* ---------------- OpenCL ----------------- */
 
@@ -6657,6 +6816,12 @@ auto BinarySubExpr<LHS, RHS>::slice(Indices<M> const &indices) const
   return lhs_.template slice<Slices...>(indices) - rhs_.template slice<Slices...>(indices);
 }
 
+template <typename LHS, typename RHS>
+std::string BinarySubExpr<LHS, RHS>::str() const
+{
+  return "(- " + lhs_.str() + " " + rhs_.str() + ")";
+}
+
 /* ----------------- OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
@@ -6696,16 +6861,6 @@ template <typename LHS, typename RHS>
 BinarySubExpr<LHS, RHS>::BinarySubExpr(LHS const &lhs, RHS const &rhs)
   : lhs_(lhs), rhs_(rhs) {}
 
-/* ----------------- Print ----------------- */
-
-/** `os` recieves BinarySubExpr(`lhs_`, `rhs_`) */ 
-template <typename LHS_, typename RHS_>
-std::ostream &operator<<(std::ostream &os, BinarySubExpr<LHS_, RHS_> const &binary_sub) 
-{
-  os << "BinarySubExpr(" << binary_sub.lhs_ << ", " << binary_sub.rhs_ << ")";
-  return os;
-}
-
 /**
  * Multiplies the inner dimensions
  * i.e. 3x4x5 * 5x4x3 produces a 3x4x4x3 tensor
@@ -6733,12 +6888,6 @@ public:
   template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
   friend BinaryMulExpr<I1_, I2_, LHS_, RHS_> 
     _mul(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
-
-  template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
-  friend std::ostream &operator<<(
-      std::ostream &os, 
-      BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul
-  );
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -6793,6 +6942,9 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(
         std::declval<return_t const>().slice(indices))>::type;
+
+  /** Produces "<`I1`, `I2`>(* `lhs`, `rhs`)" */
+  std::string str() const;
 
   /* --------------------------- OpenCL ----------------------------- */
 
@@ -7085,6 +7237,13 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
   return pSliceSequences(lhs_sequence, rhs_sequence, indices);
 }
 
+template <size_t I1, size_t I2, typename LHS, typename RHS>
+std::string BinaryMulExpr<I1, I2, LHS, RHS>::str() const
+{
+  return "<" + std::to_string(I1) + ", " + std::to_string(I2) 
+    + ">(* " + lhs_.str() + " " + rhs_.str() + ")";
+}
+
 template <typename LHS, typename RHS>
 BinaryMulExpr<LHS::rank() - 1, 0, LHS, RHS> operator*(
     Expression<LHS> const &lhs, 
@@ -7098,20 +7257,6 @@ template <size_t I1, size_t I2, typename LHS, typename RHS>
 BinaryMulExpr<I1, I2, LHS, RHS> _mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs)
 {
   return BinaryMulExpr<I1, I2, LHS, RHS>(lhs.self(), rhs.self());
-}
-
-/* ------------------------------- Print ------------------------------- */
-
-/** `os` recieves BinaryMulExpr<`I1_`, `I2_`>(`lhs_`, `rhs_`) */ 
-template <size_t I1_, size_t I2_, typename LHS_, typename RHS_>
-std::ostream &operator<<(
-    std::ostream &os, 
-    BinaryMulExpr<I1_, I2_, LHS_, RHS_> const &binary_mul
-)
-{
-  os << "BinaryMulExpr<" << I1_ << ", " << I2_ << ">(" 
-      << binary_mul.lhs_ << ", " << binary_mul.rhs_ << ")";
-  return os;
 }
 
 /* ------------------------------ Utility ------------------------------ */
@@ -7262,8 +7407,8 @@ public:
   friend BinaryHadExpr<LHS_, RHS_> 
     _hadamard(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
-  template <typename LHS_, typename RHS_>
-  friend std::ostream &operator<<(std::ostream &os, BinaryHadExpr<LHS_, RHS_> const &binary_had);
+  /** Produces "(% `lhs_` `rhs_`)" */ 
+  std::string str() const;
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -7469,12 +7614,10 @@ BinaryHadExpr<LHS, RHS>::BinaryHadExpr(LHS const &lhs, RHS const &rhs)
 
 /* ----------------- Print ----------------- */
 
-/** `os` recieves "BinaryHadExpr(`lhs_`, `rhs_`)" */ 
-template <typename LHS_, typename RHS_>
-std::ostream &operator<<(std::ostream &os, BinaryHadExpr<LHS_, RHS_> const &binary_had)
+template <typename LHS, typename RHS>
+std::string BinaryHadExpr<LHS, RHS>::str() const
 {
-  os << "BinaryHadExpr(" << binary_had.lhs_ << ", " << binary_had.rhs_ << ")";
-  return os;
+  return "(% " + lhs_.str() + " " + rhs_.str() + ")";
 }
 
 /* ----------------- OpenCL ----------------- */
@@ -7534,8 +7677,8 @@ public:
   template <typename Function_, typename... Exprs_> 
   friend MapExpr<Function_, Exprs_...> _map(Function_ &&fn, Expression<Exprs_> const&... exprs);
 
-  template <typename Function_, typename... Exprs_>
-  friend std::ostream &operator<<(std::ostream &os, MapExpr<Function_, Exprs_...> const &map_expr);
+  /** Produces "(<map> `expr_...`)" */ 
+  std::string str() const;
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -7578,7 +7721,6 @@ public:
 
 #ifdef _ENABLE_OPENCL
   opencl::Model<self_t> opencl() const { return opencl::Model<self_t>(*this); }
-  
   std::string opencl_kernel_code(
       cl::CommandQueue &cqueue, 
       std::vector<cl::Buffer> &buffers, 
@@ -7639,7 +7781,7 @@ private:
   value_t pMapSliceExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const;
 
   template <size_t... TupleIndices>
-  std::ostream &pOstreamExpansion(meta::Sequence<TupleIndices...>, std::ostream &os) const;
+  std::string pStringExpansion(meta::Sequence<TupleIndices...>) const;
 
   /* ---------------------------- OpenCL ---------------------------- */
 
@@ -7657,7 +7799,6 @@ private:
 
   std::tuple<Exprs const&...> exprs_;
   Function &fn_;
-
 };
 
 template <typename Function, typename... Exprs>
@@ -7720,11 +7861,18 @@ template <typename Function, typename... Exprs>
 MapExpr<Function, Exprs...>::MapExpr(Function &&fn, Exprs const&... exprs)
   : exprs_(std::forward_as_tuple(exprs...)), fn_(fn) {}
 
+template <typename Function, typename... Exprs>
+std::string MapExpr<Function, Exprs...>::str() const
+{
+  return pStringExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
+}
+
 /* --------------------------- Utility ------------------------------ */
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices, typename... Args, typename>
-auto MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>, Args... args) const
+auto MapExpr<Function, Exprs...>::pMapExpansion(
+    meta::Sequence<TupleIndices...>, Args... args) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>()(args...))>::type
 {
   static_assert(self_t::rank() != sizeof...(args), PANIC_ASSERTION);
@@ -7733,8 +7881,8 @@ auto MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>,
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices, typename... Args, typename>
-typename MapExpr<Function, Exprs...>::value_t 
-  MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>, Args... args) const
+auto MapExpr<Function, Exprs...>::pMapExpansion(
+      meta::Sequence<TupleIndices...>, Args... args) const -> value_t
 {
   static_assert(self_t::rank() == sizeof...(args), PANIC_ASSERTION);
   return fn_(std::get<TupleIndices>(exprs_)(args...)...);
@@ -7742,7 +7890,8 @@ typename MapExpr<Function, Exprs...>::value_t
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices, size_t M, typename>
-auto MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
+auto MapExpr<Function, Exprs...>::pMapExpansion(
+    meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
   -> typename std::remove_reference<decltype(std::declval<return_t const>()[indices])>::type
 {
   static_assert(self_t::rank() != M, PANIC_ASSERTION);
@@ -7752,7 +7901,8 @@ auto MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>,
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices, size_t M, typename>
 typename MapExpr<Function, Exprs...>::value_t 
-  MapExpr<Function, Exprs...>::pMapExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
+  MapExpr<Function, Exprs...>::pMapExpansion(
+      meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
 {
   static_assert(self_t::rank() == M, PANIC_ASSERTION);
   return fn_(std::get<TupleIndices>(exprs_)[indices]...);
@@ -7801,26 +7951,13 @@ typename MapExpr<Function, Exprs...>::value_t MapExpr<Function, Exprs...>::
 
 template <typename Function, typename... Exprs>
 template <size_t... TupleIndices>
-std::ostream &MapExpr<Function, Exprs...>::pOstreamExpansion(
-    meta::Sequence<TupleIndices...>, 
-    std::ostream &os
-) const
+std::string MapExpr<Function, Exprs...>::pStringExpansion(
+    meta::Sequence<TupleIndices...>) const
 {
-  os << "MapExpr(<fn>";
-  VARDIAC_MAP(os << ", " << std::get<TupleIndices>(exprs_));
-  os << ")";
-  return os;
-}
-
-/* ---------------------------- OpenCL ---------------------------- */
-
-template <typename Function_, typename... Exprs_>
-std::ostream &operator<<(std::ostream &os, MapExpr<Function_, Exprs_...> const &map_expr)
-{
-  return map_expr.pOstreamExpansion(
-      typename meta::MakeIndexSequence<0, sizeof...(Exprs_)>::sequence{},
-      os
-  );
+  auto s = std::string("(<map>");
+  VARDIAC_MAP(s += " " + std::get<TupleIndices>(exprs_).str());
+  s += ")";
+  return s;
 }
 
 /* ---------------------------- OpenCL ---------------------------- */
@@ -7921,6 +8058,8 @@ public:
   template <size_t... Slices>
   T slice(Indices<0> const &indices) const;
 
+  std::string str() const;
+
   /* --------------------------- OpenCL ----------------------------- */
 
 #ifdef _ENABLE_OPENCL
@@ -7951,6 +8090,9 @@ private:
 
   template <size_t... TupleIndices>
   T pReduceExpansion(meta::Sequence<TupleIndices...>) const;
+
+  template <size_t... TupleIndices>
+  std::string pStringExpansion(meta::Sequence<TupleIndices...>) const;
 
   /* ---------------------------- Data ------------------------------ */
 
@@ -8006,6 +8148,12 @@ T ReduceExpr<T, Function, Exprs...>::slice(Indices<0> const&) const
   return pReduceExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
 }
 
+template <typename T, typename Function, typename... Exprs>
+std::string ReduceExpr<T, Function, Exprs...>::str() const 
+{
+  return pStringExpansion(typename meta::MakeIndexSequence<0, sizeof...(Exprs)>::sequence{});
+}
+
 /* ----------------------- Constructors --------------------- */
 
 template <typename T, typename Function, typename... Exprs>
@@ -8029,6 +8177,17 @@ T ReduceExpr<T, Function, Exprs...>::pReduceExpansion(meta::Sequence<TupleIndice
     return_value = fn_(return_value, std::get<TupleIndices>(exprs_)[indices]...);
   } while (indices.increment(shape));
   return return_value;
+}
+
+template <typename T, typename Function, typename... Exprs>
+template <size_t... TupleIndices>
+std::string ReduceExpr<T, Function, Exprs...>::pStringExpansion(
+    meta::Sequence<TupleIndices...>) const
+{
+  auto s = std::string("(<reduce>");
+  VARDIAC_MAP(s += " " + std::get<TupleIndices>(exprs_).str());
+  s += ")";
+  return s;
 }
 
 /* --------------------- OpenCL --------------------- */
@@ -8136,6 +8295,9 @@ public:
   auto slice(Indices<M> const &indices) const
     -> typename std::remove_reference<decltype(std::declval<RHS const>().slice(indices))>::type;
 
+  std::string str() const;
+
+
   /* ---------------- OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
@@ -8228,6 +8390,14 @@ auto UnaryNegExpr<RHS>::slice(Indices<M> const &indices) const
   return -rhs_.template slice<Slices...>(indices);
 }
 
+/* ----------------- Print ----------------- */
+
+template <typename RHS>
+std::string UnaryNegExpr<RHS>::str() const
+{
+  return "(- " + rhs_.str() + ")";
+}
+
 /* ------------------ OpenCL ----------------- */
 
 #ifdef _ENABLE_OPENCL
@@ -8269,7 +8439,6 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 
 } // namespace tensor
 
-// undefine all of the debug messages
 #undef NTENSOR_0CONSTRUCTOR
 #undef NCONSTRUCTOR_0TENSOR
 #undef NELEMENTS
@@ -8300,5 +8469,17 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 #undef OPENCL_NO_DEVICES 
 #undef OPENCL_ARITY_ERROR
 #undef OPENCL_REDUCTION_SIZE_ERROR
+
+#ifndef _NDEBUG
+
+#undef PRINT
+#undef PRINTV
+#undef ARRAY_SIZE
+#undef PRINT_ARRAY1
+#undef PRINT_ARRAY2
+#undef GET_MACRO
+#undef PRINT_ARRAY
+
+#endif // not defined _NDEBUG
 
 #endif // TENSORS_H_

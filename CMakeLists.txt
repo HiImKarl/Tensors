@@ -29,3 +29,4 @@ if (benchmark_FOUND)
 endif ()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
+add_subdirectory(${PROJECT_SOURCE_DIR}/example/)

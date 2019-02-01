@@ -101,9 +101,9 @@ void ConstMethodTests() {
         for (size_t l = 0; l < tensor.dimension(3); ++l) 
           tensor(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; 
 
-  SECTION("resize") { 
+  SECTION("reshape") { 
     Matrix<int32_t, Container> mat = tensor.template slice<1, 3>(1, 2); 
-    Vector<int32_t, Container> vec = mat.template resize<1>(Shape<1>({32})); 
+    Vector<int32_t, Container> vec = mat.template reshape<1>(Shape<1>({32})); 
     REQUIRE(vec.rank() == 1); 
     REQUIRE(vec.dimension(0) == 32); 
     int32_t correct_number = 1020; 
