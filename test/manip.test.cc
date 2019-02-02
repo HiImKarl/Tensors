@@ -89,8 +89,26 @@ void MethodTests() {
       for (size_t j = 0; j < tensor_2.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_2.dimension(2); ++k) 
           REQUIRE(tensor_2(i, j, k) == -500); 
-  } 
-} 
+  }
+
+  SECTION("Flatten") {
+    auto indices = Indices<4>();
+    int i = 0;
+    do {
+      tensor[indices] = i++;
+    } while (indices.increment(tensor.shape()));
+
+    Tensor<int32_t, 3, Container> flattened_tensor = tensor.template flatten<1, 2>().ref();
+    REQUIRE(flattened_tensor.rank() == 3);
+    REQUIRE(flattened_tensor.shape() == Shape<3>{2, 24, 8});
+
+    auto flattened_indices = Indices<3>();
+    i = 0;
+    do {
+      REQUIRE(flattened_tensor[flattened_indices] == i++);
+    } while (flattened_indices.increment(flattened_tensor.shape()));
+  }
+}
 
 template <template <class> class Container>
 void ConstMethodTests() {

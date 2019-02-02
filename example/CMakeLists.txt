@@ -18,7 +18,7 @@ foreach(ONE_EXAMPLE_CC ${EXAMPLE_CC})
     set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME ${ONE_EXAMPLE_EXEC}) 
 endforeach()
 
-add_executable(example_all ${EXAMPLE_CC} example.cc example.hh) 
+add_executable(example_all ${EXAMPLE_CC}) 
 
 if (OpenCL_FOUND)
   target_link_libraries(example_all ${OpenCL_LIBRARY})

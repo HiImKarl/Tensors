@@ -2116,6 +2116,7 @@ public:
 
   /* -------------------- friends -------------------- */
 
+  template <size_t M> friend class Shape;
   template <typename X, size_t M, template <class> class C_> friend class Tensor;
   template <typename LHS, typename RHS> friend class BinaryAddExpr;
   template <typename LHS, typename RHS> friend class BinarySubExpr;
@@ -4352,19 +4353,19 @@ Tensor<T, N - (I2 - I1), C> Tensor<T, N, C>::flatten()
   size_t dimensions[N - (I2 - I1)];
   size_t strides[N - (I2 - I1)];
 
-  std::copy_n(dimensions, I1, shape_.dimensions_);
-  std::copy_n(dimensions + I2 + 1, N - I2 - 1, shape_.dimensions_ + I2 + 1);
-  std::copy_n(strides_, I1, strides_);
-  std::copy_n(strides_+ I2 + 1, N - I2 - 1, strides_ + I2 + 1);
+  std::copy_n(shape_.dimensions_, I1, dimensions);
+  std::copy_n(shape_.dimensions_ + I2 + 1, N - I2 - 1, dimensions + I1 + 1);
+  std::copy_n(strides_, I1, strides);
+  std::copy_n(strides_+ I2 + 1, N - I2 - 1, strides + I1 + 1);
 
-  size_t compressed_dimensions = std::accumulate(
+  size_t compressed_dimension = std::accumulate(
       shape_.dimensions_ + I1,
       shape_.dimensions_ + I2 + 1,
       1,
       [](size_t accum, size_t next) { return accum * next; }
   );
 
-  dimensions[I1] = compressed_dimensions;
+  dimensions[I1] = compressed_dimension;
   strides[I1] = strides_[I2];
   return Tensor<T, N - (I2 - I1), C>(dimensions, strides, offset_, ref_);
 }
