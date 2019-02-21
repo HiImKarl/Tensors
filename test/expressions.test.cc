@@ -541,41 +541,41 @@ void TensorMultiplicationTests() {
   } 
 
   SECTION("Multiplication -- Specific Facing Indices") {
-    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).rank() == 4);
-    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(0) == 3);
-    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(1) == 2);
-    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(2) == 3);
-    REQUIRE(_mul<0, 0>(tensor_3, tensor_4).dimension(3) == 2);
+    REQUIRE(_mul_<0, 0>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul_<0, 0>(tensor_3, tensor_4).dimension(0) == 3);
+    REQUIRE(_mul_<0, 0>(tensor_3, tensor_4).dimension(1) == 2);
+    REQUIRE(_mul_<0, 0>(tensor_3, tensor_4).dimension(2) == 3);
+    REQUIRE(_mul_<0, 0>(tensor_3, tensor_4).dimension(3) == 2);
 
-    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).rank() == 4);
-    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(0) == 4);
-    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(1) == 2);
-    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(2) == 4);
-    REQUIRE(_mul<1, 1>(tensor_3, tensor_4).dimension(3) == 2);
+    REQUIRE(_mul_<1, 1>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul_<1, 1>(tensor_3, tensor_4).dimension(0) == 4);
+    REQUIRE(_mul_<1, 1>(tensor_3, tensor_4).dimension(1) == 2);
+    REQUIRE(_mul_<1, 1>(tensor_3, tensor_4).dimension(2) == 4);
+    REQUIRE(_mul_<1, 1>(tensor_3, tensor_4).dimension(3) == 2);
 
-    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).rank() == 4);
-    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(0) == 4);
-    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(1) == 3);
-    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(2) == 4);
-    REQUIRE(_mul<2, 2>(tensor_3, tensor_4).dimension(3) == 3);
+    REQUIRE(_mul_<2, 2>(tensor_3, tensor_4).rank() == 4);
+    REQUIRE(_mul_<2, 2>(tensor_3, tensor_4).dimension(0) == 4);
+    REQUIRE(_mul_<2, 2>(tensor_3, tensor_4).dimension(1) == 3);
+    REQUIRE(_mul_<2, 2>(tensor_3, tensor_4).dimension(2) == 4);
+    REQUIRE(_mul_<2, 2>(tensor_3, tensor_4).dimension(3) == 3);
 
     for (size_t i = 0; i < tensor_3.dimension(1); ++i) 
       for (size_t j = 0; j < tensor_3.dimension(2); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(1); ++k) 
           for (size_t l = 0; l < tensor_4.dimension(2); ++l) 
-            REQUIRE(_mul<0, 0>(tensor_3, tensor_4)(i, j, k, l) == 4);
+            REQUIRE(_mul_<0, 0>(tensor_3, tensor_4)(i, j, k, l) == 4);
 
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_3.dimension(2); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(0); ++k) 
           for (size_t l = 0; l < tensor_4.dimension(2); ++l) 
-            REQUIRE(_mul<1, 1>(tensor_3, tensor_4)(i, j, k, l) == 3);
+            REQUIRE(_mul_<1, 1>(tensor_3, tensor_4)(i, j, k, l) == 3);
 
     for (size_t i = 0; i < tensor_3.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_3.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_4.dimension(0); ++k) 
           for (size_t l = 0; l < tensor_4.dimension(1); ++l) 
-            REQUIRE(_mul<2, 2>(tensor_3, tensor_4)(i, j, k, l) == 2);
+            REQUIRE(_mul_<2, 2>(tensor_3, tensor_4)(i, j, k, l) == 2);
   }
  
   SECTION("Combined Multiplication and Addition/Subtraction") { 
@@ -636,7 +636,7 @@ void TensorManipulationTests()
         tensor_3(i, j, k) = (int)(100 * i + 10 * j + k);
 
   SECTION("Single Tensor Map") {
-    Tensor<int, 3, C> tensor_ = _map([](int x) { return 2 * x; }, tensor_1);
+    Tensor<int, 3, C> tensor_ = _map_([](int x) { return 2 * x; }, tensor_1);
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
@@ -645,27 +645,27 @@ void TensorManipulationTests()
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-          REQUIRE(_map([](int x) { return 2 * x; }, tensor_1)(i, j, k) 
+          REQUIRE(_map_([](int x) { return 2 * x; }, tensor_1)(i, j, k) 
               == -(int)(i + j + k) * 2);
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-          REQUIRE(_map([](int x) { return 2 * x; }, tensor_1)[Indices<3>{i, j, k}]
+          REQUIRE(_map_([](int x) { return 2 * x; }, tensor_1)[Indices<3>{i, j, k}]
               == -(int)(i + j + k) * 2);
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-        REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template slice<0, 2>(1)(i, k) == -(int)(i + 1 + k) * 2);
+        REQUIRE(_map_([](int x) { return 2 * x; }, tensor_1).template slice<0, 2>(1)(i, k) == -(int)(i + 1 + k) * 2);
 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
-      REQUIRE(_map([](int x) { return 2 * x; }, tensor_1).template 
+      REQUIRE(_map_([](int x) { return 2 * x; }, tensor_1).template 
           slice<1>(1, 1)[Indices<1>{j}] == -(int)(1 + j + 1) * 2);
   }
 
   SECTION("Multi Tensor Map") {
     auto add_neg = [](int x, int y, int z) { return -(x + y + z); };
-    Tensor<int, 3, C> tensor_ = _map(add_neg, tensor_1, tensor_2, tensor_3);
+    Tensor<int, 3, C> tensor_ = _map_(add_neg, tensor_1, tensor_2, tensor_3);
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
@@ -674,74 +674,74 @@ void TensorManipulationTests()
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-          REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3)(i, j, k) 
+          REQUIRE(_map_(add_neg, tensor_1, tensor_2, tensor_3)(i, j, k) 
               == -(int)(100 * i + 10 * j + k));
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t j = 0; j < tensor_1.dimension(1); ++j)
         for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-          REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3)[Indices<3>{i, j, k}]
+          REQUIRE(_map_(add_neg, tensor_1, tensor_2, tensor_3)[Indices<3>{i, j, k}]
               == -(int)(100 * i + 10 * j + k));
 
     for (size_t i = 0; i < tensor_1.dimension(0); ++i)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-        REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
+        REQUIRE(_map_(add_neg, tensor_1, tensor_2, tensor_3).template 
             slice<0, 2>(1)(i, k) == -(int)(100 * i + 10 + k));
 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
-        REQUIRE(_map(add_neg, tensor_1, tensor_2, tensor_3).template 
+        REQUIRE(_map_(add_neg, tensor_1, tensor_2, tensor_3).template 
           slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
-        REQUIRE(_map(add_neg, tensor_1 + tensor_2, tensor_2 + tensor_1, tensor_3).template 
+        REQUIRE(_map_(add_neg, tensor_1 + tensor_2, tensor_2 + tensor_1, tensor_3).template 
           slice<1>(1, 1)[Indices<1>{j}] == -(int)(100 + 10 * j + 1));
 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j)
       for (size_t k = 0; k < tensor_1.dimension(2); ++k)
-        REQUIRE(_map(add_neg, tensor_1 * tensor_2, tensor_1 * tensor_1, (tensor_1 + tensor_2) * tensor_3).template 
+        REQUIRE(_map_(add_neg, tensor_1 * tensor_2, tensor_1 * tensor_1, (tensor_1 + tensor_2) * tensor_3).template 
           slice<1, 2>(1, 1)[Indices<2>{j, k}] == 0);
   }
 
   SECTION("Single Tensor Reduce") {
-    Scalar<int> x = _reduce(0, [](int x, int y) { return x + y; }, tensor_1);
+    Scalar<int> x = _reduce_(0, [](int x, int y) { return x + y; }, tensor_1);
     REQUIRE(x == -12);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2)() == 12);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2)[Indices<0>{}] == 12);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>() == 12);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>(Indices<0>{}) == 12);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_2)() == 12);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_2)[Indices<0>{}] == 12);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>() == 12);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_2).template slice<>(Indices<0>{}) == 12);
 
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_2)() == -24);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, 
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_2)() == -24);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, 
           tensor_1 + tensor_1 - tensor_1 + tensor_2)[Indices<0>{}] == 0);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_2 - tensor_1).template slice<>() == 24);
-    REQUIRE(_reduce(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_1 + tensor_1).template slice<>(Indices<0>{}) == -12);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_2 - tensor_1).template slice<>() == 24);
+    REQUIRE(_reduce_(0, [](int x, int y) { return x + y; }, tensor_1 - tensor_1 + tensor_1).template slice<>(Indices<0>{}) == -12);
 
-    x = _reduce(0, [](int x, int y) { return x + y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
+    x = _reduce_(0, [](int x, int y) { return x + y; }, tensor_1 * tensor_2 * (tensor_2 - tensor_1));
     REQUIRE(x == -1056);
   }
 
   SECTION("Multi Tensor Reduce") {
     auto add = [](int x, int y1, int y2, int y3) { return x + y1 - y2 - y3; };
-    Scalar<int> x = _reduce(0, add, tensor_1, tensor_2, tensor_3);
+    Scalar<int> x = _reduce_(0, add, tensor_1, tensor_2, tensor_3);
     REQUIRE(x == -468);
-    REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)() == -444);
-    REQUIRE(_reduce(0, add, tensor_1, tensor_1, tensor_3)[Indices<0>{}] == -444);
-    REQUIRE(_reduce(-111, add, tensor_1, tensor_1, tensor_3).template slice<>() == -555);
-    REQUIRE(_reduce(111, add, tensor_1, tensor_1, tensor_3).template slice<>(Indices<0>{}) == -333);
+    REQUIRE(_reduce_(0, add, tensor_1, tensor_1, tensor_3)() == -444);
+    REQUIRE(_reduce_(0, add, tensor_1, tensor_1, tensor_3)[Indices<0>{}] == -444);
+    REQUIRE(_reduce_(-111, add, tensor_1, tensor_1, tensor_3).template slice<>() == -555);
+    REQUIRE(_reduce_(111, add, tensor_1, tensor_1, tensor_3).template slice<>(Indices<0>{}) == -333);
   }
 
   SECTION("Combined Map/Reduce/Arithmetic") {
     auto fn1 = [](int x, int y) { return x * 2 - y * 2; };
     auto fn2 = [](int &x, int y1, int y2) { return x + y1 * 2 + y2 * 2; }; 
     // FIXME -- Manually compute the return value
-    Scalar<int> x = _reduce(0, fn2, tensor_2 * tensor_1, _map(fn1, tensor_1 * tensor_1, tensor_2 * tensor_1)
+    Scalar<int> x = _reduce_(0, fn2, tensor_2 * tensor_1, _map_(fn1, tensor_1 * tensor_1, tensor_2 * tensor_1)
           - tensor_2 * tensor_2);
 
     auto fn3 = [](int y1, int y2) { return y1 * 2 + y2 * 2; };
     auto fn4 = [](int &x, int y1, int y2, int y3) { return x + y1 + y2 + y3; };
     
-    REQUIRE(_reduce(0, fn4, tensor_1, tensor_2, 
-          _map(fn3, tensor_1, tensor_1) + tensor_2)() == -36);
+    REQUIRE(_reduce_(0, fn4, tensor_1, tensor_2, 
+          _map_(fn3, tensor_1, tensor_1) + tensor_2)() == -36);
   }
 }
 

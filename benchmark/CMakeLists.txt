@@ -1,5 +1,3 @@
-find_package(Threads REQUIRED)
-
 file(GLOB_RECURSE ALL_BENCH_CC *.benchmark.cc)
 
 foreach(BENCH_CC ${ALL_BENCH_CC})

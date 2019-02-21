@@ -54,16 +54,14 @@ void IteratorTests() {
   SECTION("Scalar") { 
     auto begin = tensor(1, 2).begin(); 
     auto end = tensor(1, 2).end(); 
-    REQUIRE(begin->rank() == 0); 
-    REQUIRE(end->rank() == 0); 
     int32_t i = 0; 
     for (auto it = begin; it != end; it++) 
-      REQUIRE((*it)() == (i++) + 120); 
+      REQUIRE((*it) == (i++) + 120); 
     REQUIRE(i == 4); 
  
     i = 0; 
     for (auto it = begin; it != end; ++it) 
-      REQUIRE((*it)() == (i++) + 120); 
+      REQUIRE((*it) == (i++) + 120); 
     REQUIRE(i == 4); 
   } 
  
@@ -85,6 +83,20 @@ void IteratorTests() {
       REQUIRE(_tensor == 110 + (i++)); 
     REQUIRE(i == 4); 
   } 
+
+  SECTION("Random Access Iterator Operations") {
+    tensor(0, 0, 0) = 2;
+    tensor(0, 0, 1) = 1;
+    tensor(0, 0, 2) = 7;
+    tensor(0, 0, 3) = -5;
+
+    std::sort(tensor->begin(0)->begin(0)->begin(), tensor->begin(0)->begin(0)->end());
+
+    REQUIRE(tensor(0, 0, 0) == -5);
+    REQUIRE(tensor(0, 0, 1) == 1);
+    REQUIRE(tensor(0, 0, 2) == 2);
+    REQUIRE(tensor(0, 0, 3) == 7);
+  }
 } 
  
 template <template <class> class Container>

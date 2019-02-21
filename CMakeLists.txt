@@ -17,6 +17,8 @@ endif()
 set(CMAKE_CXX_STANDARD 11)
 
 find_package(benchmark QUIET)
+find_package(X11 QUIET)
+find_package(Threads QUIET)
 find_package(OpenCL QUIET)
 
 if (OpenCL_FOUND)
@@ -24,9 +26,14 @@ if (OpenCL_FOUND)
   link_directories(${OpenCL_LIBRARY})
 endif()
 
-if (benchmark_FOUND)
+if (benchmark_FOUND AND Threads_FOUND)
     add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark/)
 endif ()
 
+if (X11_FOUND AND Threads_FOUND)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/example/)
+endif()
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
-add_subdirectory(${PROJECT_SOURCE_DIR}/example/)
+
+

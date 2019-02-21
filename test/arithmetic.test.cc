@@ -304,21 +304,21 @@ void ExpressionTests() {
             (int)((-100 * i - 10 * j - k) * (-200 * i - 20 * j - 2 * k)));
 
     auto tensor_6 = add(-tensor_1, tensor_2 - tensor_1, 
-        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+        _map_([](int x) { return 2 * -x; }, -tensor_2)); 
     for (size_t i = 0; i < tensor_6.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_6.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_6.dimension(2); ++k) 
           REQUIRE(tensor_6(i, j, k) == (int)(-500 * i - 50 * j - 5 * k));
 
     auto tensor_7 = sub(-tensor_1, tensor_2 - tensor_1,
-        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+        _map_([](int x) { return 2 * -x; }, -tensor_2)); 
     for (size_t i = 0; i < tensor_7.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_7.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_7.dimension(2); ++k) 
           REQUIRE(tensor_7(i, j, k) == (int)(300 * i + 30 * j + 3 * k));
 
     auto tensor_8 = hadamard(-tensor_1, tensor_2 - tensor_1,
-        _map([](int x) { return 2 * -x; }, -tensor_2)); 
+        _map_([](int x) { return 2 * -x; }, -tensor_2)); 
     for (size_t i = 0; i < tensor_8.dimension(0); ++i) 
       for (size_t j = 0; j < tensor_8.dimension(1); ++j) 
         for (size_t k = 0; k < tensor_8.dimension(2); ++k) 

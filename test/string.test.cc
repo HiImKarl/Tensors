@@ -77,7 +77,7 @@ void MapExprTest() {
   auto tensor_2 = Tensor<int, 3, Container>({3, 3, 3}, -1);
   auto tensor_3 = Tensor<unsigned, 3, Container>({3, 3, 3}, 0);
   auto transformer = [](float x, int y) { return x += y; };
-  REQUIRE(regex_match(_map(transformer, tensor_1, tensor_2).str(), regex(PATTERN_6)));
+  REQUIRE(regex_match(_map_(transformer, tensor_1, tensor_2).str(), regex(PATTERN_6)));
 }
 
 template <template <class> class Container> 
@@ -86,7 +86,7 @@ void ReduceExprTest() {
   auto tensor_2 = Tensor<int, 3, Container>({3, 3, 3}, -1);
   auto tensor_3 = Tensor<unsigned, 3, Container>({3, 3, 3}, 0);
   auto accumulator = [](float x, int y) { return x += y; };
-  REQUIRE(regex_match(_reduce(accumulator, tensor_1, tensor_2).str(), regex(PATTERN_7)));
+  REQUIRE(regex_match(_reduce_(accumulator, tensor_1, tensor_2).str(), regex(PATTERN_7)));
 }
 
 template <template <class> class Container> 
