@@ -124,7 +124,7 @@ void ConstIteratorTests() {
     REQUIRE(end->rank() == 2); 
     REQUIRE(end->shape()[0] == 3); 
     REQUIRE(end->shape()[1] == 4); 
- 
+
     int32_t i = 0; 
     for (auto it = begin; it != end; ++it) 
       REQUIRE((*it)(1, 1) == 100 * (i++) + 11); 
@@ -146,16 +146,14 @@ void ConstIteratorTests() {
   SECTION("Scalar") { 
     auto begin = tensor(1, 2).cbegin(); 
     auto end = tensor(1, 2).cend(); 
-    REQUIRE(begin->rank() == 0); 
-    REQUIRE(end->rank() == 0); 
     int32_t i = 0; 
     for (auto it = begin; it != end; it++) 
-      REQUIRE((*it)() == (i++) + 120); 
+      REQUIRE(*it == i++ + 120); 
     REQUIRE(i == 4); 
  
     i = 0; 
     for (auto it = begin; it != end; ++it) 
-      REQUIRE((*it)() == (i++) + 120); 
+      REQUIRE(*it == i++ + 120); 
     REQUIRE(i == 4); 
   } 
 } 
@@ -201,18 +199,15 @@ void ReverseIteratorTests() {
   SECTION("Scalar") { 
     auto begin = tensor(1, 2).rbegin(); 
     auto end = tensor(1, 2).rend(); 
- 
-    REQUIRE(begin->rank() == 0); 
-    REQUIRE(end->rank() == 0); 
- 
     int32_t i = 0; 
+
     for (auto it = begin; it != end; it++) 
-      REQUIRE((*it)() == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
+      REQUIRE(*it == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
     REQUIRE(i == 4); 
  
     i = 0; 
     for (auto it = begin; it != end; ++it) 
-      REQUIRE((*it)() == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
+      REQUIRE(*it == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
     REQUIRE(i == 4); 
   } 
  
@@ -227,6 +222,20 @@ void ReverseIteratorTests() {
         for (size_t k = 0; k < tensor.dimension(2); ++k) 
           REQUIRE(tensor(i, j, k) == 0); 
   } 
+
+  SECTION("Random Access Iterator Operations") {
+    tensor(0, 0, 0) = 2;
+    tensor(0, 0, 1) = 1;
+    tensor(0, 0, 2) = 7;
+    tensor(0, 0, 3) = -5;
+
+    std::sort(tensor->begin(0)->begin(0)->rbegin(), tensor->begin(0)->begin(0)->rend());
+
+    REQUIRE(tensor(0, 0, 0) == -5);
+    REQUIRE(tensor(0, 0, 1) == 1);
+    REQUIRE(tensor(0, 0, 2) == 2);
+    REQUIRE(tensor(0, 0, 3) == 7);
+  }
 } 
 
 template <template <class> class Container>
@@ -278,17 +287,14 @@ void ReverseConstIteratorTests() {
     auto begin = tensor(1, 2).crbegin(); 
     auto end = tensor(1, 2).crend(); 
  
-    REQUIRE(begin->rank() == 0); 
-    REQUIRE(end->rank() == 0); 
- 
     int32_t i = 0; 
     for (auto it = begin; it != end; it++) 
-      REQUIRE((*it)() == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
+      REQUIRE(*it == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
     REQUIRE(i == 4); 
  
     i = 0; 
     for (auto it = begin; it != end; ++it) 
-      REQUIRE((*it)() == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
+      REQUIRE(*it == ((int)tensor.dimension(2) - (i++) - 1) + 120); 
     REQUIRE(i == 4); 
   } 
 }

@@ -316,18 +316,18 @@ void ScalarArithmeticTests() {
   auto scalar_2 = Scalar<int32_t, C>(-10); 
  
   SECTION("Binary Addition/Subtract") { 
-    REQUIRE(scalar_1() + scalar_2() == 0); 
-    REQUIRE((scalar_1 + scalar_2)() == 0); 
-    REQUIRE(scalar_1() - scalar_2() == 20); 
-    REQUIRE((scalar_1 - scalar_2)() == 20); 
+    REQUIRE(scalar_1 + scalar_2 == 0); 
+    REQUIRE(scalar_1 + scalar_2 == 0); 
+    REQUIRE(scalar_1 - scalar_2 == 20); 
+    REQUIRE(scalar_1 - scalar_2 == 20); 
     REQUIRE(scalar_1 + 10 == 20); 
     REQUIRE(10 + scalar_1 == 20); 
     REQUIRE(scalar_1 - 10 == 0); 
  
-    Scalar<int32_t, C> scalar_3 = scalar_1 + scalar_2; 
+    auto scalar_3 = Scalar<int32_t, C>(scalar_1 + scalar_2); 
     REQUIRE(scalar_3 == 0); 
  
-    Scalar<int32_t, C> scalar_4 = scalar_1 - scalar_2; 
+    auto scalar_4 = Scalar<int32_t, C>(scalar_1 - scalar_2); 
     REQUIRE(scalar_4 == 20); 
   } 
  
@@ -339,11 +339,11 @@ void ScalarArithmeticTests() {
   } 
  
   SECTION("Multiplication") { 
-    REQUIRE(scalar_1() * scalar_2() == -100); 
-    REQUIRE((scalar_1 * scalar_2)() == -100); 
+    REQUIRE(scalar_1 * scalar_2 == -100); 
+    REQUIRE(scalar_1 * scalar_2 == -100); 
     REQUIRE(scalar_1 * 4 == 40); 
  
-    Scalar<int32_t, C> scalar_3 = scalar_1 * scalar_2; 
+    auto scalar_3 = Scalar<int32_t, C>(scalar_1 * scalar_2); 
     REQUIRE(scalar_3 == -100); 
   } 
  

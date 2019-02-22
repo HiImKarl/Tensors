@@ -2884,12 +2884,18 @@ public:
     Iterator(Iterator &&it);       
     Iterator &operator=(Iterator &&it);
 
-    Tensor<T, N, C> operator*();   /**< Create a reference to the underlying Tensor */
-    Tensor<T, N, C> operator->();  /**< Syntatic sugar for (*it). */
-    Iterator operator++(int);   /**< Increment (postfix). Returns a temporary before increment */
-    Iterator &operator++();     /**< Increment (prefix). Returns *this */
-    Iterator operator--(int);   /**< Decrement (postfix). Returns a temporary before decrement */
-    Iterator &operator--();     /**< Decrement (prefix). Returns *this */
+    /** Create a reference to the underlying Tensor */
+    Tensor<T, N, C> operator*();   
+    /** Syntatic sugar for (*it). */
+    Tensor<T, N, C> operator->();  
+    /** Increment (postfix). Returns a temporary before increment */
+    Iterator operator++(int);   
+    /** Increment (prefix). Returns *this */
+    Iterator &operator++();     
+    /** Decrement (postfix). Returns a temporary before decrement */
+    Iterator operator--(int);   
+    /** Decrement (prefix). Returns *this */
+    Iterator &operator--();     
 
     /** Returns true iff the shapes and underlying pointers are identical */
     bool operator==(Iterator const &it) const;
@@ -2898,25 +2904,25 @@ public:
     bool operator!=(Iterator const &it) const { return !(it == *this); }
 
     /** Returns true iff the offset difference is positive */
-    bool operator>(Iterator const &it) const;
+    bool operator>(Iterator const &it) const noexcept;
 
     /** Returns true iff the offset difference is non-negative */
-    bool operator>=(Iterator const &it) const;
+    bool operator>=(Iterator const &it) const noexcept;
 
     /** Returns true iff the offset difference is negative */
-    bool operator<(Iterator const &it) const { return !(*this >= it); }
+    bool operator<(Iterator const &it) const noexcept { return !(*this >= it); }
 
     /** Returns true iff the offset difference is non-positive */
-    bool operator<=(Iterator const &it) const { return !(*this > it); }
+    bool operator<=(Iterator const &it) const noexcept { return !(*this > it); }
 
     /** Returns the difference in offsets */
     std::ptrdiff_t operator-(Iterator const &it) const noexcept;
 
     /** Increments the iterator by `incr` elements */
-    Iterator operator+(std::ptrdiff_t incr) const;
+    Iterator operator+(std::ptrdiff_t incr) const noexcept;
 
     /** Decrements the iterator by `decr` elements */
-    Iterator operator-(std::ptrdiff_t decr) const;
+    Iterator operator-(std::ptrdiff_t decr) const noexcept;
 
   private:
     // Direct construction
@@ -2939,9 +2945,9 @@ public:
 
     /* ------------- Iterator Traits -------------- */
 
-    typedef Tensor<T, N - 1, C> const         value_type;
-    typedef Tensor<T, N - 1, C> const &       reference;
-    typedef Tensor<T, N - 1, C> const *       pointer;
+    typedef Tensor<T, N, C> const             value_type;
+    typedef Tensor<T, N, C> const &           reference;
+    typedef Tensor<T, N, C> const *           pointer;
     typedef std::ptrdiff_t                    difference_type;
     typedef std::bidirectional_iterator_tag   iterator_category;
 
@@ -2974,6 +2980,28 @@ public:
 
     bool operator==(ConstIterator const &it) const;
     bool operator!=(ConstIterator const &it) const { return !(it == *this); }
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ConstIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ConstIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ConstIterator const &it) const noexcept { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ConstIterator const &it) const noexcept { return !(*this > it); }
+
+    /** Returns the difference in offsets */
+    std::ptrdiff_t operator-(ConstIterator const &it) const noexcept;
+
+    /** Increments the iterator by `incr` elements */
+    ConstIterator operator+(std::ptrdiff_t incr) const noexcept;
+
+    /** Decrements the iterator by `decr` elements */
+    ConstIterator operator-(std::ptrdiff_t decr) const noexcept;
+
   private:
     ConstIterator(Tensor<T, N + 1, C> const &tensor, size_t index);
 
@@ -2997,8 +3025,8 @@ public:
 
     typedef Tensor<T, N, C>                   value_type;
     typedef Tensor<T, N, C>&                  reference;
-    typedef std::ptrdiff_t                    difference_type;
     typedef Tensor<T, N, C>*                  pointer;
+    typedef std::ptrdiff_t                    difference_type;
     typedef std::bidirectional_iterator_tag   iterator_category;
 
     /* -------------- Friend Classes -------------- */
@@ -3023,6 +3051,28 @@ public:
     ReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
     bool operator==(ReverseIterator const &it) const;
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ReverseIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ReverseIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ReverseIterator const &it) const noexcept { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ReverseIterator const &it) const noexcept { return !(*this > it); }
+
+    /** Returns the difference in offsets */
+    std::ptrdiff_t operator-(ReverseIterator const &it) const noexcept;
+
+    /** Increments the iterator by `incr` elements */
+    ReverseIterator operator+(std::ptrdiff_t incr) const noexcept;
+
+    /** Decrements the iterator by `decr` elements */
+    ReverseIterator operator-(std::ptrdiff_t decr) const noexcept;
+
   private:
     ReverseIterator (Tensor<T, N + 1, C> const &tensor, size_t index);
 
@@ -3077,6 +3127,27 @@ public:
     ConstReverseIterator &operator--();   
     bool operator==(ConstReverseIterator const &it) const;
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ConstReverseIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ConstReverseIterator const &it) const noexcept;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ConstReverseIterator const &it) const noexcept { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ConstReverseIterator const &it) const noexcept { return !(*this > it); }
+
+    /** Returns the difference in offsets */
+    std::ptrdiff_t operator-(ConstReverseIterator const &it) const noexcept;
+
+    /** Increments the iterator by `incr` elements */
+    ConstReverseIterator operator+(std::ptrdiff_t incr) const noexcept;
+
+    /** Decrements the iterator by `decr` elements */
+    ConstReverseIterator operator-(std::ptrdiff_t decr) const noexcept;
   private:
     ConstReverseIterator (Tensor<T, N + 1, C> const &tensor, size_t index);
 
@@ -3737,7 +3808,6 @@ T const &Tensor<T, N, C>::operator()(Args... args) const
       typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{}, 
       args...
   );
-
   return (static_cast<C<T> const&>(ref_))[cumul_index + offset_];
 }
 
@@ -4606,7 +4676,7 @@ void Fill(Tensor<U, M, C_> &tensor, X const &value)
 
 /** Returns a transposed Matrix, sharing the same underlying data as `mat`. If
  *  the dimension of `mat` is [n, m], the dimensions of the resulting matrix will be
- *  [m, n]. Note: This is only applicable to matrices and vectors
+ *  [m, n]. Note: This is only applicable to 2-rank tensors.
  */
 template <typename U, template <class> class C_> 
 Tensor<U, 2, C_> transpose(Tensor<U, 2, C_> &mat)
@@ -4634,7 +4704,7 @@ Tensor<U, 2, C_> const transpose(Tensor<U, 2, C_> const &mat)
 
 /** Returns a transposed Matrix, sharing the same underlying data as vec. If
  *  the dimension of `vec` is [n], the dimensions of the resulting matrix will be
- *  [1, n]. This is only applicable to 2-rank tensors.
+ *  [1, n]. This is only applicable to 1-rank tensors.
  */
 template <typename T, template <class> class C>
 Tensor<T, 2, C> transpose(Tensor<T, 1, C> &vec) 
@@ -4770,7 +4840,7 @@ auto Tensor<T, N, C>::Iterator::operator=(Iterator &&it) -> Iterator &
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_); }
+  return Tensor<T, N, C>(shape_.dimensions_, strides_, offset_, ref_);}
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator->()
@@ -4821,9 +4891,9 @@ bool Tensor<T, N, C>::Iterator::operator==(
 
 template <typename T, size_t N, template <class> class C>
 bool Tensor<T, N, C>::Iterator::operator>(
-    typename Tensor<T, N, C>::Iterator const &it) const
+    typename Tensor<T, N, C>::Iterator const &it) const noexcept
 {
-  assert(shape == it.shape_);
+  assert(shape_ == it.shape_);
   // FIXME 
   // assert(stride_ == it.shape_);
   assert(ref_ == it.ref_);
@@ -4832,9 +4902,9 @@ bool Tensor<T, N, C>::Iterator::operator>(
 
 template <typename T, size_t N, template <class> class C>
 bool Tensor<T, N, C>::Iterator::operator>=(
-    typename Tensor<T, N, C>::Iterator const &it) const
+    typename Tensor<T, N, C>::Iterator const &it) const noexcept
 {
-  assert(shape == it.shape_);
+  assert(shape_ == it.shape_);
   // FIXME 
   // assert(stride_ == it.shape_);
   assert(ref_ == it.ref_);
@@ -4842,7 +4912,7 @@ bool Tensor<T, N, C>::Iterator::operator>=(
 }
 
 template <typename T, size_t N, template <class> class C>
-auto Tensor<T, N, C>::Iterator::operator+(std::ptrdiff_t incr) const 
+auto Tensor<T, N, C>::Iterator::operator+(std::ptrdiff_t incr) const noexcept
 -> Tensor<T, N, C>::Iterator
 {
   auto incr_it = Tensor<T, N, C>::Iterator(*this);
@@ -4851,7 +4921,7 @@ auto Tensor<T, N, C>::Iterator::operator+(std::ptrdiff_t incr) const
 }
 
 template <typename T, size_t N, template <class> class C>
-auto Tensor<T, N, C>::Iterator::operator-(std::ptrdiff_t decr) const 
+auto Tensor<T, N, C>::Iterator::operator-(std::ptrdiff_t decr) const noexcept 
 -> Tensor<T, N, C>::Iterator
 {
   auto incr_it = Tensor<T, N, C>::Iterator(*this);
@@ -4879,7 +4949,9 @@ Tensor<T, N, C>::Iterator::operator-(Tensor<T, N, C>::Iterator const &it) const 
 {
   assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
   assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
-  return std::ptrdiff_t(offset_) - std::ptrdiff_t(it->offset_);
+  assert(stride_ == stride_);
+  // FIXME
+  return ((std::ptrdiff_t)offset_ - (std::ptrdiff_t)it.offset_) / stride_;
 }
 
 /* ----------------------------- ConstIterator --------------------------- */
@@ -4906,7 +4978,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ConstIterator::operator=(ConstIterator const &it)
   -> ConstIterator &
 {
-  Tensor<T, N, C>::ConstIterator::ConstIterator(it);
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -4921,7 +4997,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ConstIterator::operator=(ConstIterator &&it)
   -> ConstIterator &
 {
-  Tensor<T, N, C>::ConstIterator::ConstIterator(std::move(it));
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -4940,7 +5020,7 @@ Tensor<T, N, C> const Tensor<T, N, C>::ConstIterator::operator->()
 template <typename T, size_t N, template <class> class C>
 typename Tensor<T, N, C>::ConstIterator Tensor<T, N, C>::ConstIterator::operator++(int)
 {
-  Tensor<T, N, C>::ConstIterator it {*this};
+  auto it = Tensor<T, N, C>::ConstIterator{*this};
   ++(*this);
   return it;
 }
@@ -4973,10 +5053,75 @@ bool Tensor<T, N, C>::ConstIterator::operator==(
 ) const
 {
   if (shape_ != it.shape_) return false;
-  if (strides_ != it.strides_) return false;
+  // FIXME
+  // if (strides_ != it.strides_) return false;
+  if (stride_ != it.stride_) return false;
   if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
+
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ConstIterator::operator>(ConstIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  // assert(stride_ == it.shape_);
+  assert(ref_ == it.ref_);
+  return offset_ > it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ConstIterator::operator>=(ConstIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  // assert(stride_ == it.shape_);
+  assert(ref_ == it.ref_);
+  return offset_ >= it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+std::ptrdiff_t 
+Tensor<T, N, C>::ConstIterator::operator-(ConstIterator const &it) const noexcept
+{
+  assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
+  assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
+  assert(stride_ == stride_);
+  // FIXME
+  return ((std::ptrdiff_t)offset_ - (std::ptrdiff_t)it.offset_) / stride_;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ConstIterator::operator+(std::ptrdiff_t incr) const noexcept 
+-> ConstIterator
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ += incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ConstIterator::operator-(std::ptrdiff_t decr) const noexcept 
+-> ConstIterator 
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ -= decr* incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ConstIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, M, C_>::ConstIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ConstIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, M, C_>::ConstIterator const &it)
+{
+  return it - decr;
+} 
 
 /* ---------------------------- ReverseIterator -------------------------- */
 
@@ -5005,7 +5150,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ReverseIterator::operator=(ReverseIterator const &it)
   -> ReverseIterator &
 {
-  Tensor<T, N, C>::ReverseIterator::ReverseIterator(it);
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -5020,7 +5169,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ReverseIterator::operator=(ReverseIterator &&it)
   -> ReverseIterator &
 {
-  Tensor<T, N, C>::ReverseIterator::ReverseIterator(std::move(it));
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -5076,6 +5229,69 @@ bool Tensor<T, N, C>::ReverseIterator::operator==(
   return offset_ == it.offset_;
 }
 
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ReverseIterator::operator>(ReverseIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ > it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ReverseIterator::operator>=(ReverseIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ <= it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+std::ptrdiff_t 
+Tensor<T, N, C>::ReverseIterator::operator-(ReverseIterator const &it) const noexcept
+{
+  assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
+  assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
+  assert(stride_ == stride_);
+  // FIXME
+  return ((std::ptrdiff_t)it.offset_ - (std::ptrdiff_t)offset_) / stride_;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ReverseIterator::operator+(std::ptrdiff_t incr) const noexcept 
+-> ReverseIterator
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ -= incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ReverseIterator::operator-(std::ptrdiff_t decr) const noexcept 
+-> ReverseIterator 
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ += decr* incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ReverseIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, M, C_>::ReverseIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ReverseIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, M, C_>::ReverseIterator const &it)
+{
+  return it - decr;
+} 
+
 /* ------------------------- ConstReverseIterator ----------------------- */
 
 template <typename T, size_t N, template <class> class C>
@@ -5104,7 +5320,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ConstReverseIterator::operator=(ConstReverseIterator const &it)
   -> ConstReverseIterator &
 {
-  Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(it);
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -5119,7 +5339,11 @@ template <typename T, size_t N, template <class> class C>
 auto Tensor<T, N, C>::ConstReverseIterator::operator=(ConstReverseIterator &&it)
   -> ConstReverseIterator &
 {
-  Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(std::move(it));
+  shape_ = it.shape_;
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  std::copy_n(it.strides_, N, strides_);
   return *this;
 }
 
@@ -5179,6 +5403,72 @@ bool Tensor<T, N, C>::ConstReverseIterator::operator==(
   if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
+
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ConstReverseIterator::operator>(
+    ConstReverseIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ > it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+bool Tensor<T, N, C>::ConstReverseIterator::operator>=(
+    ConstReverseIterator const &it) const noexcept
+{
+  assert(shape_ == it.shape_);
+  // FIXME 
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ <= it.offset_;
+}
+
+template <typename T, size_t N, template <class> class C>
+std::ptrdiff_t 
+Tensor<T, N, C>::ConstReverseIterator::operator-(
+    ConstReverseIterator const &it) const noexcept
+{
+  assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
+  assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
+  assert(stride_ == it.stride_);
+  // FIXME
+  return ((std::ptrdiff_t)it.offset_ - (std::ptrdiff_t)offset_) / stride_;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ConstReverseIterator::operator+(std::ptrdiff_t incr) const noexcept 
+-> ConstReverseIterator
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ -= incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, size_t N, template <class> class C>
+auto Tensor<T, N, C>::ConstReverseIterator::operator-(std::ptrdiff_t decr) const noexcept 
+-> ConstReverseIterator 
+{
+  auto incr_it = Tensor<T, N, C>::Iterator(*this);
+  incr_it.offset_ += decr* incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ConstReverseIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, M, C_>::ConstReverseIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, size_t M, template <class> class C_>
+typename Tensor<U, M, C_>::ConstReverseIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, M, C_>::ConstReverseIterator const &it)
+{
+  return it - decr;
+} 
 
 /* ----------------------- Iterator Construction ----------------------- */
 
@@ -5404,12 +5694,15 @@ public:
 
   /** This method is only defined because MSVC++ requires a definition
    *  to be present, even if the method is never actually called.
-   *  An assertion is immediately called if this method is invoked.
+   *  An assertion immediately fails if this method is invoked.
    */
   bool increment(Shape<0> const&) 
     { assert(0 && PANIC_ASSERTION); return true;  }
 
-  /** See increment(Shape<0> const&) */
+  /** This method is only defined because MSVC++ requires a definition
+   *  to be present, even if the method is never actually called.
+   *  An assertion immediately fails if this method is invoked.
+   */
   bool decrement(Shape<0> const&) 
     { assert(0 && PANIC_ASSERTION); return true;  }
 
@@ -5682,8 +5975,8 @@ public:
     /* ------------- Iterator Traits -------------- */
 
     typedef T                                 value_type;
-    typedef T                                 reference;
-    typedef T                                 pointer;
+    typedef T&                                reference;
+    typedef T*                                pointer;
     typedef std::ptrdiff_t                    difference_type;
     typedef std::bidirectional_iterator_tag   iterator_category;
 
@@ -5698,9 +5991,7 @@ public:
     Iterator(Iterator &&it);
     Iterator &operator=(Iterator &&it);
     T &operator*();
-    T const &operator*() const;
     T *operator->();
-    T const *operator->() const;
     Iterator operator++(int);
     Iterator &operator++();
     Iterator operator--(int);
@@ -5746,8 +6037,8 @@ public:
 
     typedef T const                           value_type;
     typedef T const &                         reference;
-    typedef std::ptrdiff_t                    difference_type;
     typedef T const *                         pointer;
+    typedef std::ptrdiff_t                    difference_type;
     typedef std::bidirectional_iterator_tag   iterator_category;
 
     /* -------------- Friend Classes -------------- */
@@ -5758,14 +6049,30 @@ public:
 
     ConstIterator(ConstIterator const &it);
     ConstIterator(ConstIterator &&it);
-    Tensor<T, 0, C> const operator*();
-    Tensor<T, 0, C> const operator->();
+    T const &operator*() const;
+    T const *operator->() const;
     ConstIterator operator++(int);
     ConstIterator &operator++();
     ConstIterator operator--(int);
     ConstIterator &operator--();
     bool operator==(ConstIterator const &it) const;
     bool operator!=(ConstIterator const &it) const { return !(it == *this); }
+    std::ptrdiff_t operator-(ConstIterator const &it) const noexcept;
+    ConstIterator operator+(std::ptrdiff_t incr) const;
+    ConstIterator operator-(std::ptrdiff_t incr) const;
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ConstIterator const &it) const;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ConstIterator const &it) const;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ConstIterator const &it) const { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ConstIterator const &it) const { return !(*this > it); }
+
   private:
     ConstIterator(Tensor<T, 1, C> const &tensor, size_t);
 
@@ -5800,14 +6107,30 @@ public:
 
     ReverseIterator(ReverseIterator const &it);
     ReverseIterator(ReverseIterator &&it);
-    Tensor<T, 0, C> operator*();
-    Tensor<T, 0, C> operator->();
+    T &operator*();
+    T *operator->();
     ReverseIterator operator++(int);
     ReverseIterator &operator++();
     ReverseIterator operator--(int);
     ReverseIterator &operator--();
     bool operator==(ReverseIterator const &it) const;
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
+    std::ptrdiff_t operator-(ReverseIterator const &it) const noexcept;
+    ReverseIterator operator+(std::ptrdiff_t incr) const;
+    ReverseIterator operator-(std::ptrdiff_t incr) const;
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ReverseIterator const &it) const;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ReverseIterator const &it) const;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ReverseIterator const &it) const { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ReverseIterator const &it) const { return !(*this > it); }
+
   private:
     ReverseIterator(Tensor<T, 1, C> const &tensor, size_t);
 
@@ -5842,14 +6165,30 @@ public:
 
     ConstReverseIterator(ConstReverseIterator const &it);
     ConstReverseIterator(ConstReverseIterator &&it);
-    Tensor<T, 0, C> const operator*();
-    Tensor<T, 0, C> const operator->();
+    T const &operator*() const;
+    T const *operator->() const;
     ConstReverseIterator operator++(int);
     ConstReverseIterator &operator++();
     ConstReverseIterator operator--(int);
     ConstReverseIterator &operator--();
     bool operator==(ConstReverseIterator const &it) const;
     bool operator!=(ConstReverseIterator const &it) const { return !(it == *this); }
+    std::ptrdiff_t operator-(ConstReverseIterator const &it) const noexcept;
+    ConstReverseIterator operator+(std::ptrdiff_t incr) const;
+    ConstReverseIterator operator-(std::ptrdiff_t incr) const;
+
+    /** Returns true iff the offset difference is positive */
+    bool operator>(ConstReverseIterator const &it) const;
+
+    /** Returns true iff the offset difference is non-negative */
+    bool operator>=(ConstReverseIterator const &it) const;
+
+    /** Returns true iff the offset difference is negative */
+    bool operator<(ConstReverseIterator const &it) const { return !(*this >= it); }
+
+    /** Returns true iff the offset difference is non-positive */
+    bool operator<=(ConstReverseIterator const &it) const { return !(*this > it); }
+
   private:
     ConstReverseIterator(Tensor<T, 1, C> const &tensor, size_t);
 
@@ -6113,78 +6452,75 @@ Tensor<T, 0, C> &Tensor<T, 0, C>::operator-=(T const &scalar)
  * don't have to deal with them.
  */
 template <typename X, typename Y, template <class> class C_>
-Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+X operator+(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
 {
-  return Tensor<X, 0, C_>(tensor_1() + tensor_2());
+  return tensor_1() + tensor_2();
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator+(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+X operator+(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
-  return Tensor<X, 0, C_>(tensor() + scalar);
+  return tensor() + scalar;
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator+(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+X operator+(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
-  return Tensor<X, 0, C_>(tensor() + scalar);
+  return tensor() + scalar;
 }
 
 template <typename X, typename Y, template <class> class C_>
-Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
+X operator-(Tensor<X, 0, C_> const &tensor_1, Tensor<Y, 0, C_> const &tensor_2)
 {
-  return Tensor<X, 0, C_>(tensor_1() - tensor_2());
+  return tensor_1() - tensor_2();
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator-(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+X operator-(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
-  return Tensor<X, 0, C_>(tensor() - scalar);
+  return tensor() - scalar;
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator-(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+X operator-(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
-  return Tensor<X, 0, C_>(tensor() - scalar);
+  return scalar - tensor();
 }
 
 template <typename X, typename Y, template <class> class C1, template <class> class C2>
-Tensor<X, 0, C1> operator%(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
+X operator%(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
-  return Tensor<X, 0, C1>(tensor_1() % tensor_2());
+  return tensor_1() % tensor_2();
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator%(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+X operator%(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
-  return Tensor<X, 0, C_>(tensor() % scalar);
+  return tensor() % scalar;
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator%(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+X operator%(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
-  return Tensor<X, 0, C_>(tensor() % scalar);
+  return tensor() % scalar;
 }
 
 template <typename X, typename Y, template <class> class C1, template <class> class C2>
-Tensor<X, 0, C1> operator*(
-    Tensor<X, 0, C1> const &tensor_1, 
-    Tensor<Y, 0, C2> const &tensor_2
-)
+X operator*(Tensor<X, 0, C1> const &tensor_1, Tensor<Y, 0, C2> const &tensor_2)
 {
-  return Tensor<X, 0, C1>(tensor_1() * tensor_2());
+  return tensor_1() * tensor_2();
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator*(Tensor<X, 0, C_> const &tensor, X const &scalar) 
+X operator*(Tensor<X, 0, C_> const &tensor, X const &scalar) 
 {
-  return Tensor<X, 0, C_>(tensor() * scalar);
+  return tensor() * scalar;
 }
 
 template <typename X, template <class> class C_>
-Tensor<X, 0, C_> operator*(X const &scalar, Tensor<X, 0, C_> const &tensor) 
+X operator*(X const &scalar, Tensor<X, 0, C_> const &tensor) 
 {
-  return Tensor<X, 0, C_>(tensor() * scalar);
+  return tensor() * scalar;
 }
 
 template <typename T, template <class> class C>
@@ -6373,21 +6709,9 @@ T &Tensor<T, 0, C>::Iterator::operator*()
 }
 
 template <typename T, template <class> class C>
-T const &Tensor<T, 0, C>::Iterator::operator*() const
-{
-  return ref_[offset_];
-}
-
-template <typename T, template <class> class C>
 T *Tensor<T, 0, C>::Iterator::operator->()
 {
-  return ref_[offset_];
-}
-
-template <typename T, template <class> class C>
-T const *Tensor<T, 0, C>::Iterator::operator->() const
-{
-  return ref_[offset_];
+  return &ref_[offset_];
 }
 
 template <typename T, template <class> class C>
@@ -6504,15 +6828,15 @@ Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator &&it)
 {}
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> const Tensor<T, 0, C>::ConstIterator::operator*()
+T const &Tensor<T, 0, C>::ConstIterator::operator*() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return static_cast<C<T> const &>(ref_)[offset_];
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> const Tensor<T, 0, C>::ConstIterator::operator->()
+T const *Tensor<T, 0, C>::ConstIterator::operator->() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return &static_cast<C<T> const &>(ref_)[offset_];
 }
 
 template <typename T, template <class> class C>
@@ -6553,6 +6877,63 @@ bool Tensor<T, 0, C>::ConstIterator::operator==(
   return offset_ == it.offset_;
 }
 
+template <typename T, template <class> class C>
+std::ptrdiff_t Tensor<T, 0, C>::ConstIterator::operator-(
+    typename Tensor<T, 0, C>::ConstIterator const &it) const noexcept
+{
+  assert(ref_ == it.ref_);
+  assert(stride_ == it.stride_);
+  return ((std::ptrdiff_t)offset_ - (std::ptrdiff_t)it.offset_) / (std::ptrdiff_t)stride_;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstIterator::operator+(std::ptrdiff_t incr) const -> ConstIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ConstIterator(*this);
+  incr_it.offset_ += incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstIterator::operator-(std::ptrdiff_t decr) const -> ConstIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ConstIterator(*this);
+  incr_it.offset_ -= decr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ConstIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, 0, C_>::ConstIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ConstIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, 0, C_>::ConstIterator const &it)
+{
+  return it - decr;
+} 
+
+/** Returns true iff the offset difference is positive */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ConstIterator::operator>(ConstIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ > it.offset_;
+}
+
+/** Returns true iff the offset difference is non-negative */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ConstIterator::operator>=(ConstIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ >= it.offset_;
+}
+
 /* -------------------- ReverseIterator ---------------------- */
 
 template <typename T, template <class> class C>
@@ -6573,15 +6954,15 @@ Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
 {}
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator*()
+T &Tensor<T, 0, C>::ReverseIterator::operator*()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return ref_[offset_];
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> Tensor<T, 0, C>::ReverseIterator::operator->()
+T *Tensor<T, 0, C>::ReverseIterator::operator->()
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return &ref_[offset_];
 }
 
 template <typename T, template <class> class C>
@@ -6623,6 +7004,63 @@ bool Tensor<T, 0, C>::ReverseIterator::operator==(
   return offset_ == it.offset_;
 }
 
+template <typename T, template <class> class C>
+std::ptrdiff_t Tensor<T, 0, C>::ReverseIterator::operator-(
+    typename Tensor<T, 0, C>::ReverseIterator const &it) const noexcept
+{
+  assert(ref_ == it.ref_);
+  assert(stride_ == it.stride_);
+  return ((std::ptrdiff_t)it.offset_ - (std::ptrdiff_t)offset_) / (std::ptrdiff_t)stride_;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ReverseIterator::operator+(std::ptrdiff_t incr) const -> ReverseIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ReverseIterator(*this);
+  incr_it.offset_ -= incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ReverseIterator::operator-(std::ptrdiff_t decr) const -> ReverseIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ReverseIterator(*this);
+  incr_it.offset_ += decr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ReverseIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, 0, C_>::ReverseIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ReverseIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, 0, C_>::ReverseIterator const &it)
+{
+  return it - decr;
+} 
+
+/** Returns true iff the offset difference is positive */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ReverseIterator::operator>(ReverseIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ < it.offset_;
+}
+
+/** Returns true iff the offset difference is non-negative */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ReverseIterator::operator>=(ReverseIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ <= it.offset_;
+}
+
 /* ----------------- ConstReverseIterator ------------------- */
 
 template <typename T, template <class> class C>
@@ -6643,15 +7081,15 @@ Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator
   : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> const Tensor<T, 0, C>::ConstReverseIterator::operator*()
+T const &Tensor<T, 0, C>::ConstReverseIterator::operator*() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return static_cast<C<T> const &>(ref_)[offset_];
 }
 
 template <typename T, template <class> class C>
-Tensor<T, 0, C> const Tensor<T, 0, C>::ConstReverseIterator::operator->()
+T const *Tensor<T, 0, C>::ConstReverseIterator::operator->() const
 {
-  return Tensor<T, 0, C>(nullptr, nullptr, offset_, ref_);
+  return &static_cast<C<T> const &>(ref_)[offset_];
 }
 
 template <typename T, template <class> class C>
@@ -6695,6 +7133,65 @@ bool Tensor<T, 0, C>::ConstReverseIterator::operator==(
 {
   if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
+}
+
+template <typename T, template <class> class C>
+std::ptrdiff_t Tensor<T, 0, C>::ConstReverseIterator::operator-(
+    typename Tensor<T, 0, C>::ConstReverseIterator const &it) const noexcept
+{
+  assert(ref_ == it.ref_);
+  assert(stride_ == it.stride_);
+  return ((std::ptrdiff_t)it.offset_ - (std::ptrdiff_t)offset_) / (std::ptrdiff_t)stride_;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstReverseIterator::operator+(std::ptrdiff_t incr) const 
+-> ConstReverseIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ConstReverseIterator(*this);
+  incr_it.offset_ -= incr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstReverseIterator::operator-(std::ptrdiff_t decr) const 
+-> ConstReverseIterator
+{
+  auto incr_it = Tensor<T, 0, C>::ConstReverseIterator(*this);
+  incr_it.offset_ += decr * incr_it.stride_;
+  return incr_it;
+}
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ConstReverseIterator 
+operator+(std::ptrdiff_t incr, typename Tensor<U, 0, C_>::ConstReverseIterator const &it)
+{
+  return it + incr;
+} 
+
+template <typename U, template <class> class C_>
+typename Tensor<U, 0, C_>::ConstReverseIterator 
+operator-(std::ptrdiff_t decr, typename Tensor<U, 0, C_>::ConstReverseIterator const &it)
+{
+  return it - decr;
+} 
+
+/** Returns true iff the offset difference is positive */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ConstReverseIterator::operator>(ConstReverseIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ < it.offset_;
+}
+
+/** Returns true iff the offset difference is non-negative */
+template <typename U, template <class> class C_>
+bool Tensor<U, 0, C_>::ConstReverseIterator::operator>=(ConstReverseIterator const &it) const
+{
+  assert(stride_ == it.stride_);
+  assert(ref_ == it.ref_);
+  return offset_ <= it.offset_;
 }
 
 /* ----------------------------- Math ----------------------------- */ 
