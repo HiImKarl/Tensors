@@ -40,7 +40,7 @@
 extern int eDebugConstructorCounter; 
 #endif
 
-#ifndef _NDEBUG
+#ifndef NDEBUG
 #include <iostream>
 #define PRINT(x) std::cout << x << '\n';
 #define PRINTV(x) std::cout << #x << ": " << x << '\n';
@@ -57,7 +57,7 @@ extern int eDebugConstructorCounter;
 #define PRINT_ARRAY(...) \
   GET_MACRO(__VA_ARGS__, PRINT_ARRAY1, PRINT_ARRAY2)(__VA_ARGS__)
 
-#endif // not defined _NDEBUG
+#endif // not defined NDEBUG
 
 /* ---------------- Error Messages ---------------- */
 
@@ -574,15 +574,6 @@ struct ContainsIndex<Index>: std::false_type {};
 /** Wrapper around a vardiac size_t pack */
 template <size_t... I> 
 struct Sequence { enum: size_t { size = sizeof...(I) }; };
-
-#ifndef _NDEBUG
-template <size_t... I>
-void PrintSequence(Sequence<I...>)
-{
-  VARDIAC_MAP(std::cout << I << " ");
-  std::cout << '\n';
-}
-#endif
 
 /** Extends `Sequence<I...>` by placing `Index` in front */
 template <size_t Index, typename>
@@ -6048,7 +6039,9 @@ public:
     /* --------------- Constructors --------------- */
 
     ConstIterator(ConstIterator const &it);
+    ConstIterator &operator=(ConstIterator const &it); 
     ConstIterator(ConstIterator &&it);
+    ConstIterator &operator=(ConstIterator &&it); 
     T const &operator*() const;
     T const *operator->() const;
     ConstIterator operator++(int);
@@ -6106,7 +6099,9 @@ public:
     /* --------------- Constructors --------------- */
 
     ReverseIterator(ReverseIterator const &it);
+    ReverseIterator &operator=(ReverseIterator const &it);
     ReverseIterator(ReverseIterator &&it);
+    ReverseIterator &operator=(ReverseIterator &&it);
     T &operator*();
     T *operator->();
     ReverseIterator operator++(int);
@@ -6164,7 +6159,9 @@ public:
     /* --------------- Constructors --------------- */
 
     ConstReverseIterator(ConstReverseIterator const &it);
+    ConstReverseIterator &operator=(ConstReverseIterator const &it); 
     ConstReverseIterator(ConstReverseIterator &&it);
+    ConstReverseIterator &operator=(ConstReverseIterator &&it); 
     T const &operator*() const;
     T const *operator->() const;
     ConstReverseIterator operator++(int);
@@ -6823,9 +6820,29 @@ Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator const &it)
 {}
 
 template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstIterator::operator=(ConstIterator const &it) 
+  -> ConstIterator&
+{
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  return *this;
+}
+
+template <typename T, template <class> class C>
 Tensor<T, 0, C>::ConstIterator::ConstIterator(ConstIterator &&it)
   : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) 
 {}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstIterator::operator=(ConstIterator &&it) 
+  -> ConstIterator&
+{
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  return *this;
+}
 
 template <typename T, template <class> class C>
 T const &Tensor<T, 0, C>::ConstIterator::operator*() const
@@ -6949,9 +6966,29 @@ Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator const &it)
 {}
 
 template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ReverseIterator::operator=(ReverseIterator const &it) 
+  -> ReverseIterator&
+{
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  return *this;
+}
+
+template <typename T, template <class> class C>
 Tensor<T, 0, C>::ReverseIterator::ReverseIterator(ReverseIterator &&it)
   : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) 
 {}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ReverseIterator::operator=(ReverseIterator &&it) 
+  -> ReverseIterator&
+{
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  return *this;
+}
 
 template <typename T, template <class> class C>
 T &Tensor<T, 0, C>::ReverseIterator::operator*()
@@ -7077,8 +7114,28 @@ Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator
   : offset_(it.offset_), ref_(it.ref_), stride_(it.stride_) {}
 
 template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstReverseIterator::operator=(ConstReverseIterator const &it) 
+  -> ConstReverseIterator&
+{
+  offset_ = it.offset_;
+  ref_ = it.ref_;
+  stride_ = it.stride_;
+  return *this;
+}
+
+template <typename T, template <class> class C>
 Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(ConstReverseIterator &&it)
   : offset_(it.offset_), ref_(std::move(it.ref_)), stride_(it.stride_) {}
+
+template <typename T, template <class> class C>
+auto Tensor<T, 0, C>::ConstReverseIterator::operator=(ConstReverseIterator &&it) 
+  -> ConstReverseIterator&
+{
+  offset_ = it.offset_;
+  ref_ = std::move(it.ref_);
+  stride_ = it.stride_;
+  return *this;
+}
 
 template <typename T, template <class> class C>
 T const &Tensor<T, 0, C>::ConstReverseIterator::operator*() const
@@ -9633,7 +9690,7 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 #undef OPENCL_ARITY_ERROR
 #undef OPENCL_REDUCTION_SIZE_ERROR
 
-#ifndef _NDEBUG
+#ifndef NDEBUG
 
 #undef PRINT
 #undef PRINTV
@@ -9643,6 +9700,6 @@ UnaryNegExpr<RHS>::UnaryNegExpr(RHS const &rhs)
 #undef GET_MACRO
 #undef PRINT_ARRAY
 
-#endif // not defined _NDEBUG
+#endif // not defined NDEBUG
 
 #endif // TENSORS_H_

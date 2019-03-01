@@ -231,10 +231,10 @@ void ReverseIteratorTests() {
 
     std::sort(tensor->begin(0)->begin(0)->rbegin(), tensor->begin(0)->begin(0)->rend());
 
-    REQUIRE(tensor(0, 0, 0) == -5);
-    REQUIRE(tensor(0, 0, 1) == 1);
-    REQUIRE(tensor(0, 0, 2) == 2);
-    REQUIRE(tensor(0, 0, 3) == 7);
+    REQUIRE(tensor(0, 0, 0) == 7);
+    REQUIRE(tensor(0, 0, 1) == 2);
+    REQUIRE(tensor(0, 0, 2) == 1);
+    REQUIRE(tensor(0, 0, 3) == -5);
   }
 } 
 
