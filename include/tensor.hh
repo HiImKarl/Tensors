@@ -980,7 +980,7 @@ inline size_t NextPowerOfTwo(size_t x)
 
 /* ------- Expansion for methods which take Tensors...  --------- */
 
-// Given a pack of Expressions, return the shape of the first expression
+/** Given a pack of Expressions, return the shape of the first expression */
 template <typename NodeType, typename... Expressions>
 inline Shape<NodeType::rank()> const &GetShape(
     Expression<NodeType> const &expr, 
@@ -4266,15 +4266,15 @@ Tensor<X, LHS::rank(), C_> add(Expression<LHS> const &lhs, Expression<RHS> const
   using Y = typename LHS::value_type;
   using Z = typename RHS::value_type;
 
-  auto fn = [](X &x, Y const &y, Z const &z) 
-    -> void { x = y + z; };
+  auto fn = [](X &x, Y const &y, Z const &z) -> void { x = y + z; };
   Map(fn, result, lhs.self(), rhs.self());
+
   return result;
 }
 
 /** Creates a Tensor whose elements are the elementwise sum of `lhs`, and every 
- *  Expression in `exprs...`, which must all have equivalent shape, 
- *  or an assertion will fail during debug.
+ *  In debug builds, expression in `exprs...`, which must all have equivalent shape, 
+ *  or an assertion will fail. 
  */
 template <
     typename LHS, 
@@ -4286,7 +4286,8 @@ add(Expression<LHS> const &lhs, Expressions const&... exprs)
 {
   static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
 
-  Tensor<typename LHS::value_type, LHS::rank(), LHS::template container_type> result = lhs;
+  auto result = 
+    Tensor<typename LHS::value_type, LHS::rank(), LHS::template container_type>(lhs);
 
   VARDIAC_MAP(assert(result.shape() == exprs.shape() && SHAPE_MISMATCH));
   VARDIAC_MAP(result = add(result, exprs));
@@ -4294,24 +4295,27 @@ add(Expression<LHS> const &lhs, Expressions const&... exprs)
   return result;
 }
 
-/** The elements of `tensor` are assigned the elementwise sum of `rhs`
- *  and `tensor`. `tensor` and `rhs` must have equivalent shape, or
- *  an assertion will fail during debug.
+/** In place addition. The elements of `tensor` are assigned the elementwise sum of `rhs`
+ *  and `tensor`. In debug builds, `tensor` and `rhs` must have equivalent shape, or
+ *  an assertion will fail.
  */
 template <typename X, size_t M, template <class> class C_, typename RHS>
 void Add(Tensor<X, M, C_> &tensor, Expression<RHS> const &rhs)
 {
   assert((tensor.shape() == rhs.shape()) && DIMENSION_MISMATCH);
-
   using Y = typename RHS::value_type;
-  auto elemwise_add = [](X &x, Y const &y) 
-    -> void { x += y; };
+  auto elemwise_add = [](X &x, Y const &y) -> void { x += y; };
   Map(elemwise_add, tensor, rhs.self());
 }
 
-/** Inplace addition with a variable amount of arguments */
-template <typename X, size_t M, template <class> class C_, typename... Expressions, typename =
-          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+/** In place addition with a variable amount of arguments */
+template <
+    typename X, 
+    size_t M, 
+    template <class> class C_, 
+    typename... Expressions, 
+    typename = typename std::enable_if<sizeof...(Expressions) >= 2>::type
+>
 void Add(Tensor<X, M, C_> &tensor, Expressions const&... exprs)
 {
   static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
@@ -4398,9 +4402,14 @@ void Sub(Tensor<X, M, C_> &tensor, Expression<RHS> const &rhs)
   Map(fn, tensor, rhs.self());
 }
 
-/** Inplace subtraction with a variable amount of arguments */
-template <typename X, size_t M, template <class> class C_, typename... Expressions, typename =
-          typename std::enable_if<sizeof...(Expressions) >= 2>::type>
+/** In place subtraction with a variable amount of arguments */
+template <
+    typename X, 
+    size_t M, 
+    template <class> class C_, 
+    typename... Expressions, 
+    typename = typename std::enable_if<sizeof...(Expressions) >= 2>::type
+>
 void Sub(Tensor<X, M, C_> &tensor, Expressions const&... exprs)
 {
   auto const &shape = tensor.shape();
@@ -4512,7 +4521,8 @@ template <
     typename X = typename LHS::value_type,
     template <class> class C_ = LHS::template container_type
 >
-Tensor<X, LHS::rank() + RHS::rank() - 2, C_> mul(
+Tensor<X, LHS::rank() + RHS::rank() - 2, C_> 
+mul(
     Expression<LHS> const &lhs, 
     Expression<RHS> const &rhs
 )
@@ -4544,12 +4554,12 @@ template <
     typename = typename std::enable_if<(sizeof...(Expressions) >= 1)>::type
 >
 auto mul(Expression<LHS> const &lhs, Expression<RHS> const &rhs, Expressions const&... exprs)
-  -> Tensor<
-        typename LHS::value_type, 
-        LHS::rank() + RHS::rank() + meta::RankSum<Expressions...>::value 
-            - 2 * (sizeof...(Expressions) + 1), 
-        LHS::template container_type
-     >
+-> Tensor<
+      typename LHS::value_type, 
+      LHS::rank() + RHS::rank() + meta::RankSum<Expressions...>::value 
+          - 2 * (sizeof...(Expressions) + 1), 
+      LHS::template container_type
+   >
 {
   static_assert(meta::AreExpressions<Expressions...>::value, EXPECTING_EXPRESSION);
   auto prod_tensor = mul(lhs, rhs);
@@ -4623,8 +4633,8 @@ template <size_t M, template <class> class C_>
 Tensor<T, M, C_> Tensor<T, N, C>::reshape(Shape<M> const &shape) const noexcept
 {
   assert(shape_.index_product() == shape.index_product() && ELEMENT_COUNT_MISMATCH);
-  Tensor<T, M, C_> resized_tensor(shape);
-  Indices<N> indices = Indices<N>();
+  auto resized_tensor = Tensor<T, M, C_>(shape);
+  auto indices = Indices<N>();
   // make use of the fact that the new tensor is contiguous
   size_t index = 0;
   do {
@@ -4732,9 +4742,14 @@ U Tensor<T, N, C>::reduce(U&& initial_value, FunctionType&& fun) const
  *  to `fn` must have be const ref or value qualified, and return value
  *  that is trivially convertible to `T`. 
  */
-template <typename U, template <class> class C_, typename FunctionType, typename... Expressions>
+template <
+    typename U, 
+    template <class> class C_, 
+    typename FunctionType, 
+    typename... Expressions
+>
 Tensor<U, FirstExpression<Expressions...>::type::rank(), C_> 
-  map(FunctionType &&fn, Expressions const&... exprs)
+map(FunctionType &&fn, Expressions const&... exprs)
 {
   // verify arguments are expressions
   static_assert(sizeof...(Expressions), NO_EXPRESSIONS_PROVIDED);
@@ -4874,8 +4889,8 @@ bool Tensor<T, N, C>::Iterator::operator==(
     typename Tensor<T, N, C>::Iterator const &it) const
 {
   if (shape_ != it.shape_) return false;
-  // FIXME
-  // if (stride_ != it.stride_) return false;
+  // FIXME compare strides_
+  if (stride_ != it.stride_) return false;
   if (ref_ != it.ref_) return false;
   return offset_ == it.offset_;
 }
@@ -4886,7 +4901,7 @@ bool Tensor<T, N, C>::Iterator::operator>(
 {
   assert(shape_ == it.shape_);
   // FIXME 
-  // assert(stride_ == it.shape_);
+  assert(stride_ == it.stride_);
   assert(ref_ == it.ref_);
   return offset_ > it.offset_;
 }
@@ -4897,7 +4912,7 @@ bool Tensor<T, N, C>::Iterator::operator>=(
 {
   assert(shape_ == it.shape_);
   // FIXME 
-  // assert(stride_ == it.shape_);
+  assert(stride_ == it.stride_);
   assert(ref_ == it.ref_);
   return offset_ > it.offset_;
 }
@@ -7284,11 +7299,11 @@ std::string add::opencl_map(Args const&... args)
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " + "));
 
-  // remove trailing " + "
+  // replace trailing " + " with ")";
   expr.pop_back();
   expr.pop_back();
-  expr.pop_back();
-  expr += ")";
+  expr.back() = ')';
+
   return expr;
 }
 #endif
@@ -7297,12 +7312,17 @@ std::string add::opencl_map(Args const&... args)
 struct sub {
   template <typename T, typename... Args>
   inline T operator()(T const &arg1, Args const&... args) const;
+
 #ifdef _ENABLE_OPENCL
   /** Creates the reduce expression for the given accumulator and variable names */
   static std::string opencl_reduce(std::string const &accum, std::string const &v1)
     { return accum + " += " + v1; }
+
+  /** Expected number of arguments is a compile time value */
   static constexpr size_t arity() { return 0; }
-  template <typename... Args> static std::string opencl_map(Args const&... args);
+
+  template <typename... Args> 
+  static std::string opencl_map(Args const&... args);
 #endif
 };
 
@@ -7322,11 +7342,10 @@ std::string sub::opencl_map(Args const&... args)
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " - "));
 
-  // remove trailing " - "
+  // replace trailing " - " with ")";
   expr.pop_back();
   expr.pop_back();
-  expr.pop_back();
-  expr += ")";
+  expr.back() = ')';
 
   return expr;
 }
@@ -7362,11 +7381,10 @@ std::string mul::opencl_map(Args const&... args)
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " * "));
 
-  // remove trailing " * "
+  // replace trailing " * " with ")";
   expr.pop_back();
   expr.pop_back();
-  expr.pop_back();
-  expr += ")";
+  expr.back() = ')';
 
   return expr;
 }
@@ -7400,11 +7418,12 @@ std::string div::opencl_map(Args const&... args)
   // surround expression in brackets to give priority
   std::string expr = "(";
   VARDIAC_MAP((expr += args + " / "));
-  // remove last " / "
+
+  // replace trailing " / " with ")";
   expr.pop_back();
   expr.pop_back();
-  expr.pop_back();
-  expr += ")";
+  expr.back() = ')';
+
   return expr;
 }
 #endif
@@ -7520,7 +7539,7 @@ void Model<NodeType>::pFill(U *ptr, size_t num_elems) const
 }
 
 } // namespace opencl
-#endif
+#endif // if defined _ENABLE_OPENCL
 
 /* ---------------------- Expressions ------------------------ */
 
@@ -7749,11 +7768,11 @@ public:
 
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
-    operator-(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+  operator-(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
   template <typename LHS_, typename RHS_>
   friend BinarySubExpr<LHS_, RHS_> 
-    _sub_(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
+  _sub_(Expression<LHS_> const &lhs, Expression<RHS_> const &rhs);
 
   template <typename LHS_, typename RHS_> friend class BinaryAddExpr;
   template <typename LHS_, typename RHS_> friend class BinarySubExpr;
@@ -8161,9 +8180,15 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_type
 
   auto lhs = lhs_.template slice<I1>(Indices<left>(seperate_args.array1.data()));
   auto rhs = rhs_.template slice<I2>(Indices<right>(seperate_args.array2.data()));
-  auto mul_vals = [](value_type &accum, value_type const &x, typename RHS::value_type const &y) { 
+  auto mul_vals = [](
+      value_type &accum, 
+      value_type const &x, 
+      typename RHS::value_type const &y
+  ) 
+  { 
     return accum + x * y; 
   };
+
   return reduce(value_type{}, mul_vals, lhs, rhs);
 }
 
@@ -8285,7 +8310,8 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::slice(Indices<M> const &indices) const
 -> typename std::remove_reference<decltype(
     std::declval<return_type const>().slice(indices))>::type
 {
-  using namespace meta; // WARNING -- using namespace
+  // WARNING -- using namespace
+  using namespace meta; 
   static_assert(IsIncreasing<Slices...>::value, SLICE_INDICES_DESCENDING);
 
   constexpr size_t lhs_left_count = CountLTMax<I1, Slices...>::value;
@@ -8425,8 +8451,11 @@ auto BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(
 template <size_t I1, size_t I2, typename LHS, typename RHS>
 template <size_t... Slices1, size_t... Slices2, size_t M, typename>
 typename BinaryMulExpr<I1, I2, LHS, RHS>::value_type 
-  BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(meta::Sequence<Slices1...>, 
-  meta::Sequence<Slices2...>, Indices<M> const &indices) const 
+BinaryMulExpr<I1, I2, LHS, RHS>::pSliceSequences(
+    meta::Sequence<Slices1...>, 
+    meta::Sequence<Slices2...>, 
+    Indices<M> const &indices
+) const 
 {
   constexpr size_t left = meta::Min(LHS::rank() - sizeof...(Slices1), M);
   constexpr size_t right = meta::NonZeroDifference(M, LHS::rank() - sizeof...(Slices1));
@@ -8442,7 +8471,10 @@ typename BinaryMulExpr<I1, I2, LHS, RHS>::value_type
         value_type &accum, 
         value_type const &x, 
         typename RHS::value_type const &y
-    ) { return accum + x * y; };
+    ) 
+    { 
+      return accum + x * y; 
+    };
 
   return reduce(value_type{}, mul_vals, lhs, rhs);
 }
@@ -8463,8 +8495,7 @@ std::string BinaryMulExpr<I1, I2, LHS, RHS>::opencl_kernel_code(
   using lhs_t = typename LHS::value_type;
   using rhs_t = typename RHS::value_type;
 
-  // Create the multiplication kernel
-  // lhs and rhs buffers
+  // Create the multiplication kernel lhs and rhs buffers
   cl::Buffer lhs_buffer = opencl::details::create_buffer(lhs_);
   cl::Buffer rhs_buffer = opencl::details::create_buffer(rhs_);
 
@@ -8730,7 +8761,8 @@ auto BinaryHadExpr<LHS, RHS>::slice(Args... args) const
 
 template <typename LHS, typename RHS>
 template <size_t... Slices, typename... Args, typename>
-typename BinaryHadExpr<LHS, RHS>::value_type BinaryHadExpr<LHS, RHS>::slice(Args... args) const
+typename BinaryHadExpr<LHS, RHS>::value_type 
+BinaryHadExpr<LHS, RHS>::slice(Args... args) const
 {
   static_assert(!sizeof...(Slices), RANK_OUT_OF_BOUNDS);
   return lhs(args...) * rhs(args...);
@@ -8908,7 +8940,8 @@ private:
       typename = typename std::enable_if<self_type::rank() != sizeof...(Args)>::type
   >
   auto pMapExpansion(meta::Sequence<TupleIndices...>, Args... args) const
-  -> typename std::remove_reference<decltype(std::declval<return_type const>()(args...))>::type;
+  -> typename std::remove_reference<decltype(
+      std::declval<return_type const>()(args...))>::type;
 
   template <
       size_t... TupleIndices, 
@@ -8923,7 +8956,8 @@ private:
       typename = typename std::enable_if<self_type::rank() != M>::type
   >
   auto pMapExpansion(meta::Sequence<TupleIndices...>, Indices<M> const &indices) const
-  -> typename std::remove_reference<decltype(std::declval<return_type const>()[indices])>::type;
+  -> typename std::remove_reference<decltype(
+      std::declval<return_type const>()[indices])>::type;
 
   template <
       size_t... TupleIndices, 
@@ -9208,7 +9242,8 @@ std::string MapExpr<Function, Exprs...>::popencl_kernel_codeTupleExpansion(
     std::string &arg_list
 ) const noexcept
 {
-  return Function::opencl_map(std::get<TupleIndices>(exprs_).opencl_kernel_code(cqueue, buffers, arg_list)...);
+  return Function::opencl_map(
+      std::get<TupleIndices>(exprs_).opencl_kernel_code(cqueue, buffers, arg_list)...);
 }
 
 template <typename Function, typename... Exprs>
@@ -9321,8 +9356,9 @@ private:
   T return_value_;
 };
 
-template <typename U, typename Function_, typename... Exprs_> ReduceExpr<U, Function_, Exprs_...>
-  _reduce_(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs)
+template <typename U, typename Function_, typename... Exprs_> 
+ReduceExpr<U, Function_, Exprs_...>
+_reduce_(U &&value, Function_ &&fn, Expression<Exprs_> const&... exprs)
 {
   auto const &shape = details::GetShape(exprs...);
   VARDIAC_MAP(assert(shape == exprs.self().shape() && SHAPE_MISMATCH));

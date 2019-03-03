@@ -14,7 +14,7 @@ endforeach()
 
 add_executable(benchmark_all ${ALL_BENCH_CC} benchmark.cc)
 target_link_libraries(
-   benchmark_all $benchmark
+   benchmark_all benchmark
    ${CMAKE_THREAD_LIBS_INIT}
 )
 

@@ -30,23 +30,23 @@ void SimpleExpressionTests() {
   }
 
   SECTION("Map") {
-    Matrix<float, Container> result = _map(math::mul{}, -mat1, mat2, mat2).opencl();
+    Matrix<float, Container> result = _map_(math::mul{}, -mat1, mat2, mat2).opencl();
     for (size_t i = 0; i < result.dimension(0); ++i)
       for (size_t j = 0; j < result.dimension(1); ++j)
         REQUIRE(result(i, j) == -100);
   }
 
   SECTION("Reduce") {
-    Scalar<float, Container> result = _reduce(0.0f, math::add{}, -mat1).opencl();
+    Scalar<float, Container> result = _reduce_(0.0f, math::add{}, -mat1).opencl();
     REQUIRE(result() == -111100);
-    result = _reduce(0.0f, math::add{}, mat2).opencl();
+    result = _reduce_(0.0f, math::add{}, mat2).opencl();
     REQUIRE(result() == -1111000);
   }
 
   SECTION("Multiplication") {
     Matrix<float, Container> result1 = (mat3 * mat4).opencl();
-    Matrix<float, Container> result2 = _mul<0, 0>(mat1, mat2).opencl();
-    Matrix<float, Container> result3 = _mul<1, 1>(mat2, mat1).opencl();
+    Matrix<float, Container> result2 = _mul_<0, 0>(mat1, mat2).opencl();
+    Matrix<float, Container> result3 = _mul_<1, 1>(mat2, mat1).opencl();
 
     for (size_t i = 0; i < result1.dimension(0); ++i)
       for (size_t j = 0; j < result1.dimension(1); ++j)
@@ -68,19 +68,19 @@ void CombinationExpressionTests() {
   Matrix<float, Container> mat2({1000, 1000}, 10); 
 
   SECTION("Map") {
-    Matrix<float, Container> result = _map(math::div{}, mat1 + mat1, mat2 % mat1).opencl();
+    Matrix<float, Container> result = _map_(math::div{}, mat1 + mat1, mat2 % mat1).opencl();
     for (size_t i = 0; i < result.dimension(0); ++i)
       for (size_t j = 0; j < result.dimension(1); ++j)
         REQUIRE(result(i, j) == 0.2f);
   }
 
   SECTION("Reduce") {
-    Scalar<float, Container> result = _reduce(1e6f, math::sub{}, mat1 + mat1 % mat2).opencl();
+    Scalar<float, Container> result = _reduce_(1e6f, math::sub{}, mat1 + mat1 % mat2).opencl();
     REQUIRE(result() == 12e6f);
   }
 
   SECTION("Multipliation") {
-    Matrix<float, Container> result = _mul<0, 1>(-mat1 - mat1, -(mat1 + mat2)).opencl();
+    Matrix<float, Container> result = _mul_<0, 1>(-mat1 - mat1, -(mat1 + mat2)).opencl();
     for (size_t i = 0; i < result.dimension(0); ++i)
       for (size_t j = 0; j < result.dimension(1); ++j)
         REQUIRE(result(i, j) == -18000); 
@@ -97,4 +97,5 @@ TEST_CASE("Combination Expressions") {
   CombinationExpressionTests<data::Array>();
   CombinationExpressionTests<data::HashMap>();
 }
-#endif
+
+#endif // ifdef _ENABLE_OPENCL
