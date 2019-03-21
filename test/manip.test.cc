@@ -14,22 +14,85 @@ void MethodTests() {
           tensor(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; 
 
   SECTION("Tranpose") { 
+
+    /* --------------- Matrix --------------- */
+
     Matrix<int32_t, Container> mat = tensor.template slice<1, 3>(1, 1); 
     auto mat_t = transpose(mat); 
+
     REQUIRE(mat_t.rank() == 2); 
     REQUIRE(mat_t.dimension(0) == 8); 
     REQUIRE(mat_t.dimension(1) == 4); 
+
     for (size_t i = 0; i < mat.dimension(0); ++i) 
       for (size_t j = 0; j < mat.dimension(1); ++j) 
           REQUIRE(mat(i, j) == mat_t(j, i)); 
 
+    for (size_t i = 0; i < mat.dimension(0); ++i) 
+      for (size_t j = 0; j < mat.dimension(1); ++j) 
+        mat_t(j, i) = -10 * (int)i + -1 * (int)j;
+
+    for (size_t i = 0; i < mat.dimension(0); ++i) 
+      for (size_t j = 0; j < mat.dimension(1); ++j) 
+        CHECK(mat(i, j) == -10 * (int)i + -1 * (int)j);
+
+    /* --------------- Vector --------------- */
+
     Tensor<int32_t, 1, Container> vec = mat.template slice<1>(3); 
     Tensor<int32_t, 2, Container> vec_t = transpose(vec); 
+
     REQUIRE(vec_t.rank() == 2); 
     REQUIRE(vec_t.dimension(0) == 1); 
     REQUIRE(vec_t.dimension(1) == 8); 
     for (size_t i = 0; i < vec.dimension(0); ++i) 
       REQUIRE(vec(i) == vec_t(0, i)); 
+
+    for (size_t i = 0; i < vec.dimension(0); ++i)
+      vec_t(0, i) = -1 * (int)i;
+
+    for (size_t i = 0; i < vec.dimension(0); ++i)
+      CHECK(vec(i) == -1 * (int)i);
+  } 
+
+  SECTION("Const Tranpose") { 
+
+    /* --------------- Matrix --------------- */
+
+    Matrix<int32_t, Container> mat = tensor.template slice<1, 3>(1, 1); 
+    auto mat_t = transpose(static_cast<decltype(mat) const &>(mat)); 
+
+    REQUIRE(mat_t.rank() == 2); 
+    REQUIRE(mat_t.dimension(0) == 8); 
+    REQUIRE(mat_t.dimension(1) == 4); 
+
+    for (size_t i = 0; i < mat.dimension(0); ++i) 
+      for (size_t j = 0; j < mat.dimension(1); ++j) 
+          REQUIRE(mat(i, j) == mat_t(j, i)); 
+
+    for (size_t i = 0; i < mat.dimension(0); ++i) 
+      for (size_t j = 0; j < mat.dimension(1); ++j) 
+        mat_t(j, i) = -10 * (int)i + -1 * (int)j;
+
+    for (size_t i = 0; i < mat.dimension(0); ++i) 
+      for (size_t j = 0; j < mat.dimension(1); ++j) 
+        CHECK(mat(i, j) != mat_t(j, i));
+
+    /* --------------- Vector --------------- */
+
+    Tensor<int32_t, 1, Container> vec = mat.template slice<1>(3); 
+    Tensor<int32_t, 2, Container> vec_t = transpose(static_cast<decltype(vec) const &>(vec)); 
+
+    REQUIRE(vec_t.rank() == 2); 
+    REQUIRE(vec_t.dimension(0) == 1); 
+    REQUIRE(vec_t.dimension(1) == 8); 
+    for (size_t i = 0; i < vec.dimension(0); ++i) 
+      REQUIRE(vec(i) == vec_t(0, i)); 
+
+    for (size_t i = 0; i < vec.dimension(0); ++i)
+      vec_t(0, i) = -1 * (int)i;
+
+    for (size_t i = 0; i < vec.dimension(0); ++i)
+      CHECK(vec(i) != vec_t(0, i));
   } 
 
   SECTION("Map") { 

@@ -31,3 +31,5 @@ if (OpenCL_FOUND)
   target_link_libraries(test_all ${OpenCL_LIBRARY})
   target_compile_definitions(test_all PUBLIC _ENABLE_OPENCL=1)
 endif()
+
+set_target_properties(test_all PROPERTIES OUTPUT_NAME all) 

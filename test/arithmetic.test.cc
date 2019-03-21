@@ -266,6 +266,15 @@ void MiscTests() {
     auto scalar = reduce(10, [](int &x, int y, int z) { return x + y + z + 1; }, tensor_1, tensor_2);
     REQUIRE(scalar == 10 + 2 * 3 * 4);
   }
+
+  SECTION("Sine") {
+    auto tensor_3 = Tensor<double, 3, data::Array>(tensor_1);
+    tensor_3 = sin(tensor_3);
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+        for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+          REQUIRE(tensor_3(i, j, k) == std::sin(100000 * i + 10000 * j + 1000 * k));
+  }
 }
 
 template <template <class> class C>

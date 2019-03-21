@@ -22,3 +22,6 @@ if (OpenCL_FOUND)
   target_link_libraries(benchmark_all ${OpenCL_LIBRARY})
   target_compile_definitions(benchmark_all PUBLIC _ENABLE_OPENCL=1)
 endif()
+
+set_target_properties(benchmark_all PROPERTIES OUTPUT_NAME all) 
+
