@@ -1135,12 +1135,12 @@ Tensor<X, M1 + M2 - 2, C_> mul(
   static_assert(M2, SCALAR_TENSOR_MULT);
   assert((tensor_1.shape_[I1] == tensor_2.shape_[I2]) && PANIC_ASSERTION);
   auto shape = Shape<M1 + M2 - 2>();
-  details::FillExceptForIndex<I1, M1>(tensor_1.shape_.dimensions_, shape.dimensions_);
-  details::FillExceptForIndex<I2, M2>(tensor_2.shape_.dimensions_, shape.dimensions_ + M1 - 1);
+  details::FillExceptForIndex<I1, M1>(tensor_1.shape_.data(), shape.data());
+  details::FillExceptForIndex<I2, M2>(tensor_2.shape_.data(), shape.data() + M1 - 1);
 
   Tensor<X, M1 + M2 - 2, C_> prod_tensor(shape);
-  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_.dimensions_[I1];
-  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_.dimensions_[I2];
+  size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_[I1];
+  size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_[I2];
   auto reference_indices_1 = Indices<M1 - 1>{};
   auto reference_indices_2 = Indices<M2 - 1>{};
   size_t index = 0;
@@ -1149,7 +1149,10 @@ Tensor<X, M1 + M2 - 2, C_> mul(
   auto t1_strides = std::array<size_t, M1 - 1>{};
   auto t1_shape = Shape<M1 - 1>{};
   details::FillExceptForIndex<I1, M1>(tensor_1.strides_.data(), t1_strides.data());
-  details::FillExceptForIndex<I1, M1>(tensor_1.shape_.dimensions_, t1_shape.dimensions_);
+  details::FillExceptForIndex<I1, M1>(
+      tensor_1.shape_.data(), 
+      t1_shape.data()
+  );
   size_t const * const t1_strides_array[] = { t1_strides.data() };
   auto t1_indices = std::array<size_t, 1>{};
 
@@ -1157,14 +1160,17 @@ Tensor<X, M1 + M2 - 2, C_> mul(
   auto t2_strides = std::array<size_t, M2 - 1>{};
   auto t2_shape = Shape<M2 - 1>{};
   details::FillExceptForIndex<I2, M2>(tensor_2.strides_.data(), t2_strides.data());
-  details::FillExceptForIndex<I2, M2>(tensor_2.shape_.dimensions_, t2_shape.dimensions_);
+  details::FillExceptForIndex<I2, M2>(
+      tensor_2.shape_.data(), 
+      t2_shape.data()
+  );
   size_t const * const t2_strides_array[] = { t2_strides.data() };
 
   for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
     auto t2_indices = std::array<size_t, 1>{};
     for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
       X value {};
-      for (size_t x = 0; x < tensor_1.shape_.dimensions_[I1]; ++x)
+      for (size_t x = 0; x < tensor_1.shape_[I1]; ++x)
           value += tensor_1.ref_[tensor_1.offset_ + t1_indices[0] 
             + tensor_1.strides_[I1] * x] * tensor_2.ref_[tensor_2.offset_ 
             + t2_indices[0] + tensor_2.strides_[I2] * x];
@@ -1673,8 +1679,11 @@ std::string create_multiplication_kernel_code(
   // Initialize cumulative dimensions, excluding the axes that being folded over
   auto lhs_cumul_dim = std::array<size_t, M1 - 1>{};
   auto rhs_cumul_dim = std::array<size_t, M2 - 1>{};
-  tensor::details::FillExceptForIndex<I1, M1>(lhs_shape.dimensions_, lhs_cumul_dim.data());
-  tensor::details::FillExceptForIndex<I2, M2>(rhs_shape.dimensions_, rhs_cumul_dim.data());
+  tensor::details::FillExceptForIndex<I1, M1>(
+      lhs_shape.data(), 
+      lhs_cumul_dim.data()
+  );
+  tensor::details::FillExceptForIndex<I2, M2>(rhs_shape.data(), rhs_cumul_dim.data());
 
   // Accumulate lhs
   size_t accumulator = 1;
@@ -2168,8 +2177,11 @@ public:
 
   /* ------------------ Constructors ------------------ */
 
-  /**< initializer_list constructor */
-  explicit Shape(std::initializer_list<size_t> dimensions); 
+  /**< Initializer_list constructor */
+  Shape(std::initializer_list<size_t> dimensions); 
+
+  /**< Array constructor */
+  Shape(std::array<size_t, N> const &data);
 
   /**< Copy constructor */
   Shape(Shape<N> const &shape);                  
@@ -2183,17 +2195,26 @@ public:
   constexpr static size_t rank() { return N; } /**< `N` */
 
   /** Get dimension reference at `index`. If debugging, fails an assertion 
-   * if index is out of bounds. Note: 0-based indexing.
+   *  if index is out of bounds. Note: 0-based indexing.
    */
   size_t &operator[](size_t index);            
 
   /** Get dimension at `index`. If debugging, fails an assertion
-   * if index is out of bounds. Note: 0-based indexing.
+   *  if index is out of bounds. Note: 0-based indexing.
    */
   size_t operator[](size_t index) const;
 
-  /** Const reference to the underlying size_t array */
-  size_t const (&dimensions() const noexcept)[N] { return dimensions_; }
+  /** Reference to the underlying size_t array */
+  std::array<size_t, N> &dimensions() { return dimensions_; }
+
+  /** Const Reference to the underlying size_t array */
+  std::array<size_t, N> const &dimensions() const { return dimensions_; }
+
+  /** Pointer to the underlying memory */
+  size_t *data() { return dimensions_.data(); }
+
+  /** Const pointer to the underlying memory */
+  size_t const *data() const { return dimensions_.data(); }
 
   /* -------------------- Equality -------------------- */
 
@@ -2254,7 +2275,7 @@ private:
   
   /* ------------------ Data ------------------ */
 
-  size_t dimensions_[N]; /**< Underlying data */
+  std::array<size_t, N> dimensions_; /**< Underlying data */
 
   /* ----------------- Utility ----------------- */
 
@@ -2263,7 +2284,7 @@ private:
 
   /* --------------- Constructor --------------- */
 
-  Shape(size_t const *dimensions);
+  explicit Shape(size_t const *data);
   Shape() = default;                      
 };
 
@@ -2271,7 +2292,7 @@ template <size_t N>
 Shape<N>::Shape(std::initializer_list<size_t> dimensions)
 {
   assert(dimensions.size() == N && RANK_MISMATCH);
-  size_t *shape_ptr = dimensions_;
+  size_t *shape_ptr = dimensions_.data();
   for (size_t dim : dimensions) {
     assert(dim && ZERO_ELEMENT);
     *(shape_ptr++) = dim;
@@ -2283,19 +2304,25 @@ Shape<N>::Shape(Shape const &shape)
 {
   for (size_t i = 0; i < N; ++i) 
     assert((shape.dimensions_[i]) && ZERO_ELEMENT);
-  std::copy_n(shape.dimensions_, N, dimensions_);
+  dimensions_ = shape.dimensions_;
 }
 
 template <size_t N>
-Shape<N>::Shape(size_t const *dimensions)
+Shape<N>::Shape(std::array<size_t, N> const &data)
 {
-  std::copy_n(dimensions, N, dimensions_);
+  dimensions_ = data;
+}
+
+template <size_t N>
+Shape<N>::Shape(size_t const *data)
+{
+  std::copy_n(data, N, dimensions_.data());
 }
 
 template <size_t N>
 Shape<N> &Shape<N>::operator=(Shape<N> const &shape)
 {
-  std::copy_n(shape.dimensions_, N, dimensions_);
+  dimensions_ = shape.dimensions_;
   return *this;
 }
 
@@ -2316,21 +2343,20 @@ size_t Shape<N>::operator[](size_t index) const
 template <size_t N>
 bool Shape<N>::operator==(Shape<N> const& shape) const noexcept
 {
-  return std::equal(dimensions_, dimensions_ + N, shape.dimensions_);
+  return dimensions_ == shape.dimensions_;
 }
 
 template <size_t N>
 template <size_t M>
 bool Shape<N>::operator==(Shape<M> const& shape) const noexcept
 {
-  if (N != M) return false;
-  return std::equal(dimensions_, dimensions_ + N, shape.dimensions_);
+  return dimensions_ == shape.dimensions_;
 }
 
 template <size_t N>
 size_t Shape<N>::index_product() const noexcept
 {
-  return std::accumulate(dimensions_, dimensions_ + N, 1, std::multiplies<size_t>());
+  return std::accumulate(dimensions_.begin(), dimensions_.end(), 1, std::multiplies<size_t>());
 }
 
 template <size_t N>
@@ -2553,21 +2579,15 @@ public:
   explicit Tensor(std::initializer_list<size_t> dimensions);
 
   /** Creates a Tensor with dimensions described by `dimensions`.
-   *  Elements are zero initialized. Note: dimensions index from 0.
-   */
-  explicit Tensor(size_t const (&dimensions)[N]);
-
-  /** Creates a Tensor with dimensions described by `dimensions`.
-   *  Elements are copy initialized to value. Note: dimensions index from 0.
-   */
-  Tensor(size_t const (&dimensions)[N], T const &value);
-
-  /** Creates a Tensor with dimensions described by `dimensions`.
    *  Values returned by `factory(args...)` are forwarded to the elements in the Tensor
    *  Note: dimensions index from 0.
    */
   template <typename FunctionType, typename... Arguments>
-  Tensor(size_t const (&dimensions)[N], std::function<FunctionType> &f, Arguments&&... args);
+  Tensor(
+      std::array<size_t, N> const &dimensions, 
+      std::function<FunctionType> &f, 
+      Arguments&&... args
+  );
 
   /** Use a C multi-dimensional array to initialize the tensor. The
    *  multi-dimensional array is enclosed by the _C struct, and
@@ -2577,22 +2597,21 @@ public:
   Tensor(CArrayProxy<Array> &&md_array);
 
   /** Creates a Tensor with dimensions described by `shape`.
-   *  Elements are zero initialized. Note: dimensions index from 0.
+   *  Elements are zero initialized. 
    */
-  explicit Tensor(Shape<N> const &shape): Tensor(shape.dimensions_) {}
+  explicit Tensor(Shape<N> const &shape);
 
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are copy initialized to value. Note: dimensions index from 0.
    */
-  Tensor(Shape<N> const &shape, T const &value): Tensor(shape.dimensions_, value) {}
+  Tensor(Shape<N> const &shape, T const &value);
 
   /** Creates a Tensor with dimensions described by `shape`.
    *  Elements are copy initialized to the values returned by `factory`
    *  Note: dimensions index from 0.
    */
   template <typename FunctionType, typename... Arguments>
-  Tensor(Shape<N> const &shape, std::function<FunctionType> &f, Arguments&&... args)
-    : Tensor(shape.dimensions_, f, std::forward<Arguments>(args)...) {}
+  Tensor(Shape<N> const &shape, std::function<FunctionType> &f, Arguments&&... args);
 
   /** Copy construction, allocates memory and copies from `tensor` */
   Tensor(Tensor<T, N, C> const &tensor); 
@@ -3087,12 +3106,18 @@ public:
     ReverseIterator(ReverseIterator &&it);
     ReverseIterator &operator=(ReverseIterator &&it);
 
-    Tensor<T, N, C> operator*();     /**< Create a reference to the underlying Tensor */
-    Tensor<T, N, C> operator->();    /**< Syntatic sugar for (*it). */                                
-    ReverseIterator operator++(int); /**< Increment (postfix). Returns a temporary before increment */
-    ReverseIterator &operator++();   /**< Increment (prefix). Returns *this */
-    ReverseIterator operator--(int); /**< Decrement (postfix). Returns a temporary before decrement */
-    ReverseIterator &operator--();   /**< Decrement (prefix). Returns *this */
+    /** Create a reference to the underlying Tensor */
+    Tensor<T, N, C> operator*();     
+    /** Syntatic sugar for (*it). */                                
+    Tensor<T, N, C> operator->();    
+    /** Increment (postfix). Returns a temporary before increment */
+    ReverseIterator operator++(int); 
+    /** Increment (prefix). Returns *this */
+    ReverseIterator &operator++();   
+    /** Decrement (postfix). Returns a temporary before decrement */
+    ReverseIterator operator--(int); 
+    /** Decrement (prefix). Returns *this */
+    ReverseIterator &operator--();   
     bool operator==(ReverseIterator const &it) const;
     bool operator!=(ReverseIterator const &it) const { return !(it == *this); }
 
@@ -3287,9 +3312,14 @@ public:
   template <typename U, template <class> class C_, typename X, template <class> class C__> 
   friend Tensor<X, 2, C__> transpose(Tensor<U, 1, C_> const &vec);
 
-  template <typename U, template <class> class C_, typename FunctionType, typename... Expressions>
+  template <
+      typename U, 
+      template <class> class C_, 
+      typename FunctionType, 
+      typename... Expressions
+  >
   friend Tensor<U, FirstExpression<Expressions...>::type::rank(), C_> 
-    details::map(FunctionType &&fn, Expressions const&... exprs);
+  details::map(FunctionType &&fn, Expressions const&... exprs);
 
   template <typename FunctionType, typename... Tensors>
   friend void details::Map(FunctionType &&fn, Tensors&&... tensors);
@@ -3379,7 +3409,7 @@ private:
   // Copy the dimensions of a C-array `Array` into `dimensions`
   template <typename Array, size_t Index, size_t Limit>
   struct SetCArrayDimensions {
-    void operator()(size_t (&dimensions)[N]) 
+    void operator()(std::array<size_t, N> &dimensions)
     {
       dimensions[Index] = std::extent<Array, Index>::value;
       SetCArrayDimensions<Array, Index + 1, Limit>{}(dimensions);
@@ -3389,14 +3419,14 @@ private:
   // Base condition
   template <typename Array, size_t Limit>
   struct SetCArrayDimensions<Array, Limit, Limit> {
-    void operator()(size_t (&)[N]) {}
+    void operator()(std::array<size_t, N> &) {}
   };
 
   // Asserts that the dimensions of C-array `Array`
   // are equivalent to `dimensions`
   template <typename Array, size_t Index, size_t Limit>
   struct AssertCArrayDimensions {
-    void operator()(size_t (&dimensions)[N]) 
+    void operator()(std::array<size_t, N> &dimensions) 
     {
       assert((dimensions[Index] == std::extent<Array, Index>::value && DIMENSION_MISMATCH));
       AssertCArrayDimensions<Array, Index + 1, Limit>{}(dimensions);
@@ -3406,7 +3436,7 @@ private:
   // Base condition
   template <typename Array, size_t Limit>
   struct AssertCArrayDimensions<Array, Limit, Limit> {
-    void operator()(size_t (&)[N]) {}
+    void operator()(std::array<size_t, N> &) {}
   };
 
   // Declare all fields in the constructor, but initialize strides assuming no gaps
@@ -3444,8 +3474,8 @@ Tensor<T, N, C>::Tensor(std::initializer_list<size_t> dimensions)
 }
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
-  : shape_(Shape<N>(dimensions)), 
+Tensor<T, N, C>::Tensor(Shape<N> const &shape)
+  : shape_(shape),
     offset_(0),
     ref_(shape_.index_product())
 { 
@@ -3453,19 +3483,19 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N])
  ++eDebugConstructorCounter;
 #endif
   for (size_t i = 0; i < N; ++i)
-    assert(dimensions[i] && ZERO_ELEMENT); 
+    assert(shape[i] && ZERO_ELEMENT); 
   shape_.pInitializeStrides(strides_); 
 } 
 
 template <typename T, size_t N, template <class> class C> 
-Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
-  : shape_(Shape<N>(dimensions)), offset_(0) 
+Tensor<T, N, C>::Tensor(Shape<N> const &shape, T const& value)
+  : shape_(shape), offset_(0) 
 {
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
   for (size_t i = 0; i < N; ++i)
-    assert(dimensions[i] && ZERO_ELEMENT); 
+    assert(shape[i] && ZERO_ELEMENT); 
   shape_.pInitializeStrides(strides_); 
   size_t cumul = shape_.index_product(); 
   ref_ = container_type<T>(cumul, value); 
@@ -3474,16 +3504,16 @@ Tensor<T, N, C>::Tensor(size_t const (&dimensions)[N], T const& value)
 template <typename T, size_t N, template <class> class C> 
 template <typename FunctionType, typename... Arguments> 
 Tensor<T, N, C>::Tensor(
-    size_t const (&dimensions)[N], 
+    Shape<N> const &shape,
     std::function<FunctionType> &f, 
     Arguments&&...  args
-) : shape_(Shape<N>(dimensions)), offset_(0) 
+) : shape_(shape), offset_(0) 
 { 
 #ifdef _TEST
  ++eDebugConstructorCounter;
 #endif
   for (size_t i = 0; i < N; ++i) 
-    assert(dimensions[i] && ZERO_ELEMENT); 
+    assert(shape[i] && ZERO_ELEMENT); 
   shape_.pInitializeStrides(strides_);
   auto value_setter = 
     [&f, &args...](T &lhs) -> void { lhs = f(args...); }; 
@@ -3796,7 +3826,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
   );
 
   return Tensor<T, N - M, C>(
-      shape_.dimensions_ + M, 
+      shape_.data() + M, 
       strides_.data() + M, 
       offset_ + cumul_index, 
       ref_
@@ -3815,7 +3845,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::operator()(Args... args)
   );
 
   return Tensor<T, N - M, C>(
-      shape_.dimensions_ + M, 
+      shape_.data() + M, 
       strides_.data() + M, 
       offset_ + cumul_index, 
       ref_
@@ -3871,7 +3901,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::operator[](Indices<M> const &indices)
     cumul_index += strides_[M - i - 1] * indices[M - i - 1];
 
   return Tensor<T, N - M, C>(
-      shape_.dimensions_ + M, 
+      shape_.data() + M, 
       strides_.data() + M,  
       offset_ + cumul_index, 
       ref_
@@ -4062,7 +4092,7 @@ std::string Tensor<T, N, C>::str() const
   size_t cumul_index = shape_.index_product();
   size_t index = 0;
   size_t dim_capacities[N];
-  std::copy_n(shape_.dimensions_, N, dim_capacities);
+  std::copy_n(shape_.data(), N, dim_capacities);
 
   add_brackets(N, true);
   s += StringFormat<value_type>{}(ref_[offset_]); 
@@ -4078,7 +4108,7 @@ std::string Tensor<T, N, C>::str() const
       ++bracket_count;
       index += strides_[dim_index];
       if (!dim_capacities[dim_index]) {
-        dim_capacities[dim_index] = shape_.dimensions_[dim_index];
+        dim_capacities[dim_index] = shape_[dim_index];
         index -= dim_capacities[dim_index] * strides_[dim_index];
       } else {
         propogate = false;
@@ -4109,7 +4139,7 @@ size_t Tensor<T, N, C>::pIndicesExpansion(meta::Sequence<I...>, Args... args) co
 
   // scale indices with corresponding stride
   auto convert_index = [&](size_t dim, size_t index) -> size_t {
-    assert((dim < shape_.dimensions_[index]) && INDEX_OUT_OF_BOUNDS);
+    assert((dim < shape_[index]) && INDEX_OUT_OF_BOUNDS);
     return strides_[index] * dim;
   }; 
 
@@ -4132,7 +4162,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
   size_t array_index = 0;
   for (size_t i = 0; i < N; ++i) {
     if (!placed_indices[i]) continue;
-    assert((shape_.dimensions_[i] > indices[array_index]) && INDEX_OUT_OF_BOUNDS);
+    assert((shape_[i] > indices[array_index]) && INDEX_OUT_OF_BOUNDS);
     // 0 is reserved for the "sliced" indices, so add one to all
     // of the accessed indices to differentiate
     placed_indices[i] = indices[array_index++] + 1;
@@ -4149,7 +4179,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
       offset += (placed_indices[i] - 1) * strides_[i];
     } else {
       strides[array_index] = strides_[i];
-      dimensions[array_index] = shape_.dimensions_[i];
+      dimensions[array_index] = shape_[i];
       ++array_index;
     }
   }
@@ -4670,14 +4700,14 @@ Tensor<T, N - (I2 - I1), C> Tensor<T, N, C>::flatten()
   auto dimensions = std::array<size_t, N - (I2 - I1)>{};
   auto strides = std::array<size_t, N - (I2 - I1)>{};
 
-  std::copy_n(shape_.dimensions_, I1, dimensions.data());
-  std::copy_n(shape_.dimensions_ + I2 + 1, N - I2 - 1, dimensions.data() + I1 + 1);
+  std::copy_n(shape_.data(), I1, dimensions.data());
+  std::copy_n(shape_.data() + I2 + 1, N - I2 - 1, dimensions.data() + I1 + 1);
   std::copy_n(strides_.data(), I1, strides.data());
   std::copy_n(strides_.data() + I2 + 1, N - I2 - 1, strides.data() + I1 + 1);
 
   size_t compressed_dimension = std::accumulate(
-      shape_.dimensions_ + I1,
-      shape_.dimensions_ + I2 + 1,
+      shape_.data() + I1,
+      shape_.data() + I2 + 1,
       1,
       [](size_t accum, size_t n) { return accum * n; }
   );
@@ -4747,7 +4777,7 @@ void Fill(Tensor<U, M, C_> &tensor, X const &value)
 template <typename T, template <class> class C> 
 Tensor<T, 2, C> transpose(Tensor<T, 2, C> &mat)
 {
-  std::array<size_t, 2> transposed_dimensions = { mat.shape_[1], mat.shape_.dimensions_[0] };
+  std::array<size_t, 2> transposed_dimensions = { mat.shape_[1], mat.shape_[0] };
   std::array<size_t, 2> transposed_strides = { mat.strides_[1], mat.strides_[0] };
 
   return Tensor<T, 2, C>(
@@ -4924,8 +4954,8 @@ Tensor<T, N, C>::Iterator::Iterator(Tensor<T, N + 1, C> const &tensor, size_t in
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && PANIC_ASSERTION);
-  std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
-  std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
+  std::copy_n(tensor.shape_.data(), index, shape_.data());
+  std::copy_n(tensor.shape_.data() + index + 1, N - index, shape_.data() + index);
   std::copy_n(tensor.strides_.data(), index, strides_.data());
   std::copy_n(tensor.strides_.data() + index + 1, N - index, strides_.data() + index);
 }
@@ -4969,12 +4999,12 @@ auto Tensor<T, N, C>::Iterator::operator=(Iterator &&it) -> Iterator &
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);}
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);}
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::Iterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5090,8 +5120,8 @@ Tensor<T, N, C>::ConstIterator::ConstIterator(Tensor<T, N + 1, C> const &tensor,
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
-  std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
-  std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
+  std::copy_n(tensor.shape_.data(), index, shape_.data());
+  std::copy_n(tensor.shape_.data() + index + 1, N - index, shape_.data() + index);
   std::copy_n(tensor.strides_.data(), index, strides_.data());
   std::copy_n(tensor.strides_.data() + index + 1, N - index, strides_.data() + index);
 }
@@ -5137,13 +5167,13 @@ auto Tensor<T, N, C>::ConstIterator::operator=(ConstIterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5260,11 +5290,11 @@ Tensor<T, N, C>::ReverseIterator::ReverseIterator(
 ) : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
-  std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
-  std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
+  std::copy_n(tensor.shape_.data(), index, shape_.data());
+  std::copy_n(tensor.shape_.data() + index + 1, N - index, shape_.data() + index);
   std::copy_n(tensor.strides_.data(), index, strides_.data());
   std::copy_n(tensor.strides_.data() + index + 1, N - index, strides_.data() + index);
-  offset_ += stride_ * (tensor.shape_.dimensions_[index] - 1);
+  offset_ += stride_ * (tensor.shape_[index] - 1);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5308,13 +5338,13 @@ auto Tensor<T, N, C>::ReverseIterator::operator=(ReverseIterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::ReverseIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> Tensor<T, N, C>::ReverseIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5430,11 +5460,11 @@ Tensor<T, N, C>::ConstReverseIterator::ConstReverseIterator(
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[index])
 {
   assert(index < N + 1 && "This should throw earlier");
-  std::copy_n(tensor.shape_.dimensions_, index, shape_.dimensions_);
-  std::copy_n(tensor.shape_.dimensions_ + index + 1, N - index, shape_.dimensions_ + index);
+  std::copy_n(tensor.shape_.data(), index, shape_.data());
+  std::copy_n(tensor.shape_.data() + index + 1, N - index, shape_.data() + index);
   std::copy_n(tensor.strides_.data(), index, strides_.data());
   std::copy_n(tensor.strides_.data() + index + 1, N - index, strides_.data() + index);
-  offset_ += stride_ * (tensor.shape_.dimensions_[index] - 1);
+  offset_ += stride_ * (tensor.shape_[index] - 1);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5478,13 +5508,13 @@ auto Tensor<T, N, C>::ConstReverseIterator::operator=(ConstReverseIterator &&it)
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator*()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
 Tensor<T, N, C> const Tensor<T, N, C>::ConstReverseIterator::operator->()
 {
-  return Tensor<T, N, C>(shape_.dimensions_, strides_.data(), offset_, ref_);
+  return Tensor<T, N, C>(shape_.data(), strides_.data(), offset_, ref_);
 }
 
 template <typename T, size_t N, template <class> class C>
@@ -5612,7 +5642,7 @@ typename Tensor<T, N - 1, C>::Iterator Tensor<T, N, C>::end(size_t index)
 {
   assert((index < N) && INDEX_OUT_OF_BOUNDS);
   typename Tensor<T, N - 1, C>::Iterator it{*this, index};
-  it.offset_ += strides_[index] * shape_.dimensions_[index];
+  it.offset_ += strides_[index] * shape_[index];
   return it;
 }
 
@@ -5643,7 +5673,7 @@ typename Tensor<T, N - 1, C>::ConstIterator Tensor<T, N, C>::cend(size_t index) 
 {
   assert((index < N) && INDEX_OUT_OF_BOUNDS);
   typename Tensor<T, N - 1, C>::ConstIterator it{*this, index};
-  it.offset_ += strides_[index] * shape_.dimensions_[index];
+  it.offset_ += strides_[index] * shape_[index];
   return it;
 }
 
@@ -5674,7 +5704,7 @@ typename Tensor<T, N - 1, C>::ReverseIterator Tensor<T, N, C>::rend(size_t index
 {
   assert((index < N) && INDEX_OUT_OF_BOUNDS);
   typename Tensor<T, N - 1, C>::ReverseIterator it{*this, index};
-  it.offset_ -= strides_[index] * shape_.dimensions_[index];
+  it.offset_ -= strides_[index] * shape_[index];
   return it;
 }
 
@@ -5705,7 +5735,7 @@ typename Tensor<T, N - 1, C>::ConstReverseIterator Tensor<T, N, C>::crend(size_t
 {
   assert((index < N) && INDEX_OUT_OF_BOUNDS);
   typename Tensor<T, N - 1, C>::ConstReverseIterator it{*this, index};
-  it.offset_ -= strides_[index] * shape_.dimensions_[index];
+  it.offset_ -= strides_[index] * shape_[index];
   return it;
 }
 
@@ -7094,7 +7124,7 @@ template <typename T, template <class> class C>
 Tensor<T, 0, C>::ReverseIterator::ReverseIterator(Tensor<T, 1, C> const &tensor, size_t)
   : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {
-  offset_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
+  offset_ += stride_ * (tensor.shape_[0] - 1);
 }
 
 template <typename T, template <class> class C>
@@ -7243,7 +7273,7 @@ Tensor<T, 0, C>::ConstReverseIterator::ConstReverseIterator(
     size_t
 ) : offset_(tensor.offset_), ref_(tensor.ref_), stride_(tensor.strides_[0]) 
 {
-  offset_ += stride_ * (tensor.shape_.dimensions_[0] - 1);
+  offset_ += stride_ * (tensor.shape_[0] - 1);
 }
 
 template <typename T, template <class> class C>
@@ -8264,10 +8294,10 @@ BinaryMulExpr<I1, I2, LHS, RHS>::BinaryMulExpr(LHS const &lhs, RHS const &rhs)
   assert(lhs.dimension(I1) == rhs.dimension(I2) && DIMENSION_MISMATCH);
 
   // shape <- lhs.shape[:~I1] ++ rhs.shape[:~I2]
-  details::FillExceptForIndex<I1, LHS::rank()>(lhs.shape().dimensions_, shape_.dimensions_);
+  details::FillExceptForIndex<I1, LHS::rank()>(lhs.shape().data(), shape_.data());
   details::FillExceptForIndex<I2, RHS::rank()>(
-      rhs.shape().dimensions_, 
-      shape_.dimensions_ + LHS::rank() - 1
+      rhs.shape().data(), 
+      shape_.data() + LHS::rank() - 1
   );
 }
 
