@@ -943,8 +943,8 @@ void UpdateIndices(
   }
 }
 
-// Scalar override provided to match APIs
-// Nothing needs to be done if the Tensor is scalar
+// scalar override provided to match APIs
+// nothing needs to be done if the Tensor is scalar
 template <size_t Count>
 inline void UpdateIndices(
     Indices<0> &, 
@@ -954,7 +954,7 @@ inline void UpdateIndices(
     size_t = 0
 ) {}
 
-// Fills `result` with the elements of `input`, skipping the element at position `Index`
+// fills `result` with the elements of `input`, skipping the element at position `Index`
 template <size_t Index, size_t N>
 void FillExceptForIndex(size_t const *input, size_t *result)
 {
@@ -963,7 +963,7 @@ void FillExceptForIndex(size_t const *input, size_t *result)
   std::copy_n(input + Index + 1, N - Index - 1, result + Index);
 }
 
-// Bit twiddle to get the nearest power of 2 larger than `x` 
+// bit twiddle to get the nearest power of 2 larger than `x` 
 inline size_t NextPowerOfTwo(size_t x) 
 {
   static_assert(sizeof(x) == 4 || sizeof(x) == 8, PANIC_ASSERTION);
@@ -973,6 +973,7 @@ inline size_t NextPowerOfTwo(size_t x)
   x |= x >> 4;
   x |= x >> 8;
   x |= x >> 16;
+  // 99% of modern compilers will optimize this 
   if (sizeof(size_t) == 8)
     x |= x >> 32;
   return x + 1;
@@ -1113,9 +1114,22 @@ U reduce(U&& initial_value, FunctionType &&fn, Tensors const&... tensors)
 }
 
 /** Multiply reciever after Expressions have been converted to tensors */
-template <typename X, template <class> class C_, size_t I1, size_t I2, 
-  typename Y, typename Z, size_t M1, size_t M2, template <class> class C1, template <class> class C2>
-Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, C2> const& tensor_2)
+template <
+    typename X, 
+    template <class> class C_, 
+    size_t I1, 
+    size_t I2, 
+    typename Y, 
+    typename Z, 
+    size_t M1, 
+    size_t M2, 
+    template <class> class C1, 
+    template <class> class C2
+>
+Tensor<X, M1 + M2 - 2, C_> mul(
+    Tensor<Y, M1, C1> const& tensor_1, 
+    Tensor<Z, M2, C2> const& tensor_2
+)
 {
   static_assert(M1, SCALAR_TENSOR_MULT);
   static_assert(M2, SCALAR_TENSOR_MULT);
@@ -1169,7 +1183,7 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const& tensor_1, Tensor<Z, M2, 
 /* ---------------------------- String Formatting ---------------------------- */
 
 /** Overload this template to define how custom data types should be printed.
- *  Overrides are provided for POD types. 
+ *  Overloads are provided for primitive integral types. 
  *  Provide `std::string operator()(T const &) const;`
  */
 template <typename T>
@@ -1551,20 +1565,27 @@ cl::Buffer create_reduction_kernel(
 {
   // Create the code for the reduction kernel
   std::string kernel_code = create_reduction_kernel_code<ReturnType, Function>();
-  cl_int err = 0;
 
   // Join output buffer, which is used as the reduction output buffer as well
-  cl::Buffer output_buffer(Info::v().context(), CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
-      cumul * sizeof(ReturnType), nullptr, &err);
+  cl_int err = 0;
+  auto output_buffer = cl::Buffer(
+      Info::v().context(), 
+      CL_MEM_READ_WRITE| CL_MEM_ALLOC_HOST_PTR,
+      cumul * sizeof(ReturnType), 
+      nullptr, 
+      &err
+  );
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
 
   // Set up the program and kernel
-  cl::Program program = cl::Program(Info::v().context(), { kernel_code });
+  auto program = cl::Program(Info::v().context(), { kernel_code });
   err = program.build({ Info::v().device() });
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-  cl::Kernel kernel = cl::Kernel(program, cKernelPrefix);
+  auto kernel = cl::Kernel(program, cKernelPrefix);
   assert((err == CL_SUCCESS) && OPENCL_KERNEL_ERROR);
-  size_t const kernel_work_group_size = kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
+
+  size_t const kernel_work_group_size = 
+      kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(Info::v().device(), &err);
   kernel.setArg(0, buffer);
   kernel.setArg(2, output_buffer);
   kernel.setArg(5, kernel_work_group_size);
@@ -1590,8 +1611,12 @@ cl::Buffer create_reduction_kernel(
       kernel.setArg(1, sizeof(ReturnType) * kernel_work_group_size, nullptr);
       kernel.setArg(3, kernel_work_group_size >> 1);
       kernel.setArg(4, i);
-      cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(kernel_work_group_size),
-          cl::NDRange(kernel_work_group_size));
+      cqueue.enqueueNDRangeKernel(
+          kernel, 
+          cl::NullRange, 
+          cl::NDRange(kernel_work_group_size),
+          cl::NDRange(kernel_work_group_size)
+      );
       assert((err == CL_SUCCESS) && PANIC_ASSERTION);
     }
 
@@ -1600,8 +1625,12 @@ cl::Buffer create_reduction_kernel(
       kernel.setArg(1, sizeof(ReturnType) * last_group_size, nullptr);
       kernel.setArg(3, tensor::details::NextPowerOfTwo(last_group_size) >> 1);
       kernel.setArg(4, num_work_groups);
-      cqueue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(last_group_size),
-          cl::NDRange(last_group_size));
+      cqueue.enqueueNDRangeKernel(
+          kernel, 
+          cl::NullRange, 
+          cl::NDRange(last_group_size),
+          cl::NDRange(last_group_size)
+      );
       assert((err == CL_SUCCESS) && PANIC_ASSERTION);
     }
 
