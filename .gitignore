@@ -13,3 +13,5 @@ makefile
 q
 Win32
 run_test*
+compile_commands.json
+*.out

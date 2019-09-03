@@ -87,7 +87,7 @@ void TensorAssignmentTest() {
 
   SECTION("Assigning Tensors to Reference Tensors") { 
 
-    Tensor<int32_t, 4, Container> tensor_1_ref = tensor_1.ref(); 
+    Tensor<int32_t, 4, Container> tensor_1_ref = tensor_1.ref();
     Tensor<int32_t, 2, Container> t2({3, 4}); 
     for (size_t i = 0; i < t2.dimension(0); ++i) 
       for (size_t j = 0; j < t2.dimension(1); ++j) 

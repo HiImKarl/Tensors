@@ -45,9 +45,9 @@ void IteratorTests() {
  
     REQUIRE((*++begin)(1, 1) == 111); 
     REQUIRE((*--begin)(1, 1) == 11); 
-    REQUIRE((*begin++)(1, 1) == 11); 
+    REQUIRE((*begin++)(1, 1) == 11);
     REQUIRE((*begin)(2, 2) == 122); 
-    REQUIRE((*begin--)(2, 2) == 122); 
+    REQUIRE((*begin--)(2, 2) == 122);
     REQUIRE((*begin)(0, 0) == 0); 
   } 
  
@@ -137,9 +137,9 @@ void ConstIteratorTests() {
  
     REQUIRE((*++begin)(2, 2) == 122); 
     REQUIRE((*--begin)(1, 1) == 11); 
-    REQUIRE((*begin++)(1, 1) == 11); 
+    REQUIRE((*begin++)(1, 1) == 11);
     REQUIRE((*begin)(2, 2) == 122); 
-    REQUIRE((*begin--)(2, 2) == 122); 
+    REQUIRE((*begin--)(2, 2) == 122);
     REQUIRE((*begin)(1, 1) == 11); 
   } 
  
