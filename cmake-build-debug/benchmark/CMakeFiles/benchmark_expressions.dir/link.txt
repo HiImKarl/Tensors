@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -Wextra -fmax-errors=4 -g  -rdynamic CMakeFiles/benchmark_expressions.dir/expressions.benchmark.cc.o CMakeFiles/benchmark_expressions.dir/benchmark.cc.o  -o expressions  -L/usr/lib/x86_64-linux-gnu/libOpenCL.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libOpenCL.so -lbenchmark -lpthread 

@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -Wextra -fmax-errors=4 -g  -rdynamic CMakeFiles/test_access.dir/access.test.cc.o CMakeFiles/test_access.dir/test.cc.o  -o access  -L/usr/lib/x86_64-linux-gnu/libOpenCL.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libOpenCL.so -lOpenCL 

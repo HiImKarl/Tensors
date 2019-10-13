@@ -1,0 +1,1231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="Tensors"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\..\;CMake Files\..\..\..\..\;CMake Files\..\..\..\..\usr\;CMake Files\..\..\..\..\usr\local\;CMake Files\..\..\..\..\usr\local\lib\;CMake Files\..\..\..\..\usr\local\lib\cmake\;CMake Files\..\..\..\..\usr\local\lib\cmake\benchmark\;CMake Files\benchmark\;CMake Files\example\;CMake Files\test\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_initialize">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/initialize" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_initialize"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_initialize/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/initialize" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_initialize/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_assign">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/assign" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_assign"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_assign/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/assign" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_assign/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_all">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_all"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_all/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_all/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_expressions">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/expressions" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_expressions"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="benchmark_expressions/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/benchmark/expressions" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/benchmark"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 benchmark_expressions/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/benchmark/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="example_dummy">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/example/dummy" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/example"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_PROJECT_SOURCE_DIR=&quot;/home/karl/Documents/tensors&quot;"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 example_dummy"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="example_dummy/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/example/dummy" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/example"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_PROJECT_SOURCE_DIR=&quot;/home/karl/Documents/tensors&quot;"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 example_dummy/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="example_all">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/example/example_all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/example"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_PROJECT_SOURCE_DIR=&quot;/home/karl/Documents/tensors&quot;"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 example_all"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="example_all/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/example/example_all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/example"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_PROJECT_SOURCE_DIR=&quot;/home/karl/Documents/tensors&quot;"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 example_all/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/example/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_string">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/string" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_string"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_string/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/string" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_string/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_iterator">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/iterator" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_iterator"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_iterator/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/iterator" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_iterator/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_slice">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/slice" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_slice"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_slice/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/slice" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_slice/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_manip">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/manip" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_manip"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_manip/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/manip" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_manip/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_arithmetic">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/arithmetic" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_arithmetic"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_arithmetic/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/arithmetic" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_arithmetic/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_access">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/access" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_access"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_access/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/access" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_access/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_all">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_TEST=1"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_all"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_all/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/all" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_TEST=1"/>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_all/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_assign">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/assign" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_assign"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_assign/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/assign" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_assign/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_shape">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/shape" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_shape"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_shape/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/shape" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_shape/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_opencl">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/opencl" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_opencl"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_opencl/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/opencl" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_opencl/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_containers">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/containers" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_containers"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_containers/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/containers" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_containers/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_object">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/object" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_object"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_object/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/object" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_object/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_expressions">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/expressions" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_expressions"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_expressions/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/expressions" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_expressions/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_intialize">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/intialize" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_intialize"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_intialize/fast">
+				<Option output="/home/karl/Documents/tensors/cmake-build-debug/test/intialize" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/karl/Documents/tensors/cmake-build-debug/test"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-D_ENABLE_OPENCL=1"/>
+					<Add option="-D_TEST=1"/>
+					<Add directory="/home/karl/Documents/tensors/external"/>
+					<Add directory="/home/karl/Documents/tensors/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 test_intialize/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/karl/Documents/tensors/cmake-build-debug/test/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/assign.benchmark.cc">
+			<Option target="benchmark_assign"/>
+			<Option target="benchmark_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/benchmark.cc">
+			<Option target="benchmark_initialize"/>
+			<Option target="benchmark_assign"/>
+			<Option target="benchmark_all"/>
+			<Option target="benchmark_expressions"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/benchmark.hh">
+			<Option target="benchmark_initialize"/>
+			<Option target="benchmark_assign"/>
+			<Option target="benchmark_all"/>
+			<Option target="benchmark_expressions"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/expressions.benchmark.cc">
+			<Option target="benchmark_all"/>
+			<Option target="benchmark_expressions"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/initialize.benchmark.cc">
+			<Option target="benchmark_initialize"/>
+			<Option target="benchmark_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/example/dummy.example.cc">
+			<Option target="example_dummy"/>
+			<Option target="example_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/access.test.cc">
+			<Option target="test_access"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/arithmetic.test.cc">
+			<Option target="test_arithmetic"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/assign.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_assign"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/containers.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_containers"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/expressions.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_expressions"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/intialize.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_intialize"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/iterator.test.cc">
+			<Option target="test_iterator"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/manip.test.cc">
+			<Option target="test_manip"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/object.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_object"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/opencl.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_opencl"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/shape.test.cc">
+			<Option target="test_all"/>
+			<Option target="test_shape"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/slice.test.cc">
+			<Option target="test_slice"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/string.test.cc">
+			<Option target="test_string"/>
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/test.cc">
+			<Option target="test_string"/>
+			<Option target="test_iterator"/>
+			<Option target="test_slice"/>
+			<Option target="test_manip"/>
+			<Option target="test_arithmetic"/>
+			<Option target="test_access"/>
+			<Option target="test_all"/>
+			<Option target="test_assign"/>
+			<Option target="test_shape"/>
+			<Option target="test_opencl"/>
+			<Option target="test_containers"/>
+			<Option target="test_object"/>
+			<Option target="test_expressions"/>
+			<Option target="test_intialize"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/test.hh">
+			<Option target="test_all"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/../../../../usr/local/lib/cmake/benchmark/benchmarkConfig.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\lib\cmake\benchmark\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/../../../../usr/local/lib/cmake/benchmark/benchmarkConfigVersion.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\lib\cmake\benchmark\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/../../../../usr/local/lib/cmake/benchmark/benchmarkTargets-noconfig.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\lib\cmake\benchmark\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/../../../../usr/local/lib/cmake/benchmark/benchmarkTargets.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\lib\cmake\benchmark\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/benchmark/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\benchmark\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/example/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\example\"/>
+		</Unit>
+		<Unit filename="/home/karl/Documents/tensors/test/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\test\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

@@ -466,7 +466,6 @@ struct FillSecond<End, Middle, End> {
     {}
 };
 
-// FIXME g++ 6.3 cannot pattern match this ???
 template<size_t End>
 struct FillSecond<End, 0, End> {
     template<typename... Args>
@@ -491,7 +490,6 @@ struct FillFirst {
     }
 };
 
-// FIXME g++ 6.3 cannot pattern match this ???
 template<size_t Index, size_t Middle>
 struct FillFirst<Index, Middle, Middle> {
     template<typename... Args>
@@ -518,7 +516,6 @@ struct FillFirst<Middle, Middle, End> {
     }
 };
 
-// FIXME g++ 6.3 can't pattern match this ???
 template<size_t End>
 struct FillFirst<0, 0, End> {
     template<typename... Args>
@@ -539,7 +536,6 @@ struct FillFirst<End, End, End> {
     {}
 };
 
-// FIXME g++ 6.3 cannot pattern match this ???
 template<>
 struct FillFirst<0, 0, 0> {
     template<typename... Args>
@@ -1083,6 +1079,29 @@ inline void UpdateIndices(
 )
 {}
 
+/**
+ * Fill the first uncovered N array elements.
+ *
+ * @tparam T array type
+ * @tparam Size array size
+ * @param value to fill the array
+ * @param a array to fill
+ * @param cover skips the elements where cover is true
+ * @param n number of elements to fill
+ */
+template<typename T, size_t Size>
+void FillFirstUncoveredN(
+        std::array<T, Size> &a, std::array<bool, Size> const &cover, size_t n, T const &value)
+{
+    for (size_t i = 0; i < Size; ++i) {
+        if (!n) break;
+        if (!cover[Size - i - 1]) {
+            a[Size - i - 1] = value;
+            --n;
+        }
+    }
+}
+
 // fills `result` with the elements of `input`, skipping the element at position `Index`
 template<size_t Index, size_t N>
 void FillExceptForIndex(size_t const *input, size_t *result)
@@ -1102,7 +1121,7 @@ inline size_t NextPowerOfTwo(size_t x)
     x |= x >> 4u;
     x |= x >> 8u;
     x |= x >> 16u;
-    // modern compilers will elide this if necessary
+    // most compilers will elide this
     if (sizeof(size_t) == 8)
         x |= x >> 32u;
     return x + 1;
@@ -1172,7 +1191,7 @@ inline void ElemWiseForwardSequence(
             ));
 }
 
-/** Map reciever after all Expressions have been converted to Tensors */
+/** Map receiver after all Expressions have been converted to Tensors */
 template<typename FunctionType, typename... Tensors>
 void Map(FunctionType &&fn, Tensors &&... tensors)
 {
@@ -1183,13 +1202,13 @@ void Map(FunctionType &&fn, Tensors &&... tensors)
 
     constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
 
-    size_t cumul_index = shape.index_product();
+    size_t cumulative_index = shape.index_product();
     auto reference_indices = Indices<M>{};
     auto indices = std::array<size_t, sizeof...(Tensors)>{};
     size_t const *const strides[sizeof...(Tensors)] = {tensors.strides().data()...};
     auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
 
-    for (size_t i = 0; i < cumul_index; ++i) {
+    for (size_t i = 0; i < cumulative_index; ++i) {
         details::MapForwardSequence(
                 std::forward<FunctionType>(fn),
                 indices.data(),
@@ -1200,7 +1219,7 @@ void Map(FunctionType &&fn, Tensors &&... tensors)
     }
 }
 
-/** map reciever after all Expressions have been converted to Tensors */
+/** map receiver after all Expressions have been converted to Tensors */
 template<typename U, template<class> class C_, typename FunctionType, typename... Tensors>
 Tensor<U, FirstExpression<Tensors...>::type::rank(), C_>
 map(FunctionType &&fn, Tensors const &... tensors)
@@ -1211,13 +1230,13 @@ map(FunctionType &&fn, Tensors const &... tensors)
     VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
     constexpr size_t M = FirstExpression<Tensors...>::type::rank();
     auto tensor = Tensor<U, M, C_>(shape);
-    size_t cumul_index = shape.index_product();
+    size_t cumulative_index = shape.index_product();
     auto reference_indices = Indices<M>{};
     auto indices = std::array<size_t, sizeof...(Tensors)>{};
     size_t const *const strides[sizeof...(Tensors)] = {tensors.strides().data()...};
     auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
     // Forward the values produced by `fn` to `tensor`
-    for (size_t i = 0; i < cumul_index; ++i) {
+    for (size_t i = 0; i < cumulative_index; ++i) {
         // `tensor`'s strides will be contiguous
         tensor.pSet(i,
                 details::map_forward_sequence<U>(std::forward<FunctionType>(fn), indices.data(),
@@ -1227,7 +1246,7 @@ map(FunctionType &&fn, Tensors const &... tensors)
     return tensor;
 }
 
-/** reduce reciever after all Expressions have been converted to Tensors */
+/** reduce receiver after all Expressions have been converted to Tensors */
 template<typename U, typename FunctionType, typename... Tensors>
 U reduce(U &&initial_value, FunctionType &&fn, Tensors const &... tensors)
 {
@@ -1235,13 +1254,15 @@ U reduce(U &&initial_value, FunctionType &&fn, Tensors const &... tensors)
     auto const &shape = details::GetShape(tensors...);
     VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
     constexpr size_t M = std::remove_reference<decltype(shape)>::type::rank();
+
     auto ret_val = std::forward<U>(initial_value);
-    size_t cumul_index = shape.index_product();
+    size_t cumulative_index = shape.index_product();
     auto reference_indices = Indices<M>{};
     auto indices = std::array<size_t, sizeof...(Tensors)>{};
-    size_t const *const strides[sizeof...(Tensors)] = {tensors.strides().data()...};
+    size_t const *const strides[sizeof...(Tensors)] = { tensors.strides().data()... };
     auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
-    for (size_t i = 0; i < cumul_index; ++i) {
+
+    for (size_t i = 0; i < cumulative_index; ++i) {
         // `tensor`'s strides are contiguous
         details::ReduceForwardSequence(ret_val, std::forward<FunctionType>(fn), indices.data(),
                 std::forward_as_tuple(tensors...), sequence);
@@ -1251,20 +1272,40 @@ U reduce(U &&initial_value, FunctionType &&fn, Tensors const &... tensors)
 }
 
 // reduce receiver after Expression has been converted to a Tensor
-template<typename FunctionType, typename TensorType, size_t... Indices>
-Tensor<typename TensorType::value_type, TensorType::rank() - sizeof...(Indices),
+template<typename FunctionType, typename TensorType, size_t... ReducedIndices>
+Tensor<typename TensorType::value_type, TensorType::rank() - sizeof...(ReducedIndices),
         TensorType::template container_type>
-reduce(FunctionType &&fn, TensorType const &tensor)
+reduce_dimensions(FunctionType &&fn, TensorType const &tensor)
 {
+    using T = typename TensorType::value_type;
+    constexpr size_t N = TensorType::rank();
+    constexpr size_t M = sizeof...(ReducedIndices);
+
+    // place `true` where dimensions are not being reduced
     auto reduced_indices = std::array<bool, TensorType::rank()>{};
+    std::fill(reduced_indices.begin(), reduced_indices.end(), true);
+    meta::InsertValueIntoArray<bool, TensorType::rank(), ReducedIndices...>{reduced_indices, false};
+    auto result_dimensions = std::array<size_t, N - M>{};
+    
+    // FIXME refactor this into helper method?
+    auto tensor_i = size_t{0};
+    for (size_t i = 0; i < N; ++i) {
+        if (reduced_indices[i]) result_dimensions[tensor_i++] = tensor.dimension(i);
+    }
+    auto result = Tensor<T, N - M, TensorType::template container_type>(Shape<N - M>(result_dimensions));
+    auto result_indices = Indices<N - M>{};
+    do {
+      // FIXME use a tensor view instead, should be thread safe
+      result[result_indices] = tensor.template slice<ReducedIndices...>(result_indices).reduce(T{}, fn);
+    } while (result_indices.increment(result.shape()));
+    return result;
 }
 
-/** Multiply reciever after Expressions have been converted to tensors */
+/** Multiply receiver after Expressions have been converted to tensors */
 template<typename X, template<class> class C_, size_t I1, size_t I2, typename Y,
-        typename Z, size_t M1, size_t M2,
-        template<class> class C1,
-        template<class> class C2>
-Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const &tensor_1, Tensor<Z, M2, C2> const &tensor_2)
+        typename Z, size_t M1, size_t M2, template<class> class C1, template<class> class C2>
+Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const &tensor_1, 
+    Tensor<Z, M2, C2> const &tensor_2)
 {
     static_assert(M1, SCALAR_TENSOR_MULT);
     static_assert(M2, SCALAR_TENSOR_MULT);
@@ -1274,8 +1315,8 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const &tensor_1, Tensor<Z, M2, 
     details::FillExceptForIndex<I2, M2>(tensor_2.shape_.data(), shape.data() + M1 - 1);
     auto prod_tensor = Tensor<X, M1 + M2 - 2, C_>(shape);
 
-    size_t cumul_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_[I1];
-    size_t cumul_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_[I2];
+    size_t cumulative_index_1 = tensor_1.shape_.index_product() / tensor_1.shape_[I1];
+    size_t cumulative_index_2 = tensor_2.shape_.index_product() / tensor_2.shape_[I2];
     auto reference_indices_1 = Indices<M1 - 1>{};
     auto reference_indices_2 = Indices<M2 - 1>{};
     size_t index = 0;
@@ -1294,9 +1335,9 @@ Tensor<X, M1 + M2 - 2, C_> mul(Tensor<Y, M1, C1> const &tensor_1, Tensor<Z, M2, 
     details::FillExceptForIndex<I2, M2>(tensor_2.strides_.data(), t2_strides.data());
     details::FillExceptForIndex<I2, M2>(tensor_2.shape_.data(), t2_shape.data());
     size_t const *const t2_strides_array[] = {t2_strides.data()};
-    for (size_t i1 = 0; i1 < cumul_index_1; ++i1) {
+    for (size_t i1 = 0; i1 < cumulative_index_1; ++i1) {
         auto t2_indices = std::array<size_t, 1>{};
-        for (size_t i2 = 0; i2 < cumul_index_2; ++i2) {
+        for (size_t i2 = 0; i2 < cumulative_index_2; ++i2) {
             auto value = X{};
             for (size_t x = 0; x < tensor_1.shape_[I1]; ++x)
                 value += tensor_1.ref_[tensor_1.offset_ + t1_indices[0] +
@@ -2383,17 +2424,17 @@ public:
 
     /* ------------------ Constructors ------------------ */
 
-    /**< Initializer_list constructor */
+    /** Initializer_list constructor */
     Shape(std::initializer_list<size_t> dimensions);
 
-    /**< Array constructor */
+    /** Array constructor */
     explicit Shape(std::array<size_t, N> const &data);
 
-    /**< Iterator constructor */
+    /** Iterator constructor */
     template<typename RAIt>
     Shape(RAIt begin, RAIt const &end);
 
-    /**< Copy constructor */
+    /** Copy constructor */
     Shape(Shape<N> const &shape);
 
     /* ------------------ Assignment -------------------- */
@@ -2767,7 +2808,7 @@ std::string Indices<N>::str() const
     static_assert(N, PANIC_ASSERTION);
     auto s = std::string("I{");
     for (size_t i = 0; i < N - 1; ++i)
-        s += std::string(indices_[i]) + ", ";
+        s += std::to_string(indices_[i]) + ", ";
     s += std::to_string(indices_[N - 1]) + "}";
     return s;
 }
@@ -3074,8 +3115,7 @@ public:
     template<
             size_t... Slices,
             typename... Args,
-            typename = typename std::enable_if<N != sizeof...(Args)>::type
-    >
+            typename = typename std::enable_if<N != sizeof...(Args)>::type>
     Tensor<T, N - sizeof...(Args), C> slice(Args... args);
 
     /** Const slice<Slices...>(Args.. args) */
@@ -3669,6 +3709,12 @@ public:
     /** Returns a reference: only used to invoke reference constructor */
     typename Tensor<T, N, C>::Proxy ref();
 
+    template<typename U, typename FunctionType>
+    U reduce(U &&initial_value, FunctionType &&fn) const;
+
+    template<typename FunctionType, size_t... ReducedIndices>
+    Tensor<T, N - sizeof...(ReducedIndices), C> reduce_dimensions(FunctionType &&fn) const;
+
     template<typename U, size_t M, template<class> class C_, typename RAIt>
     friend void Fill(Tensor<U, M, C_> &tensor, RAIt begin, RAIt const &end);
 
@@ -3700,9 +3746,6 @@ public:
 
     template<typename FunctionType, typename... Tensors>
     friend void details::Map(FunctionType &&fn, Tensors &&... tensors);
-
-    template<typename U, typename FunctionType>
-    U reduce(U &&initial_value, FunctionType &&fun) const;
 
     template<typename U, typename FunctionType, typename... Tensors>
     friend U details::reduce(U &&initial_value, FunctionType &&fn, Tensors const &... tensors);
@@ -4180,10 +4223,10 @@ Tensor<T, N, C> &Tensor<T, N, C>::operator=(NoAliasProxy<NodeType> const &rhs)
 template<typename T, size_t N, template<class> class C>
 T const &Tensor<T, N, C>::get(Indices<N> const &indices) const noexcept
 {
-    size_t cumul_index = 0;
+    size_t cumulative_index = 0;
     for (size_t i = 0; i < N; ++i)
-        cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-    return (static_cast<C<T> const &>(ref_))[cumul_index + offset_];
+        cumulative_index += strides_[N - i - 1] * indices[N - i - 1];
+    return (static_cast<C<T> const &>(ref_))[cumulative_index + offset_];
 }
 
 /* ------------------------------- Setters ------------------------------- */
@@ -4208,10 +4251,10 @@ template<typename T, size_t N, template<class> class C>
 template<typename U>
 void Tensor<T, N, C>::Set(Indices<N> const &indices, U &&value)
 {
-    size_t cumul_index = 0;
+    size_t cumulative_index = 0;
     for (size_t i = 0; i < N; ++i)
-        cumul_index += strides_[N - i - 1] * indices[N - i - 1];
-    ref_.Set(cumul_index + offset_, std::forward<U>(value));
+        cumulative_index += strides_[N - i - 1] * indices[N - i - 1];
+    ref_.Set(cumulative_index + offset_, std::forward<U>(value));
 }
 
 /* ------------------------------- Access ------------------------------- */
@@ -4222,7 +4265,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
 {
     static_assert(N >= sizeof...(Args), TOO_MANY_INDICES);
     constexpr size_t M = sizeof...(args);
-    size_t cumul_index = pIndicesExpansion(
+    size_t cumulative_index = pIndicesExpansion(
             typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{},
             args...
     );
@@ -4230,7 +4273,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::at(Args... args)
     return Tensor<T, N - M, C>(
             shape_.data() + M,
             strides_.data() + M,
-            offset_ + cumul_index,
+            offset_ + cumulative_index,
             ref_
     );
 }
@@ -4241,7 +4284,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::operator()(Args... args)
 {
     static_assert(N > sizeof...(Args), TOO_MANY_INDICES);
     constexpr size_t M = sizeof...(args);
-    size_t cumul_index = pIndicesExpansion(
+    size_t cumulative_index = pIndicesExpansion(
             typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{},
             args...
     );
@@ -4249,7 +4292,7 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::operator()(Args... args)
     return Tensor<T, N - M, C>(
             shape_.data() + M,
             strides_.data() + M,
-            offset_ + cumul_index,
+            offset_ + cumulative_index,
             ref_
     );
 }
@@ -4259,12 +4302,12 @@ template<typename... Args, typename>
 T &Tensor<T, N, C>::operator()(Args... args)
 {
     static_assert(N == sizeof...(Args), PANIC_ASSERTION);
-    size_t cumul_index = pIndicesExpansion(
+    size_t cumulative_index = pIndicesExpansion(
             typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{},
             args...
     );
 
-    return ref_[cumul_index + offset_];
+    return ref_[cumulative_index + offset_];
 }
 
 template<typename T, size_t N, template<class> class C>
@@ -4286,11 +4329,11 @@ template<typename... Args, typename>
 T const &Tensor<T, N, C>::operator()(Args... args) const
 {
     static_assert(N == sizeof...(Args), PANIC_ASSERTION);
-    size_t cumul_index = pIndicesExpansion(
+    size_t cumulative_index = pIndicesExpansion(
             typename meta::MakeIndexSequence<0, sizeof...(Args)>::sequence{},
             args...
     );
-    return (static_cast<C<T> const &>(ref_))[cumul_index + offset_];
+    return (static_cast<C<T> const &>(ref_))[cumulative_index + offset_];
 }
 
 template<typename T, size_t N, template<class> class C>
@@ -4298,14 +4341,14 @@ template<size_t M, typename>
 Tensor<T, N - M, C> Tensor<T, N, C>::operator[](Indices<M> const &indices)
 {
     static_assert(N > M, TOO_MANY_INDICES);
-    size_t cumul_index = 0;
+    size_t cumulative_index = 0;
     for (size_t i = 0; i < M; ++i)
-        cumul_index += strides_[M - i - 1] * indices[M - i - 1];
+        cumulative_index += strides_[M - i - 1] * indices[M - i - 1];
 
     return Tensor<T, N - M, C>(
             shape_.data() + M,
             strides_.data() + M,
-            offset_ + cumul_index,
+            offset_ + cumulative_index,
             ref_
     );
 }
@@ -4315,11 +4358,11 @@ template<size_t M, typename>
 T &Tensor<T, N, C>::operator[](Indices<M> const &indices)
 {
     static_assert(N == M, PANIC_ASSERTION);
-    size_t cumul_index = 0;
+    size_t cumulative_index = 0;
     for (size_t i = 0; i < N; ++i)
-        cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+        cumulative_index += strides_[N - i - 1] * indices[N - i - 1];
 
-    return ref_[cumul_index + offset_];
+    return ref_[cumulative_index + offset_];
 }
 
 template<typename T, size_t N, template<class> class C>
@@ -4334,22 +4377,22 @@ template<size_t M, typename>
 T const &Tensor<T, N, C>::operator[](Indices<M> const &indices) const
 {
     static_assert(N == M, PANIC_ASSERTION);
-    size_t cumul_index = 0;
+    size_t cumulative_index = 0;
     for (size_t i = 0; i < N; ++i)
-        cumul_index += strides_[N - i - 1] * indices[N - i - 1];
+        cumulative_index += strides_[N - i - 1] * indices[N - i - 1];
 
-    return (static_cast<C<T> const &>(ref_))[cumul_index + offset_];
+    return (static_cast<C<T> const &>(ref_))[cumulative_index + offset_];
 }
 
 template<typename U, size_t M, template<class> class C_>
 void Set(Tensor<U, M, C_> &tensor, Indices<M> const &indices, U &&value)
 {
     static_assert(M, PANIC_ASSERTION);
-    size_t cumul_index = tensor.offset_;
+    size_t cumulative_index = tensor.offset_;
     for (size_t i = 0; i < M; ++i)
-        cumul_index += tensor.strides_[M - i - 1] * indices[M - i - 1];
+        cumulative_index += tensor.strides_[M - i - 1] * indices[M - i - 1];
 
-    tensor.ref_.Set(cumul_index, std::forward<U>(value));
+    tensor.ref_.Set(cumulative_index, std::forward<U>(value));
 }
 
 template<typename T, size_t N, template<class> class C>
@@ -4359,19 +4402,13 @@ Tensor<T, N - sizeof...(Args), C> Tensor<T, N, C>::slice(Args... args)
     static_assert(N >= sizeof...(Slices) + sizeof...(args), SLICES_OUT_OF_BOUNDS);
     auto sliced_indices = std::array<bool, N>{};
 
-    // fill the array with `false`, place `true` where the indices are sliced
+    // place `true` where the indices are sliced, `false` o.w.
     std::fill(sliced_indices.begin(), sliced_indices.end(), false);
     meta::InsertValueIntoArray<bool, N, Slices...>{sliced_indices, true};
 
-    // slice dimensions (aka set to 0) not explicitly sliced
-    size_t unfilled_dimensions = N - sizeof...(Args) - sizeof...(Slices);
-    for (size_t i = 0; i < N; ++i) {
-        if (!unfilled_dimensions) break;
-        if (!sliced_indices[N - i - 1]) {
-            sliced_indices[N - i - 1] = true;
-            --unfilled_dimensions;
-        }
-    }
+    // slice dimensions (aka set to `true`) not explicitly sliced nor filled
+    details::FillFirstUncoveredN<bool, N>(sliced_indices, sliced_indices,
+            N - sizeof...(Args) - sizeof...(Slices), true);
 
     // expand `args` into Indices and forward both
     auto indices = Indices<sizeof...(args)>{(size_t) args...};
@@ -4410,22 +4447,13 @@ Tensor<T, N - M, C> Tensor<T, N, C>::slice(Indices<M> const &indices)
     static_assert(N >= M + sizeof...(Slices), SLICES_OUT_OF_BOUNDS);
     auto sliced_indices = std::array<bool, N>{};
 
-    // Initially fill the array with `false`
-    // place `true` where the indices are sliced
+    // place `true` where the indices are sliced, `false` o.w.
     std::fill(sliced_indices.begin(), sliced_indices.end(), false);
     meta::InsertValueIntoArray<bool, N, Slices...>{sliced_indices, true};
 
-    // slice dimensions (aka set `true`) not explicitly sliced nor
-    // filled by `indices`
-    size_t unfilled_dimensions = N - M - sizeof...(Slices);
-    for (size_t i = 0; i < N; ++i) {
-        if (!unfilled_dimensions) break;
-        if (!sliced_indices[N - i - 1]) {
-            sliced_indices[N - i - 1] = true;
-            --unfilled_dimensions;
-        }
-    }
-
+    // slice dimensions (aka set `true`) not explicitly sliced or filled
+    details::FillFirstUncoveredN<bool, N>(sliced_indices, sliced_indices,
+            N - M - sizeof...(Slices), true);
     return pSliceExpansion<M>(sliced_indices, indices);
 }
 
@@ -4459,12 +4487,10 @@ template<typename T, size_t N, template<class> class C>
 bool Tensor<T, N, C>::operator==(Tensor<T, N, C> const &tensor) const
 {
     assert((shape_ == tensor.shape_) && DIMENSION_MISMATCH);
-
     size_t indices_product = shape_.index_product();
     for (size_t i = 0; i < indices_product; ++i)
         if (ref_[i + offset_] != tensor.ref_[i + tensor.offset_])
             return false;
-
     return true;
 }
 
@@ -4473,12 +4499,10 @@ template<typename X>
 bool Tensor<T, N, C>::operator==(Tensor<X, N, C> const &tensor) const
 {
     assert((shape_ == tensor.shape_) && DIMENSION_MISMATCH);
-
     size_t index_product = shape_.index_product();
     for (size_t i = 0; i < index_product; ++i)
         if (ref_[i + offset_] != tensor.ref_[i + tensor.offset_])
             return false;
-
     return true;
 }
 
@@ -4491,7 +4515,7 @@ std::string Tensor<T, N, C>::str() const
             s += (is_left ? '[' : ']');
     };
 
-    size_t cumul_index = shape_.index_product();
+    size_t cumulative_index = shape_.index_product();
     size_t index = 0;
     size_t dim_capacities[N];
     std::copy_n(shape_.data(), N, dim_capacities);
@@ -4499,7 +4523,7 @@ std::string Tensor<T, N, C>::str() const
     add_brackets(N, true);
     s += StringFormat<value_type>{}(ref_[offset_]);
 
-    for (size_t i = 0; i < cumul_index - 1; ++i) {
+    for (size_t i = 0; i < cumulative_index - 1; ++i) {
         size_t bracket_count = 0;
         bool propogate = true;
         int dim_index = N - 1;
@@ -4546,25 +4570,25 @@ size_t Tensor<T, N, C>::pIndicesExpansion(meta::Sequence<I...>, Args... args) co
     };
 
     // sum reduce args after conversion
-    size_t cumul_index = 0;
-    VARDIAC_MAP(cumul_index += convert_index(args, I));
+    size_t cumulative_index = 0;
+    VARDIAC_MAP(cumulative_index += convert_index(args, I));
     (void) (convert_index);
-    return cumul_index;
+    return cumulative_index;
 }
 
 /* ------------ Expansion for Slice() ------------ */
 
 template<typename T, size_t N, template<class> class C>
 template<size_t M>
-Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
-        std::array<bool, N> &sliced_indices, Indices<M> const &indices
-)
+Tensor<T, N - M, C>
+Tensor<T, N, C>::pSliceExpansion(std::array<bool, N> &sliced_indices, Indices<M> const &indices)
 {
-    size_t offset = 0;
     auto dimensions = std::array<size_t, N - M>{};
     auto strides = std::array<size_t, N - M>{};
+    size_t offset = 0;
     size_t indices_i = 0;
     size_t tensor_i = 0;
+
     for (size_t i = 0; i < N; ++i) {
         if (!sliced_indices[i]) {
             assert((shape_[i] > indices[indices_i]) && INDEX_OUT_OF_BOUNDS);
@@ -4577,8 +4601,7 @@ Tensor<T, N - M, C> Tensor<T, N, C>::pSliceExpansion(
     }
 
     return Tensor<T, N - M, C>(
-            dimensions.begin(), dimensions.end(),
-            strides.begin(), strides.end(),
+            dimensions.begin(), dimensions.end(), strides.begin(), strides.end(),
             offset_ + offset, ref_
     );
 }
@@ -4723,7 +4746,7 @@ auto elemwise(FunctionType &&fn, Tensors &&... tensors)
     VARDIAC_MAP(assert(shape == tensors.shape() && SHAPE_MISMATCH));
 
     auto result = return_type(shape);
-    size_t cumul_index = shape.index_product();
+    size_t cumulative_index = shape.index_product();
     auto reference_indices = Indices<M>{};
     auto indices = std::array<size_t, sizeof...(Tensors) + 1>{};
     size_t const *const strides[sizeof...(Tensors) + 1] = {
@@ -4733,7 +4756,7 @@ auto elemwise(FunctionType &&fn, Tensors &&... tensors)
 
     auto sequence = typename meta::MakeIndexSequence<0, sizeof...(Tensors)>::sequence{};
 
-    for (size_t i = 0; i < cumul_index; ++i) {
+    for (size_t i = 0; i < cumulative_index; ++i) {
         details::ElemWiseForwardSequence(
                 result, indices[0], fn, indices.data() + 1,
                 std::forward_as_tuple(tensors...), sequence
@@ -5251,6 +5274,18 @@ U Tensor<T, N, C>::reduce(U &&initial_value, FunctionType &&fun) const
     return ret_val;
 }
 
+/** Given an expression, reduces the expression along the specified dimensions `Indices`.
+ *  The provided function `fn` must have arity equivalent to `sizeof...(Indices)`.
+ */
+template<typename T, size_t N, template<class> class C>
+template<typename FunctionType, size_t... ReducedIndices>
+Tensor<T, N - sizeof...(ReducedIndices), C> 
+Tensor<T, N, C>::reduce_dimensions(FunctionType &&fn) const
+{
+  return details::reduce_dimensions<FunctionType, Tensor<T, N, C>, ReducedIndices...>(
+      std::forward<FunctionType>(fn), *this);
+}
+
 /** Given a function `fn` and a variable sequence of Expressions, `exprs`,
  *  apply the function to the elements of `exprs` and return
  *  a new tensor of type, with shape equivalent to `Expressions`
@@ -5368,22 +5403,24 @@ U reduce(U &&initial_value, FunctionType &&fn, Expressions const &... exprs)
 }
 
 /** Given an expression, reduces the expression along the specified dimensions `Indices`.
-  * The provided function `fn` must have arity equivalent to `sizeof...(Indices)`.
-  */
-
-template<typename FunctionType, typename Expression, size_t... Indices>
+ *  The provided function `fn` must have arity equivalent to `sizeof...(Indices)`.
+ */
+template<typename FunctionType, typename Expression, size_t... ReducedIndices>
 Tensor<
-        typename Expression::value_type, Expression::rank() - sizeof...(Indices),
+        typename Expression::value_type, Expression::rank() - sizeof...(ReducedIndices),
         Expression::template container_type
 >
-reduce(FunctionType &&fn, Expression const &expression)
+reduce_dimensions(FunctionType &&fn, Expression const &expression)
 {
     // verify arguments are expressions
     static_assert(meta::AreExpressions<Expression>::value, EXPECTING_EXPRESSION);
 
     // if expression, evaluate and forward as rvalue reference,
     // if tensor, forward as lvalue reference
-    return details::reduce<Indices...>(std::forward<FunctionType>(fn), expression.eval());
+    auto tensor = expression.eval();
+
+    return details::reduce_dimensions<FunctionType, decltype(tensor), ReducedIndices...>(
+        std::forward<FunctionType>(fn), tensor);
 }
 
 /** Creates a Tensor whose elements are the elementwise std::sin evaluation of `rhs`.
@@ -5609,7 +5646,6 @@ Tensor<T, N, C>::Iterator::operator-(Tensor<T, N, C>::Iterator const &it) const 
     assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
     assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
     assert(stride_ == stride_);
-    // FIXME
     return ((std::ptrdiff_t) offset_ - (std::ptrdiff_t) it.offset_) / stride_;
 }
 
@@ -5904,7 +5940,7 @@ template<typename T, size_t N, template<class> class C>
 bool Tensor<T, N, C>::ReverseIterator::operator>(ReverseIterator const &it) const noexcept
 {
     assert(shape_ == it.shape_);
-    // FIXME
+    assert(strides_ == it.strides_);
     assert(stride_ == it.stride_);
     assert(ref_ == it.ref_);
     return offset_ > it.offset_;
@@ -5914,7 +5950,7 @@ template<typename T, size_t N, template<class> class C>
 bool Tensor<T, N, C>::ReverseIterator::operator>=(ReverseIterator const &it) const noexcept
 {
     assert(shape_ == it.shape_);
-    // FIXME
+    assert(strides_ == it.strides_);
     assert(stride_ == it.stride_);
     assert(ref_ == it.ref_);
     return offset_ <= it.offset_;
@@ -5926,8 +5962,8 @@ Tensor<T, N, C>::ReverseIterator::operator-(ReverseIterator const &it) const noe
 {
     assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
     assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
-    // FIXME
-    // assert(stride_ == it->stride_);
+    assert(strides_ == it->strides_);
+    assert(stride_ == it->stride_);
     return ((std::ptrdiff_t) it.offset_ - (std::ptrdiff_t) offset_) / stride_;
 }
 
@@ -6087,7 +6123,7 @@ bool Tensor<T, N, C>::ConstReverseIterator::operator>(
 ) const noexcept
 {
     assert(shape_ == it.shape_);
-    // FIXME
+    assert(strides_ == it.strides_);
     assert(stride_ == it.stride_);
     assert(ref_ == it.ref_);
     return offset_ > it.offset_;
@@ -6099,7 +6135,7 @@ bool Tensor<T, N, C>::ConstReverseIterator::operator>=(
 ) const noexcept
 {
     assert(shape_ == it.shape_);
-    // FIXME
+    assert(strides_ == it.strides_);
     assert(stride_ == it.stride_);
     assert(ref_ == it.ref_);
     return offset_ <= it.offset_;
@@ -6114,7 +6150,7 @@ Tensor<T, N, C>::ConstReverseIterator::operator-(
     assert(ref_ == it->ref_ && INVALID_ITERATOR_COMPARISON);
     assert((offset_ - it->offset_) % strides_[N - 1] == 0 && PANIC_ASSERTION);
     assert(stride_ == it.stride_);
-    // FIXME
+    assert(strides_ == it.strides_);
     return ((std::ptrdiff_t) it.offset_ - (std::ptrdiff_t) offset_) / stride_;
 }
 
@@ -6324,6 +6360,9 @@ public:
 
     explicit Shape() = default;
 
+    // to match @Shape<N> constructor
+    explicit Shape(std::array<size_t, 0> const &): Shape() {};
+
     Shape(Shape<0> const &) = default;
 
     /* -------------------- Getters --------------------- */
@@ -6405,10 +6444,12 @@ public:
 
     Indices() = default;
 
+    /* ----------------- Getters --------------- */
+
     /** This method is only defined because MSVC++ requires a definition
-   *  to be present, even if the method is never actually called.
-   *  An assertion is immediately called if this method is invoked.
-   */
+     *  to be present, even if the method is never actually called.
+     *  An assertion is immediately called if this method is invoked.
+     */
     size_t &operator[](size_t)
     {
         assert(0 && PANIC_ASSERTION);
@@ -6422,25 +6463,15 @@ public:
         return *(size_t *) this;
     }
 
-    /** This method is only defined because MSVC++ requires a definition
-   *  to be present, even if the method is never actually called.
-   *  An assertion immediately fails if this method is invoked.
-   */
-    bool increment(Shape<0> const &)
-    {
-        assert(0 && PANIC_ASSERTION);
-        return true;
-    }
+    /* ----------------- Utility --------------- */
 
-    /** This method is only defined because MSVC++ requires a definition
-   *  to be present, even if the method is never actually called.
-   *  An assertion immediately fails if this method is invoked.
-   */
-    bool decrement(Shape<0> const &)
-    {
-        assert(0 && PANIC_ASSERTION);
-        return true;
-    }
+    /** Since the rank is 0, immediately returns done */
+    bool increment(Shape<0> const &) { return false; }
+
+    /** Since the rank is 0, immediately returns done */
+    bool decrement(Shape<0> const &) { return false; }
+
+    std::string str() const { return "I{0}"; }
 
 private:
 
@@ -6575,6 +6606,12 @@ public:
     /** Returns the data as a const reference */
     value_type const &operator()() const
     { return ref_[offset_]; }
+
+    /** Returns the data as a reference */
+    value_type &operator[](Indices<0> const &) { return ref_[offset_]; }
+ 
+    /** Returns the data as a const reference */
+    value_type const &operator[](Indices<0> const &) const { return ref_[offset_]; }
 
     /** Creates a Scalar with the same underlying data */
     Tensor<T, 0, C> at()

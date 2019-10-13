@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -Wextra -fmax-errors=4 -g  -rdynamic CMakeFiles/test_assign.dir/assign.test.cc.o CMakeFiles/test_assign.dir/test.cc.o  -o assign  -L/usr/lib/x86_64-linux-gnu/libOpenCL.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libOpenCL.so -lOpenCL 

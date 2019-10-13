@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -Wextra -fmax-errors=4 -g  -rdynamic CMakeFiles/test_iterator.dir/iterator.test.cc.o CMakeFiles/test_iterator.dir/test.cc.o  -o iterator  -L/usr/lib/x86_64-linux-gnu/libOpenCL.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libOpenCL.so -lOpenCL 

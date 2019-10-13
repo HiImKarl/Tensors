@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -Wextra -fmax-errors=4 -g  -rdynamic CMakeFiles/benchmark_initialize.dir/initialize.benchmark.cc.o CMakeFiles/benchmark_initialize.dir/benchmark.cc.o  -o initialize  -L/usr/lib/x86_64-linux-gnu/libOpenCL.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libOpenCL.so -lbenchmark -lpthread 

@@ -235,11 +235,15 @@ template <template <class> class C>
 void MiscTests() {
   auto tensor_1 = Tensor<int32_t, 3, C>{2, 3, 4}; 
   auto tensor_2 = Tensor<int32_t, 3, C>{2, 3, 4}; 
+  auto sum_1 = int32_t{0};
 
-  for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
-    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
-      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+  for (size_t i = 0; i < tensor_1.dimension(0); ++i)
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j)
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k)
+      {
         tensor_1(i, j, k) = 100000 * i + 10000 * j + 1000 * k; 
+        sum_1 += 100000 * i + 10000 * j + 1000 * k;
+      }
 
   for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
@@ -262,9 +266,33 @@ void MiscTests() {
           REQUIRE(tensor_3(i, j, k) == (int)(200000 * i + 20000 * j + 2000 * k));
   }
 
-  SECTION("Reduction") {
-    auto scalar = reduce(10, [](int &x, int y, int z) { return x + y + z + 1; }, tensor_1, tensor_2);
-    REQUIRE(scalar == 10 + 2 * 3 * 4);
+  SECTION("Reduce") {
+    auto scalar_1 = reduce(
+        10, [](int x, int y, int z) { return x + y + z + 1; }, tensor_1, tensor_2);
+    REQUIRE(scalar_1 == 10 + 2 * 3 * 4);
+
+    auto scalar_2 = reduce(0, [](int x, int y) { return x + y; }, tensor_1);
+    REQUIRE(scalar_2 == sum_1);
+
+    REQUIRE(scalar_2 == tensor_1.reduce(0, [](int x, int y) { return x + y; })); 
+  }
+
+  SECTION("Reduce Dimensions") {
+    struct add {
+      int operator()(int x, int y) const { return x + y; }
+    };
+
+    auto scalar = reduce_dimensions<add, decltype(tensor_1), 0, 1, 2>(add{}, tensor_1);
+    REQUIRE(scalar == reduce(0, [](int &a, int b) { return a + b; }, tensor_1));
+
+    auto tensor = reduce_dimensions<add, decltype(tensor_1), 2>(add{}, tensor_1);
+    for (size_t i = 0; i < tensor.dimension(0); ++i)
+      for (size_t j = 0; j <  tensor.dimension(1); ++j)
+        REQUIRE(tensor(i, j) == 
+            tensor_1.template slice<2>(i, j).reduce(0, [](int a, int b) { return a + b; }));
+
+    REQUIRE(scalar == tensor_1.template reduce_dimensions<add, 0, 1, 2>(add{}));
+    REQUIRE(tensor == tensor_1.template reduce_dimensions<add, 2>(add{}));
   }
 
   SECTION("Sine") {
