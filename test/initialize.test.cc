@@ -5,7 +5,7 @@ using namespace tensor;
 
 template <template <class> class Container>
 void InitializingTensorTests() {
-  auto tensor_1 = Tensor<int32_t, 4, Container>{1, 2, 3, 4}; 
+  auto tensor_1 = Tensor<int32_t, 4, Container>{2, 3, 4, 5}; 
  
   for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
     for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
@@ -13,11 +13,11 @@ void InitializingTensorTests() {
         for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
           tensor_1(i, j, k, l) = 1000 * i + 100 * j + 10 * k + l; 
  
-  SECTION("Const correctness") { 
-    const auto& const_tensor = tensor_1; 
-    REQUIRE(!std::is_const<decltype(tensor_1(0, 1, 2))>::value); 
-    REQUIRE(std::is_const<decltype(const_tensor(0, 1, 2))>::value); 
-  } 
+  SECTION("Const correctness") {
+    const auto& const_tensor = tensor_1;
+    REQUIRE(!std::is_const<decltype(tensor_1(0, 0, 0))>::value); 
+    REQUIRE(std::is_const<decltype(const_tensor(0, 0, 0))>::value); 
+  }
  
   SECTION("Rank and Dimensions") { 
     REQUIRE(tensor_1.rank() == 4); 
@@ -25,8 +25,10 @@ void InitializingTensorTests() {
     REQUIRE(tensor_1.at(0, 0).rank() == 2); 
     REQUIRE(tensor_1.at(0, 0, 0).rank() == 1); 
     REQUIRE(tensor_1.at(0, 0, 0, 0).rank() == 0); 
-    for (size_t i = 0; i < 4; ++i) REQUIRE(tensor_1.dimension(i) == i + 1); 
-    for (size_t i = 0; i < 3; ++i) REQUIRE(tensor_1(0).dimension(i) == i + 2); 
+    for (size_t i = 0; i < 4; ++i) 
+      REQUIRE(tensor_1.dimension(i) == i + 2); 
+    for (size_t i = 0; i < 3; ++i) 
+      REQUIRE(tensor_1(0).dimension(i) == i + 3); 
   } 
  
   SECTION("Initializing Values") { 
@@ -53,6 +55,11 @@ void InitializingTensorTests() {
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
             REQUIRE(copy_tensor(i, j, k, l) == (int)(1000 * i + 100 * j + 10 * k + l)); 
+
+    auto copy_sub_tensor = tensor_1.template slice<0, 2>(1, 1);
+    for (size_t i = 0; i < tensor_1.dimension(0); ++i) 
+      for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
+        REQUIRE(copy_sub_tensor(i, k) == (int)(1000 * i + 10 * k + 101)); 
   } 
  
   SECTION("Move Constructor") { 
@@ -62,6 +69,11 @@ void InitializingTensorTests() {
         for (size_t k = 0; k < tensor_1.dimension(2); ++k) 
           for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
             REQUIRE(move_tensor(i, j, k, l) == (int)(1000 * i + 100 * j + 10 * k + l)); 
+
+    auto moved_sub_tensor = std::move(move_tensor.template slice<1, 3>(1, 1));
+    for (size_t j = 0; j < tensor_1.dimension(1); ++j) 
+      for (size_t l = 0; l < tensor_1.dimension(3); ++l) 
+        REQUIRE(moved_sub_tensor(j, l) == (int)(100 * j + l + 1010)); 
  } 
  
  SECTION("Value Constructor") { 
@@ -78,7 +90,8 @@ void InitializingTensorTests() {
  } 
  
  SECTION("C Multi-dimensional arrays") { 
-    Tensor<int32_t, 3, Container> naturals = _C<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); 
+    Tensor<int32_t, 3, Container> naturals = 
+      _C<int[1][6][2]>({{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 12}}}); 
     REQUIRE(naturals.rank() == 3); 
     REQUIRE(naturals.dimension(0) == 1); 
     REQUIRE(naturals.dimension(1) == 6); 
